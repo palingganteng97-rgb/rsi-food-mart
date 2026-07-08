@@ -3,102 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to RSI FOOD & MARK</title>
+    <title>RSI Food & Mark - Loading</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://jsdelivr.net"></script>
     <style>
-        /* Desain dasar halaman Splash Screen penuh */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1a1a1a; /* Warna latar gelap premium */
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-        }
-
-        .splash-container {
-            text-align: center;
-            color: #ffffff;
-            animation: fadeIn 1.2s ease-out;
-        }
-
-        /* Desain Logo Lingkaran Bulat */
-        .logo-box {
-            width: 100dp;
-            height: 100px;
-            background: linear-gradient(135deg, #76c000, #5a9200); /* Gradasi Hijau khas kuliner */
-            border-radius: 50%;
-            margin: 0 auto 20px auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 8px 25px rgba(118, 192, 0, 0.4);
-            position: relative;
-        }
-
-        /* Ikon Sendok Garpu Sederhana di dalam Logo */
-        .logo-icon {
-            font-size: 40px;
-        }
-
-        h1 {
-            font-size: 26px;
-            font-weight: bold;
-            letter-spacing: 2px;
-            margin: 0 0 8px 0;
-        }
-
-        p {
-            font-size: 13px;
-            color: #aaaaaa;
-            margin: 0 0 40px 0;
-            letter-spacing: 1px;
-        }
-
-        /* Efek Putaran Memuat Data (Loading Spinner) */
-        .spinner {
-            width: 35px;
-            height: 35px;
-            border: 3px solid rgba(255, 255, 255, 0.1);
-            border-radius: 50%;
-            border-top-color: #76c000; /* Warna hijau menyala */
-            margin: 0 auto;
-            animation: spin 0.8s linear infinite;
-        }
-
-        /* Animasi Transisi Teks */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loader { border-top-color: #34D399; animation: spin 1s linear infinite; }
     </style>
 </head>
-<body>
+<body class="bg-gray-900 flex flex-col items-center justify-center min-h-screen text-white select-none">
 
-    <div class="splash-container">
-        <!-- Bagian Logo Utama -->
-        <div class="logo-box">
-            <span class="logo-icon">🍽️</span>
+    <div class="text-center p-6">
+        <!-- Logo / Icon Rumah Sakit -->
+        <div class="mx-auto bg-emerald-600 p-5 rounded-full w-24 h-24 flex items-center justify-center shadow-lg shadow-emerald-900/50 mb-6 animate-pulse">
+            <svg xmlns="http://w3.org" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-12 h-12 text-white">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
         </div>
         
-        <!-- Nama Aplikasi Anda -->
-        <h1>RSI FOOD & MARK</h1>
-        <p>Click & Collect App</p>
+        <!-- Judul Aplikasi -->
+        <h1 class="text-3xl font-extrabold tracking-wide mb-2">RSI FOOD & MARK</h1>
+        <p class="text-gray-400 text-sm font-medium">Aplikasi Pemesanan Makanan Internal Rumah Sakit</p>
         
-        <!-- Komponen Loading -->
-        <div class="spinner"></div>
+        <!-- Spinner Loading -->
+        <div class="mt-12 flex justify-center">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-700 h-10 w-10"></div>
+        </div>
+        <p class="text-xs text-gray-500 mt-4 tracking-widest uppercase">Menyiapkan Layanan...</p>
     </div>
 
     <script>
-        // Logika Pengalihan Halaman Otomatis (Menggunakan Javascript)
-        // 3000 milidetik = 3 detik halaman pembuka akan muncul di layar
-        setTimeout(function() {
-            window.location.href = "menu.html";
+        // Simulasi inisialisasi menu bawaan jika LocalStorage masih kosong
+        if (!localStorage.getItem('menuMakanan')) {
+            const menuAwal = [
+                { id: 1, nama: "Bubur Ayam Nutrisi", harga: 15000, diet: "Diet Rendah Garam", gambar: "https://unsplash.com" },
+                { id: 2, nama: "Sup Sayur Bening", harga: 12000, diet: "Diet Serat Tinggi", gambar: "https://unsplash.com" }
+            ];
+            localStorage.setItem('menuMakanan', JSON.stringify(menuAwal));
+        }
+
+        // Otomatis pindah halaman ke home.html setelah 3 detik
+        setTimeout(() => {
+            window.location.href = 'home.html';
         }, 3000);
     </script>
 </body>
