@@ -1,51 +1,50 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RSI Food & Mark - Loading</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://jsdelivr.net"></script>
-    <style>
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .loader { border-top-color: #34D399; animation: spin 1s linear infinite; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RSI Food &amp; Mark - Loading</title>
+  <style>
+    :root{--bg:#020617;--emerald:#059669;--muted:rgba(255,255,255,.6)}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+    .card{text-align:center;width:100%;max-width:520px}
+    .iconBox{width:96px;height:96px;border-radius:24px;background:rgba(5,150,105,.92);box-shadow:0 25px 50px -12px rgba(4,120,87,.5);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+    .iconPlus{font-size:56px;line-height:1;font-weight:800}
+    h1{margin:0;font-size:26px;font-weight:800;letter-spacing:.5px}
+    .sub{margin-top:8px;color:var(--muted);font-size:13px}
+    .spinnerWrap{margin-top:28px;display:flex;justify-content:center}
+    .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,.14);border-top-color:var(--emerald);border-radius:50%;animation:spin .9s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .label{margin-top:16px;color:var(--muted);text-transform:uppercase;font-size:12px;letter-spacing:.08em}
+    .progress{margin-top:14px;height:8px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden}
+    .bar{height:100%;width:0;background:var(--emerald);animation:fill 3s linear forwards}
+    @keyframes fill{from{width:0%}to{width:100%}}
+  </style>
 </head>
-<body class="bg-gray-900 flex flex-col items-center justify-center min-h-screen text-white select-none">
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="iconBox" aria-hidden="true"><div class="iconPlus">+</div></div>
+      <h1>RSI FOOD &amp; MARK</h1>
+      <div class="sub">Aplikasi Pemesanan Makanan Rumah Sakit</div>
 
-    <div class="text-center p-6">
-        <!-- Logo / Icon Rumah Sakit -->
-        <div class="mx-auto bg-emerald-600 p-5 rounded-full w-24 h-24 flex items-center justify-center shadow-lg shadow-emerald-900/50 mb-6 animate-pulse">
-            <svg xmlns="http://w3.org" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-12 h-12 text-white">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-        </div>
-        
-        <!-- Judul Aplikasi -->
-        <h1 class="text-3xl font-extrabold tracking-wide mb-2">RSI FOOD & MARK</h1>
-        <p class="text-gray-400 text-sm font-medium">Aplikasi Pemesanan Makanan Internal Rumah Sakit</p>
-        
-        <!-- Spinner Loading -->
-        <div class="mt-12 flex justify-center">
-            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-700 h-10 w-10"></div>
-        </div>
-        <p class="text-xs text-gray-500 mt-4 tracking-widest uppercase">Menyiapkan Layanan...</p>
+      <div class="spinnerWrap" aria-live="polite" aria-busy="true">
+        <div class="spinner"></div>
+      </div>
+
+      <div class="label">Menyiapkan Layanan...</div>
+      <div class="progress" aria-hidden="true"><div class="bar"></div></div>
     </div>
+  </div>
 
-    <script>
-        // Simulasi inisialisasi menu bawaan jika LocalStorage masih kosong
-        if (!localStorage.getItem('menuMakanan')) {
-            const menuAwal = [
-                { id: 1, nama: "Bubur Ayam Nutrisi", harga: 15000, diet: "Diet Rendah Garam", gambar: "https://unsplash.com" },
-                { id: 2, nama: "Sup Sayur Bening", harga: 12000, diet: "Diet Serat Tinggi", gambar: "https://unsplash.com" }
-            ];
-            localStorage.setItem('menuMakanan', JSON.stringify(menuAwal));
-        }
-
-        // Otomatis pindah halaman ke home.html setelah 3 detik
-        setTimeout(() => {
-            window.location.href = 'home.html';
-        }, 3000);
-    </script>
+  <script>
+    setTimeout(function(){
+      window.location.href = 'home.html';
+    }, 3000);
+  </script>
 </body>
 </html>
+

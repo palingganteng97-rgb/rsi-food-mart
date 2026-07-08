@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRUD Admin - RSI Food &amp; Mark</title>
+
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+  :root {
+    --bg: #020617;
+    --panel: rgba(255, 255, 255, .06);
+    --panel-border: rgba(255, 255, 255, .10);
+    --text: rgba(255, 255, 255, .92);
+    --muted: rgba(255, 255, 255, .62);
+  }
+  body { background: var(--bg); color: var(--text); }
+  .panel { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 16px; overflow: hidden; }
+  .form-control, .form-select { background: rgba(0, 0, 0, .18) !important; border: 1px solid rgba(255, 255, 255, .14); color: var(--text) !important; }
+  .form-control::placeholder { color: rgba(255, 255, 255, .45) !important; }
+  .btn-outline-light { border-color: rgba(255, 255, 255, .25) !important; }
+  .table { color: var(--text); }
+  .table td, .table th { border-color: rgba(255, 255, 255, .10) !important; }
+  .table thead th { font-size: .9rem; color: rgba(255, 255, 255, .75); font-weight: 700; }
+  .badge-diet { border: 1px solid rgba(25, 135, 84, .55); background: rgba(25, 135, 84, .20); color: #d1fae5; }
+  .badge-muted { border: 1px solid rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .04); color: rgba(255, 255, 255, .78); }
+  .preview-img { width: 100%; aspect-ratio: 4/3; border-radius: 12px; border: 1px dashed rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .03); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .preview-img img { width: 100%; height: 100%; object-fit: cover; }
+  .small-muted { color: var(--muted); }
+  .sticky-actions { position: sticky; bottom: 0; background: rgba(2, 6, 23, .92); backdrop-filter: blur(6px); }
+</style>
+
+</head>
+<body>
+  <div class="container-fluid px-3 px-md-4 py-4" style="max-width: 1200px;">
+
+    <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
+      <div>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="badge rounded-pill text-bg-success bg-opacity-25 text-success-emphasis border border-success border-opacity-50 py-2 px-3">
+            <i class="bi bi-shield-lock me-2"></i> CRUD Admin
+          </span>
+        </div>
+        <h1 class="h4 mb-1">Kelola Menu Makanan</h1>
+        <div class="small-muted">Perubahan disimpan di <b>localStorage</b> (key: <b>menuMakanan</b>)</div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <a href="home.html" class="btn btn-outline-light">
+          <i class="bi bi-house-door me-2"></i> Ke Home
+        </a>
+        <button id="btnResetStorage" type="button" class="btn btn-outline-warning">
+          <i class="bi bi-arrow-clockwise me-2"></i> Reset Data
+        </button>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- Form -->
+      <div class="col-12 col-lg-5">
+        <div class="panel p-3 p-md-4 h-100">
+          <h2 class="h5 mb-3">
+            <i class="bi bi-pencil-square me-2"></i>
+            {"Mode": "Tambah/Edit"}
+            <span id="formModeLabel" class="badge badge-muted ms-2">Tambah</span>
+          </h2>
+
+          <form id="menuForm" autocomplete="off">
+            <input type="hidden" id="menuId" value="" />
+
+            <div class="mb-3">
+              <label class="form-label small-muted">Nama Menu</label>
+              <input id="namaInput" type="text" class="form-control" placeholder="Contoh: Nasi Ayam Penyet" required />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small-muted">Harga (Rp)</label>
+              <input id="hargaInput" type="number" min="0" step="1000" class="form-control" placeholder="Contoh: 25000" required />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small-muted">Diet</label>
+              <select id="dietInput" class="form-select" required>
+                <option value="Semua">Semua</option>
+                <option value="Diet Rendah Garam">Diet Rendah Garam</option>
+                <option value="Diet Serat Tinggi">Diet Serat Tinggi</option>
+                <option value="Diabetes">Diabetes</option>
+                <option value="Lunak">Lunak</option>
+              </select>
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label small-muted">Gambar (URL atau File)</label>
+              <input id="gambarUrlInput" type="url" class="form-control mb-2" placeholder="Tempel URL gambar (opsional)" />
+              <div class="input-group">
+                <input id="gambarFileInput" class="form-control" type="file" accept="image/*" />
+              </div>
+              <div class="form-text small-muted mt-2">
+                Jika memilih file, gambar akan disimpan sebagai Base64 di localStorage (bisa besar).
+              </div>
+            </div>
+
+            <div class="preview-img mt-3">
+              <div id="previewPlaceholder" class="text-center text-white-50">
+                <i class="bi bi-image fs-1"></i>
+                <div class="small-muted mt-2">Preview Gambar</div>
+              </div>
+              <img id="previewImg" class="d-none" alt="Preview" />
+            </div>
+
+            <div class="mt-4 d-flex gap-2 flex-wrap">
+              <button id="btnSubmit" type="submit" class="btn btn-success flex-grow-1">
+                <i class="bi bi-plus-circle me-2" id="btnSubmitIcon"></i>
+                <span id="btnSubmitText">Tambah Menu</span>
+              </button>
+              <button id="btnCancelEdit" type="button" class="btn btn-outline-light" style="display:none;">
+                <i class="bi bi-x-circle me-2"></i> Batal Edit
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="col-12 col-lg-7">
+        <div class="panel p-3 p-md-4">
+          <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">
+            <div>
+              <h2 class="h5 mb-1"><i class="bi bi-list-check me-2"></i> Daftar Menu</h2>
+              <div class="small-muted" id="countLabel">0 item</div>
+            </div>
+
+            <div class="d-flex gap-2 align-items-center">
+              <div class="input-group" style="min-width: 260px;">
+                <span class="input-group-text bg-dark bg-opacity-25 border-0 text-white-50">
+                  <i class="bi bi-search"></i>
+                </span>
+                <input id="searchInput" type="search" class="form-control bg-dark bg-opacity-25 border-0" placeholder="Cari nama menu..." />
+              </div>
+            </div>
+          </div>
+
+          <div class="table-responsive" style="max-height: 560px;">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th style="width: 52px;">#</th>
+                  <th>Menu</th>
+                  <th style="width: 160px;">Diet</th>
+                  <th style="width: 130px;">Harga</th>
+                  <th style="width: 160px;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody">
+                <!-- injected -->
+              </tbody>
+            </table>
+          </div>
+
+          <div id="emptyState" class="d-none text-center py-5">
+            <div class="mb-3">
+              <i class="bi bi-emoji-frown fs-1" style="color: rgba(255,255,255,.35)"></i>
+            </div>
+            <div class="h6 mb-1">Belum ada menu.</div>
+            <div class="small-muted">Isi form di kiri untuk menambah menu pertama.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-3 small-muted">
+      Tip: Untuk melihat hasil, buka <b>home.html</b>. Menu akan otomatis terbaca dari localStorage.
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    const STORAGE_KEY = 'menuMakanan';
+
+    const els = {
+      menuForm: document.getElementById('menuForm'),
+      menuId: document.getElementById('menuId'),
+      namaInput: document.getElementById('namaInput'),
+      hargaInput: document.getElementById('hargaInput'),
+      dietInput: document.getElementById('dietInput'),
+      gambarUrlInput: document.getElementById('gambarUrlInput'),
+      gambarFileInput: document.getElementById('gambarFileInput'),
+
+      previewImg: document.getElementById('previewImg'),
+      previewPlaceholder: document.getElementById('previewPlaceholder'),
+
+      btnSubmit: document.getElementById('btnSubmit'),
+      btnSubmitIcon: document.getElementById('btnSubmitIcon'),
+      btnSubmitText: document.getElementById('btnSubmitText'),
+      btnCancelEdit: document.getElementById('btnCancelEdit'),
+      formModeLabel: document.getElementById('formModeLabel'),
+
+      tableBody: document.getElementById('tableBody'),
+      emptyState: document.getElementById('emptyState'),
+      countLabel: document.getElementById('countLabel'),
+
+      searchInput: document.getElementById('searchInput'),
+      btnResetStorage: document.getElementById('btnResetStorage'),
+    };
+
+    const escapeHtml = (str) => {
+      return String(str ?? '')
+        .replaceAll('&','&amp;')
+        .replaceAll('<','<')
+        .replaceAll('>','>')
+        .replaceAll('"','"')
+        .replaceAll("'",'&#039;');
+    };
+
+    const randomId = () => 'id_' + Math.random().toString(16).slice(2) + '_' + Date.now();
+
+    const normalizeItem = (item) => {
+      return {
+        id: item?.id ?? randomId(),
+        nama: item?.nama ?? item?.judul ?? item?.namaMenu ?? '',
+        harga: item?.harga ?? item?.price ?? 0,
+        diet: item?.diet ?? item?.kategoriDiet ?? item?.kategori ?? 'Semua',
+        gambar: item?.gambar ?? item?.foto ?? item?.image ?? ''
+      };
+    };
+
+    const loadMenus = () => {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.map(normalizeItem);
+        if (parsed && Array.isArray(parsed.data)) return parsed.data.map(normalizeItem);
+        if (parsed && Array.isArray(parsed.menu)) return parsed.menu.map(normalizeItem);
+        return [];
+      } catch {
+        return [];
+      }
+    };
+
+    const saveMenus = (menus) => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(menus));
+    };
+
+    let menus = loadMenus();
+    let editModeId = null;
+
+    const setPreviewImage = (src) => {
+      if (src) {
+        els.previewPlaceholder.classList.add('d-none');
+        els.previewImg.classList.remove('d-none');
+        els.previewImg.src = src;
+      } else {
+        els.previewImg.classList.add('d-none');
+        els.previewImg.removeAttribute('src');
+        els.previewPlaceholder.classList.remove('d-none');
+      }
+    };
+
+    const readFileAsDataURL = (file) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    };
+
+    const resetForm = () => {
+      editModeId = null;
+      els.menuId.value = '';
+
+      els.menuForm.reset();
+      setPreviewImage('');
+
+      els.btnCancelEdit.style.display = 'none';
+      els.formModeLabel.textContent = 'Tambah';
+
+      els.btnSubmitIcon.className = 'bi bi-plus-circle me-2';
+      els.btnSubmitText.textContent = 'Tambah Menu';
+    };
+
+    const startEdit = (id) => {
+      const item = menus.find(m => String(m.id) === String(id));
+      if (!item) return;
+
+      editModeId = item.id;
+      els.menuId.value = item.id;
+
+      els.namaInput.value = item.nama ?? '';
+      els.hargaInput.value = item.harga ?? 0;
+      els.dietInput.value = item.diet ?? 'Semua';
+
+      els.gambarUrlInput.value = '';
+      els.gambarFileInput.value = '';
+
+      setPreviewImage(item.gambar || '');
+
+      els.btnCancelEdit.style.display = 'inline-flex';
+      els.formModeLabel.textContent = 'Edit';
+
+      els.btnSubmitIcon.className = 'bi bi-save2 me-2';
+      els.btnSubmitText.textContent = 'Simpan Perubahan';
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const removeMenu = (id) => {
+      const ok = confirm('Hapus menu ini?');
+      if (!ok) return;
+      menus = menus.filter(m => String(m.id) !== String(id));
+      saveMenus(menus);
+      renderTable();
+      if (editModeId && String(editModeId) === String(id)) resetForm();
+    };
+
+    const filteredMenus = () => {
+      const q = (els.searchInput.value || '').toLowerCase().trim();
+      if (!q) return menus;
+      return menus.filter(m => (m.nama || '').toLowerCase().includes(q));
+    };
+
+    const renderTable = () => {
+      const list = filteredMenus();
+      els.countLabel.textContent = `${menus.length} item`;
+
+      if (menus.length === 0) {
+        els.emptyState.classList.remove('d-none');
+        els.tableBody.innerHTML = '';
+        return;
+      }
+
+      els.emptyState.classList.add('d-none');
+
+      els.tableBody.innerHTML = '';
+
+      list.forEach((m, idx) => {
+        const tr = document.createElement('tr');
+
+        const dietBadge = m.diet && String(m.diet).trim() && String(m.diet).trim() !== 'Semua'
+          ? `<span class="badge badge-diet">${escapeHtml(m.diet)}</span>`
+          : `<span class="badge badge-muted">${escapeHtml(m.diet || 'Semua')}</span>`;
+
+        const gambar = m.gambar ? `<img src="${escapeHtml(m.gambar)}" alt="${escapeHtml(m.nama)}" style="width:56px;height:42px;object-fit:cover;border-radius:.6rem;border:1px solid rgba(255,255,255,.12);">` : `<i class="bi bi-image" style="font-size:1.4rem;color:rgba(255,255,255,.4)"></i>`;
+
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td>
+            <div class="d-flex align-items-center gap-3">
+              ${gambar}
+              <div>
+                <div class="fw-bold">${escapeHtml(m.nama || '-') || '-'}</div>
+                <div class="small-muted" style="max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">ID: ${escapeHtml(m.id)}</div>
+              </div>
+            </div>
+          </td>
+          <td>${dietBadge}</td>
+          <td><span class="fw-semibold">${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(m.harga || 0))}</span></td>
+          <td>
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-light btn-sm" type="button" data-edit="${escapeHtml(m.id)}">
+                <i class="bi bi-pencil"></i> Edit
+              </button>
+              <button class="btn btn-outline-danger btn-sm" type="button" data-del="${escapeHtml(m.id)}">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </div>
+          </td>
+        `;
+
+        els.tableBody.appendChild(tr);
+      });
+
+      // Bind buttons
+      els.tableBody.querySelectorAll('[data-edit]').forEach(btn => {
+        btn.addEventListener('click', () => startEdit(btn.getAttribute('data-edit')));
+      });
+      els.tableBody.querySelectorAll('[data-del]').forEach(btn => {
+        btn.addEventListener('click', () => removeMenu(btn.getAttribute('data-del')));
+      });
+    };
+
+    // Preview from URL
+    els.gambarUrlInput.addEventListener('input', () => {
+      const url = (els.gambarUrlInput.value || '').trim();
+      if (url) setPreviewImage(url);
+      else {
+        // if user typed nothing, keep preview from current (handled on load/edit)
+        if (!editModeId) setPreviewImage('');
+      }
+    });
+
+    // Preview from file
+    els.gambarFileInput.addEventListener('change', async () => {
+      const file = els.gambarFileInput.files && els.gambarFileInput.files[0];
+      if (!file) return;
+      const dataUrl = await readFileAsDataURL(file);
+      setPreviewImage(dataUrl);
+
+      // If user chooses file, we clear URL input so final source is base64
+      els.gambarUrlInput.value = '';
+    });
+
+    // Submit CRUD
+    els.menuForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const nama = (els.namaInput.value || '').trim();
+      const harga = Number(els.hargaInput.value || 0);
+      const diet = els.dietInput.value;
+
+      if (!nama) {
+        alert('Nama menu wajib diisi.');
+        els.namaInput.focus();
+        return;
+      }
+
+      if (!Number.isFinite(harga) || harga < 0) {
+        alert('Harga tidak valid.');
+        els.hargaInput.focus();
+        return;
+      }
+
+      // Determine gambar source
+      let gambar = '';
+      const url = (els.gambarUrlInput.value || '').trim();
+      const file = els.gambarFileInput.files && els.gambarFileInput.files[0];
+
+      if (file) {
+        gambar = await readFileAsDataURL(file);
+      } else if (url) {
+        gambar = url;
+      } else {
+        // Use current preview if already set during edit
+        const previewSrc = els.previewImg.classList.contains('d-none') ? '' : els.previewImg.src;
+        gambar = previewSrc || '';
+      }
+
+      if (editModeId) {
+        const idx = menus.findIndex(m => String(m.id) === String(editModeId));
+        if (idx !== -1) {
+          menus[idx] = normalizeItem({
+            id: editModeId,
+            nama,
+            harga,
+            diet,
+            gambar
+          });
+        }
+      } else {
+        const newItem = normalizeItem({
+          id: randomId(),
+          nama,
+          harga,
+          diet,
+          gambar
+        });
+        menus.unshift(newItem);
+      }
+
+      saveMenus(menus);
+      renderTable();
+      resetForm();
+    });
+
+    els.btnCancelEdit.addEventListener('click', () => resetForm());
+
+    els.searchInput.addEventListener('input', () => renderTable());
+
+    els.btnResetStorage.addEventListener('click', () => {
+      const ok = confirm('Reset semua data menu? Ini akan menghapus localStorage menuMakanan.');
+      if (!ok) return;
+      localStorage.removeItem(STORAGE_KEY);
+      menus = [];
+      resetForm();
+      renderTable();
+    });
+
+    // Init
+    renderTable();
+  </script>
+</body>
+</html>
+
