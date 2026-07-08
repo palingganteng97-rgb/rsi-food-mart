@@ -20,6 +20,8 @@
     <button id="btn-hamburger" onclick="toggleSidebar()" style="position: absolute; left: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #333;">☰</button>
     <span style="font-weight: bold; font-size: 20px;">RSI FOOD & MARK</span>
   </div>
+  
+  <!-- Bar Pencarian Makanan -->
   <div class="searchbar" role="search">
     <span class="search-ic">🔍</span>
     <input id="search" class="search-in" type="text" placeholder="Cari makanan..." autocomplete="off">
@@ -28,40 +30,18 @@
 
   <div class="banner">Click & Collect now available!</div>
 
-  <!-- Konten Utama Desktop & Mobile -->
+  <!-- Konten Utama Desktop & Mobile (Bersih Total dari Sisa Elemen Keranjang) -->
   <div id="main-konten">
-    <div class="menu-list" id="menu-list-container"><div style="text-align:center;padding:30px;color:#999;font-weight:700;width:100%;">Memuat menu...</div></div>
-    <aside class="desktop-cart-panel" id="cart-panel-desktop">
-      <span style="font-size:40px;margin-bottom:10px;">🛒</span>
-      <div class="cart-title">Keranjang</div>
-      <div class="cart-sub"><span id="cart-items-count">0</span> item</div>
-      <div class="cart-items" id="cart-items-desktop"></div>
-      <div class="cart-total"><span>Total</span><b id="cart-total-desktop">Rp 0</b></div>
-      <button class="btn-checkout" id="btn-checkout-desktop" type="button" disabled>Checkout</button>
-    </aside>
-  </div>
-  <div class="bottom-sheet" id="cart-sheet-mobile">
-    <div class="bottom-sheet-head"><div><b>Keranjang</b> <span id="cart-items-count-mobile">0</span> item</div><button class="sheet-close" type="button" onclick="tutupCartSheet()">×</button></div>
-    <div class="bottom-sheet-body"><div class="cart-items" id="cart-items-mobile"></div></div>
-    <div class="bottom-sheet-foot"><div class="cart-total"><span>Total</span><b id="cart-total-mobile">Rp 0</b></div><button class="btn-checkout" id="btn-checkout-mobile" type="button" disabled>Checkout</button></div>
-  </div>
-  <div class="modal" id="checkout-modal" role="dialog" aria-modal="true">
-    <div class="modal-card"><div class="modal-title">Konfirmasi</div><div class="modal-desc" id="checkout-desc">Pesanan Anda akan dikirim.</div><div class="modal-actions"><button class="btn-muted" type="button" id="btn-close-modal">Batal</button><button class="btn-ok" type="button" id="btn-ok-checkout">Konfirmasi</button></div></div>
-  </div>
-
-  <!-- Navigasi Bawah Menempel Layar -->
-  <div class="bottom-nav">
-    <a href="#" class="nav-item">🏠<div>Home</div></a>
-    <a href="#" class="nav-item">🛒<div>Keranjang</div></a>
-    <a href="#" class="nav-item">🔍<div>Cari</div></a>
-    <a href="#" class="nav-item">💬<div>Chat</div></a>
-    <a href="#" class="nav-item">👤<div>Profile</div></a>
+    <div class="menu-list" id="menu-list-container">
+      <div style="text-align:center;padding:30px;color:#999;font-weight:700;width:100%;">Memuat menu...</div>
+    </div>
   </div>
 
 </div> <!-- Akhir dari app-container -->
 
-<!-- Urutan script: Panggil aset sidebar asli Anda terlebih dahulu sebelum menu.js -->
+<!-- Urutan script: Panggil aset sidebar, navigasi eksternal, baru logika utama menu -->
 <script src="sidebar.js"></script>
+<script src="bottom-nav.js"></script>
 <script src="menu.js"></script>
 </body>
 </html>

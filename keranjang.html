@@ -1,124 +1,180 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Keranjang Belanja - RSI FOOD & MARK</title>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f5f5f5; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 90vh; margin: 0; box-sizing: border-box; }
-        .cart-container { width: 100%; max-width: 700px; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); box-sizing: border-box; }
-        h2 { margin-top: 0; color: #333; text-align: center; font-size: 26px; margin-bottom: 20px; border-bottom: 2px solid #f5f5f5; padding-bottom: 15px; }
-        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; }
-        .item-info h4 { margin: 0 0 5px 0; color: #333; font-size: 16px; }
-        .item-info p { margin: 0; font-size: 13px; color: #888; }
-        .item-price { font-size: 14px; color: #76c000; font-weight: bold; margin-top: 5px; display: block; }
-        .qty-control { display: flex; align-items: center; gap: 12px; }
-        .btn-qty { border: 1px solid #ccc; background: white; border-radius: 6px; width: 30px; height: 30px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
-        .btn-qty.plus { background: #76c000; color: white; border: none; }
-        .btn-qty:hover { opacity: 0.8; }
-        .qty-val { font-weight: bold; font-size: 15px; min-width: 15px; text-align: center; }
-        .total-section { margin-top: 30px; display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #eee; padding-top: 20px; }
-        .total-section strong { font-size: 18px; color: #333; }
-        .total-price { font-size: 22px; color: #76c000; font-weight: bold; }
-        .btn-process { background-color: #76c000; color: white; border: none; padding: 14px; width: 100%; border-radius: 25px; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 25px; box-shadow: 0 4px 10px rgba(118,192,0,0.2); transition: background 0.2s ease; }
-        .btn-process:hover { background-color: #65a300; }
-        .link-back { display: block; text-align: center; margin-top: 15px; color: #007bff; text-decoration: none; font-size: 14px; }
-        .empty-cart { text-align: center; padding: 40px 0; color: #999; }
-        .empty-icon { font-size: 60px; display: block; margin-bottom: 10px; }
-        @media (max-width: 480px) { body { padding: 10px; } .cart-container { padding: 20px; } h2 { font-size: 22px; } .total-price { font-size: 19px; } }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout Pasien - RSI FOOD & MARK</title>
+  <link rel="icon" href="data:,">
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background: #f4f6f9; margin: 0; padding: 0; display: flex; justify-content: center; }
+    .wrap { width: 100%; max-width: 600px; background: #fff; min-height: 100vh; padding: 15px; box-sizing: border-box; padding-bottom: 100px; position: relative; box-shadow: 0 0 15px rgba(0,0,0,0.05); }
+    .header { background: #fff; padding: 14px 0; display: flex; align-items: center; border-bottom: 1px solid #eee; margin-bottom: 15px; }
+    .btn-back { background: none; border: none; font-size: 20px; cursor: pointer; color: #333; margin-right: 15px; text-decoration: none; }
+    .section-title { font-weight: bold; color: #222; font-size: 15px; margin: 15px 0 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    /* Kardus Info Lokasi RS */
+    .hospital-box { background: #eef7e8; border: 1px solid #cce8b5; border-radius: 12px; padding: 15px; margin-bottom: 20px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 12px; font-weight: bold; color: #555; margin-bottom: 4px; }
+    .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; background: #fff; }
+    
+    /* Item Belanjaan */
+    .list { border: 1px solid #eee; border-radius: 12px; padding: 10px 14px; background: #fff; }
+    .item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f8f8f8; }
+    .item:last-child { border-bottom: none; }
+    .meta { display: flex; gap: 12px; align-items: center; }
+    .thumb { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; background: #eee; }
+    .name { font-weight: bold; color: #333; font-size: 14px; margin: 0; }
+    .qty-tag { font-size: 12px; color: #777; margin: 2px 0 0; }
+    .price { color: #222; font-weight: bold; font-size: 14px; }
+    .qty-controls { display: flex; align-items: center; gap: 8px; }
+    .qty-controls button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #ddd; background: #fff; cursor: pointer; font-weight: bold; }
+    
+    /* Bar Kunci Bawah ala Grab */
+    .grab-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 600px; background: #fff; padding: 15px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; z-index: 9999; }
+    .btn-order { background: #76c000; color: #fff; border: none; padding: 12px 28px; border-radius: 10px; font-weight: bold; font-size: 15px; cursor: pointer; }
+    .btn-order:disabled { background: #ccc; cursor: not-allowed; }
+    .empty { color: #999; text-align: center; padding: 30px 0; font-size: 14px; }
+  </style>
 </head>
 <body>
 
-    <div class="cart-container">
-        <h2>Keranjang Belanja</h2>
-        
-        <!-- Wadah List Pesanan -->
-        <div id="list-keranjang"></div>
+<div class="wrap">
+  <div class="header">
+    <a href="menu.html" class="btn-back">📋</a>
+    <b style="font-size: 18px;">Konfirmasi Pesanan Pasien</b>
+  </div>
 
-        <!-- Bagian Total Bayar -->
-        <div class="total-section">
-            <strong>Total Bayar:</strong>
-            <span class="total-price" id="total-bayar">Rp 0</span>
-        </div>
-
-        <button class="btn-process" onclick="prosesPesanan()">PROSES PESANAN</button>
-        <a href="menu.html" class="link-back">➔ Kembali Pilih Menu</a>
+  <!-- 1. FORM LOKASI INTERNAL RUMAH SAKIT (SUDAH DIUBAH JADI KOLOM TEKS) -->
+  <div class="section-title">📍 Tujuan Pengantaran Internal</div>
+  <div class="hospital-box">
+    <div class="form-group">
+      <label>Gedung / Sayap</label>
+      <!-- Diubah dari select menjadi input teks biasa -->
+      <input type="text" id="lokasi-gedung" placeholder="Contoh: Gedung Utama (A)">
     </div>
+    <div class="form-group">
+      <label>Lantai</label>
+      <!-- Diubah dari select menjadi input teks biasa -->
+      <input type="text" id="lokasi-lantai" placeholder="Contoh: Lantai 3">
+    </div>
+    <div class="form-group">
+      <label>Nomor Kamar / Nama Ruangan / Ruang Tunggu Poli</label>
+      <input type="text" id="lokasi-detail" placeholder="Contoh: Kamar 302 Bed B / Ruang Tunggu Poli Anak" required>
+    </div>
+    <div class="form-group">
+      <label>Nama Pemesan / Pasien</label>
+      <input type="text" id="nama-pemesan" placeholder="Masukkan nama Anda" required>
+    </div>
+  </div>
 
-    <script>
-        // Fungsi untuk merender/menampilkan item dari localStorage
-        function muatKeranjang() {
-            const wadah = document.getElementById("list-keranjang");
-            let keranjang = JSON.parse(localStorage.getItem("keranjang_belanja")) || [];
-            
-            if (keranjang.length === 0) {
-                wadah.innerHTML = `
-                    <div class="empty-cart">
-                        <span class="empty-icon">🛒</span>
-                        <p style="font-weight: 600; margin: 0;">Keranjang belanja Anda kosong</p>
-                    </div>`;
-                document.getElementById("total-bayar").innerText = "Rp 0";
-                return;
-            }
+  <!-- 2. RINGKASAN PESANAN -->
+  <div class="section-title">🍔 Ringkasan Menu Hidangan</div>
+  <div class="list">
+    <div id="list-items"></div>
+  </div>
+  
+  <!-- 3. BAR PEMBAYARAN KUNCI BAWAH ALA GRAB -->
+  <div class="grab-bar">
+    <div>
+      <div style="font-size: 11px; color: #777; text-transform: uppercase;">Total Pembayaran</div>
+      <b id="total-bayar" style="font-size: 20px; color: #76c000;">Rp 0</b>
+    </div>
+    <button id="btnPlaceOrder" class="btn-order" type="button" disabled>Tempatkan Pesanan</button>
+  </div>
+</div>
 
-            let htmlKonten = "";
-            let totalBayar = 0;
+<script>
+  const CART_KEY = 'cart_belanja';
+  let cart = [];
 
-            keranjang.forEach((item, index) => {
-                // Konversi harga string (contoh: "15.000") menjadi angka murni untuk dihitung
-                let hargaAngka = parseInt(item.harga.replace(/\./g, '')) || 0;
-                let subTotal = hargaAngka * item.jumlah;
-                totalBayar += subTotal;
+  function rupiah(n) { return 'Rp ' + (Number(n) || 0).toLocaleString('id-ID'); }
+  function parseHarga(s) { return parseInt(String(s || '0').replace(/\./g, '')) || 0; }
+  
+  function loadCart() { try { cart = JSON.parse(localStorage.getItem(CART_KEY)) || []; } catch(e) { cart = []; } }
+  function saveCart() { localStorage.setItem(CART_KEY, JSON.stringify(cart)); }
+  function hitungTotal() { return cart.reduce((a, b) => a + parseHarga(b.harga) * b.jumlah, 0); }
 
-                htmlKonten += `
-                    <div class="cart-item">
-                        <div class="item-info">
-                            <h4>${item.nama}</h4>
-                            <p>${item.deskripsi || 'Menu Lezat'}</p>
-                            <span class="item-price">Rp ${item.harga}</span>
-                        </div>
-                        <div class="qty-control">
-                            <button class="btn-qty" onclick="ubahJumlah(${index}, -1)">-</button>
-                            <span class="qty-val">${item.jumlah}</span>
-                            <button class="btn-qty plus" onclick="ubahJumlah(${index}, 1)">+</button>
-                        </div>
-                    </div>`;
-            });
+  function renderCart() {
+    const listEl = document.getElementById('list-items');
+    const totalEl = document.getElementById('total-bayar');
+    const btnOrder = document.getElementById('btnPlaceOrder');
+    
+    const t = hitungTotal();
+    totalEl.textContent = rupiah(t);
+    btnOrder.disabled = cart.length === 0;
 
-            wadah.innerHTML = htmlKonten;
-            document.getElementById("total-bayar").innerText = "Rp " + totalBayar.toLocaleString('id-ID');
-        }
+    if (!cart.length) {
+      listEl.innerHTML = '<div class="empty">Belum ada makanan di keranjang Anda.</div>';
+      return;
+    }
 
-        // Fungsi memperbarui kuantitas (tambah / kurang)
-        function ubahJumlah(index, perubahan) {
-            let keranjang = JSON.parse(localStorage.getItem("keranjang_belanja")) || [];
-            keranjang[index].jumlah += perubahan;
+    listEl.innerHTML = cart.map((it, i) => `
+      <div class="item">
+        <div class="meta">
+          <img class="thumb" src="${it.foto || ''}" onerror="this.style.display='none'"/>
+          <div>
+            <p class="name">${it.nama}</p>
+            <p class="qty-tag">Jumlah: ${it.jumlah} porsi</p>
+          </div>
+        </div>
+        <div class="qty-controls">
+          <button type="button" onclick="ubahQty(${i},-1)">-</button>
+          <span class="price">${rupiah(parseHarga(it.harga) * it.jumlah)}</span>
+          <button type="button" onclick="ubahQty(${i},1)">+</button>
+        </div>
+      </div>
+    `).join('');
+  }
 
-            // Jika jumlah item habis (0), hapus dari keranjang
-            if (keranjang[index].jumlah <= 0) {
-                keranjang.splice(index, 1);
-            }
+  function ubahQty(i, d) {
+    if (!cart[i]) return;
+    cart[i].jumlah += d;
+    if (cart[i].jumlah <= 0) cart.splice(i, 1);
+    saveCart();
+    renderCart();
+  }
 
-            localStorage.setItem("keranjang_belanja", JSON.stringify(keranjang));
-            muatKeranjang(); // Render ulang tampilan halaman
-        }
+  // PROSES PENGIRIMAN DATA CHECKOUT KE SERVER PHP NYATA
+  async function tempatkanPesanan() {
+    const gedung = document.getElementById('lokasi-gedung').value;
+    const lantai = document.getElementById('lokasi-lantai').value;
+    const detail = document.getElementById('lokasi-detail').value.trim();
+    const nama = document.getElementById('nama-pemesan').value.trim();
 
-        // Fungsi ketika tombol proses pesanan ditekan
-        function prosesPesanan() {
-            let keranjang = JSON.parse(localStorage.getItem("keranjang_belanja")) || [];
-            if(keranjang.length === 0) {
-                alert("Keranjang Anda masih kosong!");
-                return;
-            }
-            alert("Pesanan Anda berhasil diproses! Silakan tunggu konfirmasi penjual.");
-            // Opsional: Kosongkan keranjang setelah checkout sukses
-            // localStorage.removeItem("keranjang_belanja");
-            // window.location.href = "menu.html";
-        }
+    if (!detail || !nama) {
+      alert('Mohon isi nama dan detail nomor kamar/ruangan pengantaran!');
+      return;
+    }
 
-        // Jalankan fungsi otomatis saat halaman terbuka
-        document.addEventListener("DOMContentLoaded", muatKeranjang);
-    </script>
+    const payload = {
+      id_transaksi: 'RSI-' + Date.now(),
+      nama_pasien: nama,
+      tujuan: { gedung, lantai, detail_ruangan: detail },
+      menu_dipesan: cart.map(x => ({ nama: x.nama, jumlah: x.jumlah, harga: x.harga })),
+      total_pembayaran: hitungTotal(),
+      waktu_order: new Date().toLocaleString('id-ID')
+    };
+
+    try {
+      const res = await fetch('ambil-pesanan.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      if (res.ok) {
+        alert(`Pesanan Sukses Dibuat!\nMakanan Anda akan segera diantar ke ${gedung}, ${lantai}, ${detail}.`);
+        localStorage.removeItem(CART_KEY);
+        window.location.href = 'menu.html'; // Balik ke menu utama
+      }
+    } catch(e) {
+      alert('Gagal mengirim pesanan ke server gizi/kantin.');
+    }
+  }
+
+  document.getElementById('btnPlaceOrder').addEventListener('click', tempatkanPesanan);
+  document.addEventListener('DOMContentLoaded', () => { loadCart(); renderCart(); });
+</script>
 </body>
 </html>
