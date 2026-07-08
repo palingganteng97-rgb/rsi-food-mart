@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSI FOOD & MARK - Daftar Menu</title>
+    
+    <!-- BARIS KUNCI: Menghubungkan ke file CSS eksternal agar VS Code tidak penuh -->
+    <link rel="stylesheet" href="style.css">
+    <!-- BARIS BARU: Sambinkan file kustom sidebar -->
+    <link rel="stylesheet" href="sidebar.css">
+    
+    <!-- Gaya Tambahan untuk Angka Indikator Keranjang -->
+    <style>
+        .badge-keranjang { background-color: #ff3b30; color: white; border-radius: 50%; padding: 2px 6px; font-size: 11px; font-weight: bold; position: absolute; top: 2px; right: 15px; display: none; }
+        .nav-item { position: relative; }
+    </style>
+</head>
+<body>
+
+    <div class="phone-container">
+        <!-- 1. TOMBOL HAMBURGER (Tiga Garis) Untuk Pemicu Sidebar -->
+        <button class="btn-hamburger" onclick="bukaSidebar()">☰</button>
+
+        <!-- 2. WADAH DUDUKAN SIDEBAR: Isi file sidebar.html akan otomatis disuntikkan ke sini -->
+        <div id="wadah-sidebar"></div>
+
+        <!-- 3. DROPDOWN KOTAK PENCARIAN TERSEMBUNYI -->
+        <div class="search-bar-container" id="search-bar-wrapper">
+            <div class="search-input-wrapper">
+                <span>🔍</span>
+                <input type="text" id="input-pencarian" placeholder="Cari makanan favoritmu..." oninput="filterMakanan(this.value)">
+            </div>
+            <button class="btn-close-search" onclick="tutupKolomCari()">✕</button>
+        </div>
+
+        <!-- 4. HEADER & BANNER APLIKASI -->
+        <div class="header">RSI FOOD & MARK</div>
+        <div class="banner">Click & Collect now available!</div>
+        
+        <!-- 5. MAIN KONTEN UTAMA -->
+        <main id="main-konten">
+            <div style="text-align: center; padding: 40px 20px; color: #888;">
+                Memuat menu...
+            </div>
+        </main>
+
+        <!-- 6. MENU NAVIGASI BAWAH (Urutan Tombol Rapi) -->
+        <nav class="bottom-nav">
+            <div class="nav-item active" onclick="gantiTab('home')">
+                <span class="nav-icon">🏠</span>
+                <span>Home</span>
+            </div>
+            <!-- Modifikasi: Mengubah Orders Menjadi Keranjang Ber-Badge Angka -->
+            <div class="nav-item" onclick="bukaHalamanKeranjang()">
+                <span class="badge-keranjang" id="jumlah-keranjang">0</span>
+                <span class="nav-icon">🛒</span>
+                <span>Keranjang</span>
+            </div>
+            <!-- Tombol Cari Tetap Berfungsi Sebagai Pemicu Dropdown Atas -->
+            <div class="nav-item" onclick="bukaKolomCari()">
+                <span class="nav-icon">🔍</span>
+                <span>Cari</span>
+            </div>
+            <div class="nav-item" onclick="gantiTab('chat')">
+                <span class="nav-icon">💬</span>
+                <span>Chat</span>
+            </div>
+            <div class="nav-item" onclick="gantiTab('profile')">
+                <span class="nav-icon">👤</span>
+                <span>Profile</span>
+            </div>
+        </nav>
+    </div>
+
+<!-- 1. SELIPKAN PANGGILAN FILE BARU ANDA DI SINI -->
+<script src="sidebar.js"></script>
+
+<!-- 2. INI SCRIPT UTAMA HALAMAN MENU (dipindahkan ke menu.js) -->
+<script src="menu.js"></script>
+
+<!-- 3. SCRIPT LOGIC OPERASIONAL KERANJANG BELANJA -->
+<script>
+    // Fungsi memperbarui total angka pesanan di ikon navigasi bawah
+    function perbaruiBadgeKeranjang() {
+        const badge = document.getElementById("jumlah-keranjang");
+        let keranjang = JSON.parse(localStorage.getItem("keranjang_belanja")) || [];
+        
+        // Hitung total kuantitas barang yang dipesan pembeli
+        let totalItem = keranjang.reduce((sum, item) => sum + item.jumlah, 0);
+        
+        if (totalItem > 0) {
+            badge.innerText = totalItem;
+            badge.style.display = "block"; // Tampilkan lingkaran merah jika ada isi
+        } else {
+            badge.style.display = "none";  // Sembunyikan lingkaran jika kosong
+        }
+    }
+
+    // Fungsi pemicu navigasi ketika ikon keranjang ditekan
+    function bukaHalamanKeranjang() {
+        // Mengarahkan pembeli langsung ke halaman daftar rincian belanjaan
+        window.location.href = "keranjang.html";
+    }
+
+    // Jalankan penghitung angka otomatis saat halaman menu pertama kali dibuka oleh pembeli
+    document.addEventListener("DOMContentLoaded", perbaruiBadgeKeranjang);
+</script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keranjang Belanja - RSI FOOD & MARK</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f5f5f5; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 90vh; margin: 0; box-sizing: border-box; }
+        .cart-container { width: 100%; max-width: 700px; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); box-sizing: border-box; }
+        h2 { margin-top: 0; color: #333; text-align: center; font-size: 26px; margin-bottom: 20px; border-bottom: 2px solid #f5f5f5; padding-bottom: 15px; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #eee; }
+        .item-info h4 { margin: 0 0 5px 0; color: #333; font-size: 16px; }
+        .item-info p { margin: 0; font-size: 13px; color: #888; }
+        .item-price { font-size: 14px; color: #76c000; font-weight: bold; margin-top: 5px; display: block; }
+        .qty-control { display: flex; align-items: center; gap: 12px; }
+        .btn-qty { border: 1px solid #ccc; background: white; border-radius: 6px; width: 30px; height: 30px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .btn-qty.plus { background: #76c000; color: white; border: none; }
+        .btn-qty:hover { opacity: 0.8; }
+        .qty-val { font-weight: bold; font-size: 15px; min-width: 15px; text-align: center; }
+        .total-section { margin-top: 30px; display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #eee; padding-top: 20px; }
+        .total-section strong { font-size: 18px; color: #333; }
+        .total-price { font-size: 22px; color: #76c000; font-weight: bold; }
+        .btn-process { background-color: #76c000; color: white; border: none; padding: 14px; width: 100%; border-radius: 25px; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 25px; box-shadow: 0 4px 10px rgba(118,192,0,0.2); transition: background 0.2s ease; }
+        .btn-process:hover { background-color: #65a300; }
+        .link-back { display: block; text-align: center; margin-top: 15px; color: #007bff; text-decoration: none; font-size: 14px; }
+        .empty-cart { text-align: center; padding: 40px 0; color: #999; }
+        .empty-icon { font-size: 60px; display: block; margin-bottom: 10px; }
+        @media (max-width: 480px) { body { padding: 10px; } .cart-container { padding: 20px; } h2 { font-size: 22px; } .total-price { font-size: 19px; } }
+    </style>
+</head>
+<body>
+
+    <div class="cart-container">
+        <h2>Keranjang Belanja</h2>
+        
+        <!-- Wadah List Pesanan -->
+        <div id="list-keranjang"></div>
+
+        <!-- Bagian Total Bayar -->
+        <div class="total-section">
+            <strong>Total Bayar:</strong>
+            <span class="total-price" id="total-bayar">Rp 0</span>
+        </div>
+
+        <button class="btn-process" onclick="prosesPesanan()">PROSES PESANAN</button>
+        <a href="menu.html" class="link-back">➔ Kembali Pilih Menu</a>
+    </div>
+
+    <script>
+        // Fungsi untuk merender/menampilkan item dari localStorage
+        function muatKeranjang() {
+            const wadah = document.getElementById("list-keranjang");
+            let keranjang = JSON.parse(localStorage.getItem("keranjang_belanja")) || [];
+            
+            if (keranjang.length === 0) {
+                wadah.innerHTML = `
+                    <div class="empty-cart">
+                        <span class="empty-icon">🛒</span>
+                        <p style="font-weight: 600; margin: 0;">Keranjang belanja Anda kosong</p>
+                    </div>`;
+                document.getElementById("total-bayar").innerText = "Rp 0";
+                return;
+            }
+
+            let htmlKonten = "";
+            let totalBayar = 0;
+
+            keranjang.forEach((item, index) => {
+                // Konversi harga string (contoh: "15.000") menjadi angka murni untuk dihitung
+                let hargaAngka = parseInt(item.harga.replace(/\./g, '')) || 0;
+                let subTotal = hargaAngka * item.jumlah;
+                totalBayar += subTotal;
+
+                htmlKonten += `
+                    <div class="cart-item">
+                        <div class="item-info">
+                            <h4>${item.nama}</h4>
+                            <p>${item.deskripsi || 'Menu Lezat'}</p>
+                            <span class="item-price">Rp ${item.harga}</span>
+                        </div>
+                        <div class="qty-control">
+                            <button class="btn-qty" onclick="ubahJumlah(${index}, -1)">-</button>
+                            <span class="qty-val">${item.jumlah}</span>
+                            <button class="btn-qty plus" onclick="ubahJumlah(${index}, 1)">+</button>
+                        </div>
+                    </div>`;
+            });
+
+            wadah.innerHTML = htmlKonten;
+            document.getElementById("total-bayar").innerText = "Rp " + totalBayar.toLocaleString('id-ID');
+        }
+
+        // Fungsi memperbarui kuantitas (tambah / kurang)
+        function ubahJumlah(index, perubahan) {
+            let keranjang = JSON.parse(localStorage.getItem("keranjang_belanja")) || [];
+            keranjang[index].jumlah += perubahan;
+
+            // Jika jumlah item habis (0), hapus dari keranjang
+            if (keranjang[index].jumlah <= 0) {
+                keranjang.splice(index, 1);
+            }
+
+            localStorage.setItem("keranjang_belanja", JSON.stringify(keranjang));
+            muatKeranjang(); // Render ulang tampilan halaman
+        }
+
+        // Fungsi ketika tombol proses pesanan ditekan
+        function prosesPesanan() {
+            let keranjang = JSON.parse(localStorage.getItem("keranjang_belanja")) || [];
+            if(keranjang.length === 0) {
+                alert("Keranjang Anda masih kosong!");
+                return;
+            }
+            alert("Pesanan Anda berhasil diproses! Silakan tunggu konfirmasi penjual.");
+            // Opsional: Kosongkan keranjang setelah checkout sukses
+            // localStorage.removeItem("keranjang_belanja");
+            // window.location.href = "menu.html";
+        }
+
+        // Jalankan fungsi otomatis saat halaman terbuka
+        document.addEventListener("DOMContentLoaded", muatKeranjang);
+    </script>
+</body>
+</html>

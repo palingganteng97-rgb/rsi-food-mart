@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to RSI FOOD & MARK</title>
+    <style>
+        /* Desain dasar halaman Splash Screen penuh */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a; /* Warna latar gelap premium */
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .splash-container {
+            text-align: center;
+            color: #ffffff;
+            animation: fadeIn 1.2s ease-out;
+        }
+
+        /* Desain Logo Lingkaran Bulat */
+        .logo-box {
+            width: 100dp;
+            height: 100px;
+            background: linear-gradient(135deg, #76c000, #5a9200); /* Gradasi Hijau khas kuliner */
+            border-radius: 50%;
+            margin: 0 auto 20px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 25px rgba(118, 192, 0, 0.4);
+            position: relative;
+        }
+
+        /* Ikon Sendok Garpu Sederhana di dalam Logo */
+        .logo-icon {
+            font-size: 40px;
+        }
+
+        h1 {
+            font-size: 26px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin: 0 0 8px 0;
+        }
+
+        p {
+            font-size: 13px;
+            color: #aaaaaa;
+            margin: 0 0 40px 0;
+            letter-spacing: 1px;
+        }
+
+        /* Efek Putaran Memuat Data (Loading Spinner) */
+        .spinner {
+            width: 35px;
+            height: 35px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: #76c000; /* Warna hijau menyala */
+            margin: 0 auto;
+            animation: spin 0.8s linear infinite;
+        }
+
+        /* Animasi Transisi Teks */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="splash-container">
+        <!-- Bagian Logo Utama -->
+        <div class="logo-box">
+            <span class="logo-icon">🍽️</span>
+        </div>
+        
+        <!-- Nama Aplikasi Anda -->
+        <h1>RSI FOOD & MARK</h1>
+        <p>Click & Collect App</p>
+        
+        <!-- Komponen Loading -->
+        <div class="spinner"></div>
+    </div>
+
+    <script>
+        // Logika Pengalihan Halaman Otomatis (Menggunakan Javascript)
+        // 3000 milidetik = 3 detik halaman pembuka akan muncul di layar
+        setTimeout(function() {
+            window.location.href = "menu.html";
+        }, 3000);
+    </script>
+</body>
+</html>
