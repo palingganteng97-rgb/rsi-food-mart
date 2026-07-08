@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:,">
     <title>Admin - Edit Produk</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #f5f5f5; padding: 20px; display: flex; justify-content: center; align-items: flex-start; min-height: 90vh; margin: 0; box-sizing: border-box; }
@@ -57,32 +58,79 @@
 </div>
 
 <script>
-function searchProduct() {
-    let input = document.getElementById('searchBar').value;
-    let cards = document.querySelectorAll('.product-card');
-    let clearBtn = document.getElementById('clearBtn');
-    let hasMatch = false;
+// Ganti alamat URL lama Anda dengan alamat relatif super aman ini:
+const API_URL = 'ambil-produk.php';
 
-    // Tampilkan tombol silang hanya saat kolom ada isinya
-    clearBtn.style.display = input.length > 0 ? 'block' : 'none';
+  const elSearch = document.getElementById('searchBar');
+  const elClearSearch = document.getElementById('clearBtn');
+  let query = '', semuaProduk = [];
 
-    cards.forEach(card => {
-        let name = card.querySelector('h3').innerText.toLowerCase();
-        if (name.includes(input.toLowerCase())) {
-            card.style.setProperty('display', 'flex', 'important');
-            hasMatch = true;
-        } else {
-            card.style.display = 'none';
-        }
+  // 1. Memuat data produk langsung dari server pusat
+  async function loadProduk() {
+    try {
+      const res = await fetch(API_URL);
+      semuaProduk = await res.json();
+      render();
+    } catch (e) {
+      console.error('Gagal memuat data dari server API:', e);
+    }
+  }
+
+  // 2. Event Listener untuk menangani ketikan kolom pencarian
+  if (elSearch) {
+    elSearch.addEventListener('input', (e) => {
+      query = (e.target.value || '').toLowerCase().trim();
+      render();
     });
+  }
 
-    document.getElementById('notFound').style.display = hasMatch ? 'none' : 'block';
-}
+  // 3. Fungsi untuk tombol pembatalan (tanda silang ×)
+  if (elClearSearch) {
+    elClearSearch.addEventListener('click', () => {
+      if (elSearch) { elSearch.value = ''; query = ''; render(); }
+    });
+  }
 
-function clearSearch() {
-    document.getElementById('searchBar').value = '';
-    searchProduct(); // Reset saringan produk agar muncul semua kembali
-}
+  // 4. Fungsi menampilkan list kartu produk secara dinamis ke layar
+  function render() {
+    const listEl = document.querySelector('.product-grid');
+    const notFoundEl = document.getElementById('notFound');
+    if (elClearSearch) elClearSearch.style.display = query.length > 0 ? 'block' : 'none';
+
+    // Saring data secara aman (hanya mencocokkan teks nama dan deskripsi saja)
+    const hasil = query ? semuaProduk.filter(p => 
+      (p.nama || '').toLowerCase().includes(query) || 
+      (p.deskripsi || '').toLowerCase().includes(query)
+    ) : semuaProduk;
+
+    // Bersihkan daftar lama kecuali elemen pesan error "Not Found"
+    const existingCards = listEl.querySelectorAll('.product-card');
+    existingCards.forEach(card => card.remove());
+
+    if (!hasil.length && query) {
+      if (notFoundEl) notFoundEl.style.display = 'block';
+      return;
+    }
+    if (notFoundEl) notFoundEl.style.display = 'none';
+
+    // Cetak kartu produk yang cocok ke dalam grid
+    hasil.forEach(p => {
+      const card = document.createElement('div');
+      card.className = 'product-card';
+      card.innerHTML = `
+        <div class="product-info">
+          <h3>${p.nama || '-'}</h3>
+          <p>${p.deskripsi || '-'}</p>
+          <span>Rp ${p.harga || '-'}</span>
+        </div>
+        <a href="formulir-edit.html?id=${p.id}" class="btn-edit">Edit</a>
+      `;
+      listEl.appendChild(card);
+    });
+  }
+
+  // Jalankan pemanggilan data otomatis saat halaman selesai dimuat oleh browser
+  document.addEventListener('DOMContentLoaded', loadProduk);
 </script>
 
 </body>

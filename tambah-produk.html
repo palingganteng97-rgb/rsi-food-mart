@@ -1,118 +1,96 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
+  <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Tambah Produk Kuliner</title>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f5f5f5; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 90vh; margin: 0; box-sizing: border-box; }
-        .form-container { width: 100%; max-width: 700px; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); box-sizing: border-box; }
-        h2 { margin-top: 0; color: #333; text-align: center; font-size: 26px; margin-bottom: 20px; }
-        .form-group { margin-bottom: 18px; }
-        label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; font-size: 14px; }
-        input, textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-family: inherit; font-size: 14px; }
-        textarea { height: 100px; resize: none; }
-        .kotak-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px dashed #76c000; border-radius: 12px; height: 160px; background-color: #fafafa; cursor: pointer; transition: all 0.3s ease; overflow: hidden; position: relative; box-sizing: border-box; }
-        .kotak-upload:hover { background-color: #f0f9e6; border-color: #5a9200; }
-        #konten-instruksi { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; }
-        .ikon-plus { font-size: 36px; color: #76c000; font-weight: bold; line-height: 1; margin-bottom: 4px; text-align: center; }
-        .teks-upload { font-size: 13px; color: #777; text-align: center; padding: 0 10px; }
-        .preview-img { width: 100%; height: 100%; object-fit: cover; display: none; position: absolute; top: 0; left: 0; }
-        .btn-submit { background-color: #76c000; color: white; border: none; padding: 14px; width: 100%; border-radius: 25px; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 15px; box-shadow: 0 4px 10px rgba(118,192,0,0.2); transition: background 0.2s ease; }
-        .btn-submit:hover { background-color: #65a300; }
-        .link-view { display: block; text-align: center; margin-top: 15px; color: #007bff; text-decoration: none; font-size: 14px; }
-        @media (max-width: 480px) { body { padding: 10px; } .form-container { padding: 20px; } h2 { font-size: 22px; } }
-    </style>
+    <link rel="icon" href="data:,">
+    <title>Admin - Tambah Produk</title>
+  <style>
+    body{font-family:'Segoe UI',sans-serif;background-color:#f5f5f5;padding:20px;margin:0;box-sizing:border-box;}
+    .container{width:100%;max-width:700px;margin:0 auto;background:#fff;padding:30px;border-radius:15px;box-shadow:0 4px 15px rgba(0,0,0,0.1);box-sizing:border-box;}
 
+    h2 { text-align: center; color: #333; margin-bottom: 20px; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+    .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+    .btn-submit { width: 100%; background-color: #76c000; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; margin-top: 10px; }
+    .btn-submit:hover { background-color: #65a300; }
+    .menu-link { display: inline-block; color: #007bff; text-decoration: none; font-weight: bold; margin-bottom: 20px; }
+  </style>
 </head>
 <body>
 
-    <div class="form-container">
-        <h2>Tambah Produk Baru</h2>
-        
-        <form id="form-produk">
-            <div class="form-group">
-                <label for="nama">Nama Makanan / Produk</label>
-                <input type="text" id="nama" placeholder="Contoh: Ayam Geprek" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="deskripsi">Deskripsi Menu</label>
-                <textarea id="deskripsi" placeholder="Contoh: Pedas level 1-5 + lalapan" required></textarea>
-            </div>
-            
-            <div class="form-group">
-                <label for="harga">Harga (Rupiah)</label>
-                <input type="number" id="harga" placeholder="Contoh: 15000" required>
-            </div>
-
-            <!-- Elemen Baru: Kotak Upload dan Pratinjau Gambar -->
-            <div class="form-group">
-                <label>Foto Produk</label>
-                <label for="upload-foto" class="kotak-upload" id="area-drop">
-                    <div id="konten-instruksi">
-                        <div class="ikon-plus">+</div>
-                        <div class="teks-upload">Klik untuk unggah gambar</div>
-                    </div>
-                    <img id="preview" class="preview-img" alt="Pratinjau Foto">
-                    <input type="file" id="upload-foto" accept="image/*" style="display: none;" required>
-                </label>
-            </div>
-            
-            <button type="submit" class="btn-submit">SIMPAN PRODUK</button>
-        </form>
-
-        <a href="index.html" class="link-view" target="_blank">Lihat Tampilan Menu Utama ➔</a>
+<div class="container">
+  <a href="menu.html" class="menu-link">➔ Kembali ke Menu</a>
+  <h2>Tambah Produk Baru</h2>
+  
+  <!-- Form Pengisian Data Produk -->
+  <form id="form-tambah">
+    <div class="form-group">
+      <label for="nama">Nama Produk</label>
+      <input type="text" id="nama" required placeholder="Contoh: Ayam geprek">
     </div>
+    <div class="form-group">
+      <label for="deskripsi">Deskripsi</label>
+      <textarea id="deskripsi" rows="3" placeholder="Contoh: Sambel Pisah"></textarea>
+    </div>
+    <div class="form-group">
+      <label for="harga">Harga (Rp)</label>
+      <input type="text" id="harga" required placeholder="Contoh: 15.000">
+    </div>
+    <div class="form-group">
+      <label for="foto">Foto Produk</label>
+      <input type="file" id="foto" accept="image/*">
+    </div>
+    <button type="submit" class="btn-submit">Simpan Produk</button>
+  </form>
+</div>
 
-    <script>
-        const inputFoto = document.getElementById("upload-foto");
-        const imgPreview = document.getElementById("preview");
-        const kontenInstruksi = document.getElementById("konten-instruksi");
+<script>
+  // Menggunakan URL relatif agar otomatis mengikuti port server XAMPP yang aktif (8080)
+  const API_URL = 'ambil-produk.php';
 
-        // Fungsi logic untuk menampilkan pratinjau gambar saat file dipilih
-        inputFoto.addEventListener("change", function() {
-            const file = this.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    imgPreview.src = e.target.result;
-                    imgPreview.style.display = "block";
-                    kontenInstruksi.style.display = "none"; // Sembunyikan teks petunjuk +
-                }
-                reader.readAsDataURL(file);
-            }
-        });
+  document.getElementById('form-tambah').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const nama = document.getElementById('nama').value.trim();
+    const deskripsi = document.getElementById('deskripsi').value.trim();
+    const harga = document.getElementById('harga').value.trim();
+    const fotoInput = document.getElementById('foto');
+    
+    // Jika ada file foto yang diunggah, konversi ke format teks Base64 agar bisa masuk file JSON
+    if (fotoInput.files && fotoInput.files[0]) {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        await kirimKeServer({ nama, deskripsi, harga, foto: reader.result });
+      };
+      reader.readAsDataURL(fotoInput.files[0]);
+    } else {
+      // Jika tidak mengunggah foto, kirim string kosong
+      await kirimKeServer({ nama, deskripsi, harga, foto: '' });
+    }
+  });
 
-        document.getElementById("form-produk").addEventListener("submit", function(e) {
-            e.preventDefault(); 
+  async function kirimKeServer(data) {
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      
+      if (res.ok) {
+        alert('Produk berhasil ditambahkan ke database!');
+        document.getElementById('form-tambah').reset();
+      } else {
+        alert('Gagal menyimpan produk ke server.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Terjadi kesalahan koneksi ke server.');
+    }
+  }
+</script>
 
-            const nama = document.getElementById("nama").value;
-            const deskripsi = document.getElementById("deskripsi").value;
-            const hargaInput = document.getElementById("harga").value;
-            const fotoBase64 = imgPreview.src; // Mengambil data string base64 gambar untuk disimpan
-
-            const hargaFormatted = parseInt(hargaInput).toLocaleString('id-ID');
-
-            let listProduk = JSON.parse(localStorage.getItem("data_produk")) || [];
-
-            listProduk.push({
-                nama: nama,
-                deskripsi: deskripsi,
-                harga: hargaFormatted,
-                foto: fotoBase64 // Menyimpan data gambar ke localStorage
-            });
-
-            localStorage.setItem("data_produk", JSON.stringify(listProduk));
-
-            // Reset form dan kembalikan tampilan kotak upload seperti semula
-            document.getElementById("form-produk").reset();
-            imgPreview.style.display = "none";
-            imgPreview.src = "";
-            kontenInstruksi.style.display = "block";
-
-            alert("Produk '" + nama + "' berhasil ditambahkan! Silakan cek halaman Utama.");
-        });
-    </script>
 </body>
 </html>

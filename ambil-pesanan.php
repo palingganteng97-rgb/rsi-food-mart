@@ -1,0 +1,1 @@
+<?php header("Access-Control-Allow-Origin: *");header("Access-Control-Allow-Headers: *");header("Access-Control-Allow-Methods: *");header("Content-Type: application/json");$file='db.json';$db=file_exists($file)?json_decode(file_get_contents($file),true):[];if(!$db)$db=[];if(!isset($db['pesanan']))$db['pesanan']=[];echo json_encode(['pesanan'=>$db['pesanan']]); ?>
