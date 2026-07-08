@@ -12,12 +12,17 @@
 </head>
 <body>
 
+<!-- 🪟 ELEMEN CONTAINER SIDEBAR ASLI (Melayang di atas segalanya) -->
+<div id="overlay-samping" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 99998;" onclick="tutupSidebar()"></div>
+<div id="sidebar-wrapper" style="display: none; position: fixed; top: 0; left: 0; width: 280px; height: 100vh; background: #fff; z-index: 99999; box-shadow: 4px 0 15px rgba(0,0,0,0.1); box-sizing: border-box;"></div>
+
 <!-- Pembungkus Utama (Wajib Ada agar CSS Desktop Aktif) -->
 <div class="app-container">
 
   <!-- Bagian Kepala Halaman (Header) -->
   <div class="header" style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 60px; background: #fff;">
-    <button id="btn-hamburger" onclick="toggleSidebar()" style="position: absolute; left: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #333;">☰</button>
+    <!-- LOGIKA MURNI: Tombol khusus memanggil fungsi bukaSidebar() dari sidebar.js -->
+    <button id="btn-hamburger" onclick="bukaSidebar(event)" style="position: absolute; left: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #333; top: 50%; transform: translateY(-50%); padding: 5px; line-height: 1;">☰</button>
     <span style="font-weight: bold; font-size: 20px;">RSI FOOD & MARK</span>
   </div>
   
@@ -30,7 +35,7 @@
 
   <div class="banner">Click & Collect now available!</div>
 
-  <!-- Konten Utama Desktop & Mobile (Bersih Total dari Sisa Elemen Keranjang) -->
+  <!-- Konten Utama Desktop & Mobile -->
   <div id="main-konten">
     <div class="menu-list" id="menu-list-container">
       <div style="text-align:center;padding:30px;color:#999;font-weight:700;width:100%;">Memuat menu...</div>
@@ -39,9 +44,10 @@
 
 </div> <!-- Akhir dari app-container -->
 
-<!-- Urutan script: Panggil aset sidebar, navigasi eksternal, baru logika utama menu -->
+<!-- Pemanggilan skrip independen secara teratur -->
 <script src="sidebar.js"></script>
-<script src="bottom-nav.js"></script>
 <script src="menu.js"></script>
+<script src="bottom-nav.js"></script>
+
 </body>
 </html>
