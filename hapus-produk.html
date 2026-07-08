@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Hapus Produk</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background-color: #f5f5f5; padding: 20px; display: flex; justify-content: center; align-items: flex-start; min-height: 90vh; margin: 0; box-sizing: border-box; }
+    .container { width: 100%; max-width: 850px; background: white; padding: 26px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); box-sizing: border-box; }
+    h2 { text-align: center; color: #333; margin-bottom: 20px; }
+    .actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .btn { padding: 10px 16px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; font-size: 14px; text-decoration: none; }
+    .btn-danger { background-color: #dc3545; color: white; }
+    .btn-small { padding: 6px 12px; font-size: 12px; border-radius: 6px; }
+    .btn-link { color: #007bff; text-decoration: none; font-weight: bold; }
+    
+    /* Pembungkus komponen pencarian */
+    .search-wrapper { position: relative; width: 100%; margin-bottom: 20px; display: flex; align-items: center; }
+    .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #888; font-size: 16px; }
+    .search-input { width: 100%; height: 42px; padding: 10px 40px 10px 35px; border-radius: 10px; border: 1px solid #ddd; box-sizing: border-box; font-size: 14px; }
+    .clear-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #aaa; font-size: 18px; cursor: pointer; display: none; }
+    
+    /* Struktur list produk */
+    .list { display: flex; flex-wrap: wrap; gap: 15px; justify-content: flex-start; width: 100%; }
+    .item { flex: 1 1 240px; max-width: 260px; background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
+    .left { display: flex; align-items: center; gap: 10px; }
+    .foto { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; background-color: #eee; }
+    .meta p { margin: 0 0 4px 0; }
+    .nama { font-weight: bold; font-size: 15px; color: #333; }
+    .desc { font-size: 12px; color: #777; }
+    .harga { font-size: 13px; color: #76c000; font-weight: bold; }
+    
+    /* Tampilan layar kosong */
+    .empty { text-align: center; color: #999; padding: 30px; font-weight: bold; width: 100%; }
+    .empty span { font-size: 40px; display: block; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Hapus Produk (Mode Demo)</h2>
+
+  <div class="actions">
+    <button class="btn btn-danger" id="btn-hapus-semua" type="button">Hapus Semua</button>
+    <a class="btn-link" href="menu.html">➔ Kembali ke Menu</a>
+  </div>
+
+  <!-- Kolom Pencarian Identik dengan Ikon Lensa dan Tombol Silang -->
+  <div class="search-wrapper">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="search" class="search-input" placeholder="Cari produk...">
+    <button id="btnClearSearch" class="clear-btn">&times;</button>
+  </div>
+
+  <!-- Wadah List Produk -->
+  <div class="list" id="list-produk"></div>
+
+  <!-- Wadah Pesan Status -->
+  <div id="empty" class="empty" style="display:none;">
+    <span id="empty-icon">🗑️</span>
+    <div id="empty-title">Belum ada produk tersimpan</div>
+    <div id="empty-desc" style="font-size:13px; margin-top:6px; font-weight:normal;">Tambahkan produk lewat halaman Tambah Produk terlebih dahulu.</div>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'data_produk';
+
+  // Fungsi memuat produk dengan otomatis mengisi data dummy jika lokal kosong
+  function loadProduk() {
+    try { 
+      let data = localStorage.getItem(STORAGE_KEY);
+      if (!data) {
+        // Otomatis buat data tiruan (dummy) agar fungsi demo berjalan
+        const dummy = [{ nama: 'Ayam geprek', deskripsi: 'Sambel Pisah', harga: '15.000', foto: '' }];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(dummy));
+        return dummy;
+      }
+      return JSON.parse(data) || []; 
+    } catch (e) { 
+      return []; 
+    }
+  }
+
+  function saveProduk(list) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  }
+
+  function formatHarga(harga) {
+    if (harga == null) return '-';
+    return String(harga);
+  }
+
+  const elSearch = document.getElementById('search');
+  const elClearSearch = document.getElementById('btnClearSearch');
+  let query = '';
+
+  if (elSearch) { 
+    elSearch.addEventListener('input', (e) => { 
+      query = (e.target.value || '').toLowerCase().trim(); 
+      render(); 
+    }); 
+  }
+
+  if (elClearSearch) {
+    elClearSearch.addEventListener('click', () => {
+      if (elSearch) {
+        elSearch.value = '';
+        query = '';
+        render();
+      }
+    });
+  }
+
+  const renderList = () => {
+    const listEl = document.getElementById('list-produk');
+    const emptyEl = document.getElementById('empty');
+    const clearBtn = document.getElementById('btnClearSearch');
+    const produk = loadProduk();
+    
+    // Perbaikan total: Hanya saring berdasarkan nama dan deskripsi, abaikan data gambar (foto)
+    const hasil = query ? produk.filter(p => {
+      const nama = (p.nama || '').toLowerCase();
+      const desc = (p.deskripsi || '').toLowerCase();
+      return nama.includes(query) || desc.includes(query);
+    }) : produk;
+
+    if (clearBtn) {
+      clearBtn.style.display = query.length > 0 ? 'block' : 'none';
+    }
+
+    if (!produk.length) {
+      listEl.innerHTML = '';
+      emptyEl.style.display = 'block';
+      document.getElementById('empty-icon').innerText = '🗑️';
+      document.getElementById('empty-title').innerText = 'Belum ada produk tersimpan';
+      document.getElementById('empty-desc').style.display = 'block';
+      return;
+    }
+
+    if (!hasil.length && query) {
+      listEl.innerHTML = '';
+      emptyEl.style.display = 'block';
+      document.getElementById('empty-icon').innerText = '🔍';
+      document.getElementById('empty-title').innerText = 'Produk Tidak Ditemukan';
+      document.getElementById('empty-desc').style.display = 'none';
+      return;
+    }
+
+    emptyEl.style.display = 'none';
+    listEl.innerHTML = hasil.map((p) => {
+      const foto = p.foto ? p.foto : '';
+      const origIndex = produk.indexOf(p);
+      return `
+        <div class="item">
+          <div class="left">
+            <img class="foto" src="${foto}" alt="Foto" onerror="this.style.display='none'" />
+            <div class="meta">
+              <p class="nama" title="${(p.nama || '').replace(/"/g, '"')}">${p.nama || '-'}</p>
+              <p class="desc" title="${(p.deskripsi || '').replace(/"/g, '"')}">${p.deskripsi || '-'}</p>
+              <div class="harga">Rp ${formatHarga(p.harga)}</div>
+            </div>
+          </div>
+          <div class="right">
+            <button class="btn btn-danger btn-small" type="button" onclick="hapusSatu(${origIndex})">Hapus</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  };
+
+  function render() { renderList(); }
+
+  function hapusSatu(index) {
+    const produk = loadProduk();
+    const item = produk[index];
+    if (!item) return;
+
+    const ok = confirm(`Hapus produk: ${item.nama || 'Produk ini'}?`);
+    if (!ok) return;
+
+    produk.splice(index, 1);
+    saveProduk(produk);
+    render();
+    alert('Produk berhasil dihapus.');
+    window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY, newValue: JSON.stringify(produk) }));
+  }
+
+  function hapusSemua() {
+    const produk = loadProduk();
+    if (!produk.length) return;
+    const ok = confirm('Hapus semua produk tersimpan?');
+    if (!ok) return;
+    saveProduk([]);
+    render();
+    alert('Semua produk berhasil dihapus.');
+    window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY, newValue: JSON.stringify([]) }));
+  }
+
+  document.getElementById('btn-hapus-semua').addEventListener('click', hapusSemua);
+  window.hapusSatu = hapusSatu;
+  document.addEventListener('DOMContentLoaded', render);
+  window.addEventListener('storage', (e) => { if (e.key === STORAGE_KEY) render(); });
+</script>
+
+</body>
+</html>
