@@ -10,9 +10,7 @@ $menu = [
     'user.php'        => [ 'href' => 'user.php',        'label' => 'User',         'icon' => 'bi-person' ],
     'roles.php'       => [ 'href' => 'roles.php',       'label' => 'Roles',        'icon' => 'bi-shield-lock' ],
     'permissions.php' => [ 'href' => 'permissions.php', 'label' => 'Permissions',  'icon' => 'bi-key' ],
-
-    
-    ];
+];
 
 function activeClass(string $file, string $currentFile): string {
     return $file === $currentFile ? 'active' : '';
@@ -24,6 +22,7 @@ function activeClass(string $file, string $currentFile): string {
   :root { --sidebar-w: 280px; --bg: #0f172a; --text: #e5e7eb; --muted:#94a3b8; --green:#22c55e; }
   body { background: var(--bg) !important; color: var(--text); }
 
+  /* FIX: Menggunakan Flexbox layout agar tombol bawah terkunci sempurna */
   .sidebar-fixed {
       position: fixed;
       top: 0;
@@ -33,6 +32,10 @@ function activeClass(string $file, string $currentFile): string {
       background: #0b1223;
       border-right: 1px solid rgba(148,163,184,.25);
       padding-top: 1rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      z-index: 1000;
   }
   .sidebar-fixed .app-brand {
       padding: 0 1rem;
@@ -41,6 +44,7 @@ function activeClass(string $file, string $currentFile): string {
       gap:.75rem;
       color: var(--text);
       margin-bottom: 1.25rem;
+      flex-shrink: 0;
   }
   .sidebar-fixed .app-brand .logo-badge{
       width: 42px; height:42px;
@@ -51,6 +55,18 @@ function activeClass(string $file, string $currentFile): string {
       color: var(--green);
       font-size: 1.25rem;
   }
+
+  /* FIX: Container scroll untuk menu dan menyembunyikan scrollbar */
+  .sidebar-scroll-container {
+      flex-grow: 1;
+      overflow-y: auto;
+      scrollbar-width: none; /* Hide scrollbar Firefox */
+      -ms-overflow-style: none;  /* Hide scrollbar IE/Edge */
+  }
+  .sidebar-scroll-container::-webkit-scrollbar {
+      display: none; /* Hide scrollbar Chrome, Safari, Opera */
+  }
+
   .navmenu .nav-link {
       color: rgba(229,231,235,.82);
       border-radius: 12px;
@@ -70,6 +86,32 @@ function activeClass(string $file, string $currentFile): string {
       color: #052e16;
       background: rgba(34,197,94,.9);
       border-color: rgba(34,197,94,.55);
+  }
+
+  /* FIX: Komponen tombol logout terkunci di bagian paling bawah */
+  .sidebar-footer {
+      padding: 1rem;
+      border-top: 1px solid rgba(148,163,184,.12);
+      background: #0b1223;
+      flex-shrink: 0;
+  }
+  .btn-logout {
+      color: #f87171;
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      width: 100%;
+      border-radius: 12px;
+      padding: .7rem .85rem;
+      display: flex;
+      align-items: center;
+      gap: .65rem;
+      text-decoration: none;
+      transition: all 0.15s ease;
+  }
+  .btn-logout:hover {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.3);
   }
 
   .mobile-topbar {
@@ -119,23 +161,37 @@ function activeClass(string $file, string $currentFile): string {
 
 <!-- Desktop Sidebar -->
 <aside class="desktop-sidebar sidebar-fixed d-none d-lg-block">
-  <div class="app-brand">
-    <div class="logo-badge" aria-hidden="true">
-      <i class="bi bi-hospital"></i>
+  <!-- Pembungkus Atas (Brand + Scrollable Menu) -->
+  <div class="d-flex flex-column flex-grow-1 overflow-hidden">
+    <div class="app-brand">
+      <div class="logo-badge" aria-hidden="true">
+        <i class="bi bi-hospital"></i>
+      </div>
+      <div>
+        <div class="fw-bold" style="letter-spacing:.2px;">RSI FOOD &amp; MART</div>
+        <div class="text-white-50" style="font-size:.82rem;">Pemesanan Makanan Sehat</div>
+      </div>
     </div>
-    <div>
-      <div class="fw-bold" style="letter-spacing:.2px;">RSI FOOD &amp; MART</div>
-      <div class="text-white-50" style="font-size:.82rem;">Pemesanan Makanan Sehat</div>
+
+    <!-- Area Ter-scroll Tanpa Memunculkan Batang Scroll -->
+    <div class="sidebar-scroll-container">
+      <div class="navmenu mt-1">
+        <?php foreach ($menu as $file => $item): ?>
+          <a class="nav-link <?php echo activeClass($file, $currentFile); ?>" href="<?php echo htmlspecialchars($item['href']); ?>">
+            <i class="bi <?php echo htmlspecialchars($item['icon']); ?>"></i>
+            <span><?php echo htmlspecialchars($item['label']); ?></span>
+          </a>
+        <?php endforeach; ?>
+      </div>
     </div>
   </div>
 
-  <div class="navmenu mt-3">
-    <?php foreach ($menu as $file => $item): ?>
-      <a class="nav-link <?php echo activeClass($file, $currentFile); ?>" href="<?php echo htmlspecialchars($item['href']); ?>">
-        <i class="bi <?php echo htmlspecialchars($item['icon']); ?>"></i>
-        <span><?php echo htmlspecialchars($item['label']); ?></span>
+  <!-- Pembungkus Bawah (Tombol Logout Terkunci Permanen) -->
+  <div class="sidebar-footer">
+      <a href="logout.php" class="btn-logout" onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?')">
+          <i class="bi bi-box-arrow-left"></i>
+          <span>Logout</span>
       </a>
-    <?php endforeach; ?>
   </div>
 </aside>
 
@@ -153,14 +209,25 @@ function activeClass(string $file, string $currentFile): string {
     </div>
     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
   </div>
-  <div class="offcanvas-body">
-    <div class="navmenu">
-      <?php foreach ($menu as $file => $item): ?>
-        <a class="nav-link <?php echo activeClass($file, $currentFile); ?>" href="<?php echo htmlspecialchars($item['href']); ?>" data-mobile-nav="1">
-          <i class="bi <?php echo htmlspecialchars($item['icon']); ?>"></i>
-          <span><?php echo htmlspecialchars($item['label']); ?></span>
+  <div class="offcanvas-body d-flex flex-column justify-content-between p-0">
+    <!-- Area Ter-scroll Mobile -->
+    <div class="sidebar-scroll-container py-3">
+      <div class="navmenu">
+        <?php foreach ($menu as $file => $item): ?>
+          <a class="nav-link <?php echo activeClass($file, $currentFile); ?>" href="<?php echo htmlspecialchars($item['href']); ?>" data-mobile-nav="1">
+            <i class="bi <?php echo htmlspecialchars($item['icon']); ?>"></i>
+            <span><?php echo htmlspecialchars($item['label']); ?></span>
+          </a>
+        <?php endforeach; ?>
+      </div>
+    </div>
+    
+    <!-- Tombol Logout Mobile Offcanvas -->
+    <div class="sidebar-footer w-100">
+        <a href="logout.php" class="btn-logout" onclick="return confirm('Apakah Anda yakin ingin keluar?')">
+            <i class="bi bi-box-arrow-left"></i>
+            <span>Logout</span>
         </a>
-      <?php endforeach; ?>
     </div>
   </div>
 </div>
@@ -176,4 +243,3 @@ function activeClass(string $file, string $currentFile): string {
     });
   })();
 </script>
-

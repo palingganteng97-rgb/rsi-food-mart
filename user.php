@@ -1,6 +1,6 @@
 <?php
 // user.php
-include "db.php"; // Memanggil koneksi database & session_start()
+include "db.php"; // Memanggil koneksi database ($conn) & session_start()
 
 // Proteksi Halaman: Jika sesi user_id kosong, tendang kembali ke login.php
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
@@ -10,6 +10,22 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
 
 // Cukup panggil file handler di sini setelah koneksi database ($conn) aktif
 include "delete_handler.php";
+
+// =========================================================================
+// PERBAIKAN: AMBIL DATA ROLES DI SINI (SETELAH $conn SUDAH PASTI TERSEDIA)
+// =========================================================================
+$listRoles = [];
+try {
+    // Memastikan koneksi database aktif menggunakan mysqli
+    $roleQuery = $conn->query("SELECT id, name FROM roles ORDER BY name ASC");
+    if ($roleQuery) {
+        while ($rRow = $roleQuery->fetch_assoc()) {
+            $listRoles[] = $rRow;
+        }
+    }
+} catch (Throwable $e) {
+    // Meredam eror jika tabel roles belum memiliki data
+}
 
 $userId = (int)$_SESSION['user_id'];
 
@@ -24,7 +40,7 @@ $photo = $_SESSION['photo'] ?? '';
 $status = $_SESSION['status'] ?? 0;
 $lastLogin = '-';
 
-// READ DATA: Mengambil data lengkap user dari database berdasarkan ID
+// READ DATA: Mengambil data lengkap user dari database berdasarkan ID Sesi (User Logged In)
 try {
     $stmt = $conn->prepare('SELECT id, role_id, tenant_id, name, username, email, phone, photo, status, last_login FROM users WHERE id = ? LIMIT 1');
     $stmt->bind_param('i', $userId);
@@ -47,61 +63,183 @@ try {
 }
 
 $isVerified = (int)$status === 1;
-$photoUrl = $photo ? $photo : 'assets/img/default-avatar.png';
+$photoUrl = $photo ? (strpos($photo, 'uploads/') === 0 ? $photo : 'uploads/' . $photo) : 'assets/img/default-avatar.png';
 
-// UPDATE DATA (CRUD): Proses modifikasi profil dan file foto profil
+// Variabel status notifikasi global halaman
 $updateError = '';
 $updateSuccess = '';
 
+// =========================================================================
+// 1. CRUD: LOGIKA INSERT DATA USER BARU (DARI MODAL TAMBAH)
+// =========================================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_register'])) {
+    $newName     = trim($_POST['name'] ?? '');
+    $newUsername = trim($_POST['username'] ?? '');
+    $newEmail    = trim($_POST['email'] ?? '');
+    $newPhone    = trim($_POST['phone'] ?? '');
+    $newPassword = $_POST['password'] ?? '';
+    $newRoleId   = (int)($_POST['role_id'] ?? 0); // PERBAIKAN: Menangkap role_id dinamis dari dropdown modal tambah
+
+    // Validasi input wajib di sisi PHP (Sekarang memeriksa apakah role_id sudah dipilih)
+    if (empty($newName) || empty($newUsername) || empty($newEmail) || empty($newPassword) || $newRoleId <= 0) {
+        header("Location: user.php?status=error_insert&msg=" . urlencode("Semua kolom wajib termasuk Role Akses harus diisi!"));
+        exit;
+    }
+
+    $uploadedPhotoName = '';
+    $uploadOk = true;
+    $updateError = '';
+
+    // Proses upload foto
+    if (!empty($_FILES['photo']['name'])) {
+        $targetDir = "uploads/";
+        if (!file_exists($targetDir)) { mkdir($targetDir, 0777, true); }
+
+        $fileExtension = strtolower(pathinfo($_FILES["photo"]["name"], PATHINFO_EXTENSION));
+        $newFileName = time() . '_' . bin2hex(random_bytes(4)) . '.' . $fileExtension;
+        $targetFilePath = $targetDir . $newFileName;
+
+        if (in_array($fileExtension, ['jpg', 'jpeg', 'png', 'gif'])) {
+            if ($_FILES["photo"]["size"] <= 2 * 1024 * 1024) {
+                if (move_uploaded_file($_FILES["photo"]["tmp_name"], $targetFilePath)) {
+                    $uploadedPhotoName = $newFileName;
+                } else { $uploadOk = false; $updateError = "Gagal mengunggah berkas gambar."; }
+            } else { $uploadOk = false; $updateError = "Ukuran file foto maksimal 2MB."; }
+        } else { $uploadOk = false; $updateError = "Format berkas tidak didukung."; }
+    }
+
+    if ($uploadOk) {
+        try {
+            $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT);
+            $defaultStatus = 1; // Menyesuaikan TINYINT status default '1'
+
+            // PERBAIKAN: Mengikat variabel $newRoleId dari dropdown select modal ke query INSERT
+            $insertStmt = $conn->prepare("INSERT INTO users (role_id, name, username, email, phone, password, photo, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $insertStmt->bind_param("issssssi", $newRoleId, $newName, $newUsername, $newEmail, $newPhone, $hashedPassword, $uploadedPhotoName, $defaultStatus);
+            
+            if ($insertStmt->execute()) {
+                header("Location: user.php?status=success_insert");
+                exit;
+            } else {
+                header("Location: user.php?status=error_insert&msg=" . urlencode($insertStmt->error));
+                exit;
+            }
+            $insertStmt->close();
+        } catch (Throwable $e) { 
+            header("Location: user.php?status=error_insert&msg=" . urlencode($e->getMessage()));
+            exit;
+        }
+    } else {
+        header("Location: user.php?status=error_insert&msg=" . urlencode($updateError));
+        exit;
+    }
+}
+
+// =========================================================================
+// 2. CRUD: LOGIKA UPDATE DATA USER OLEH ADMIN (DARI MODAL EDIT)
+// =========================================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_admin'])) {
+    $targetId = (int)($_POST['id'] ?? 0);
+    $upName   = trim($_POST['name'] ?? '');
+    $upEmail  = trim($_POST['email'] ?? '');
+    $upPhone  = trim($_POST['phone'] ?? '');
+    $upPass   = $_POST['password'] ?? '';
+    $oldPhoto = trim($_POST['old_photo'] ?? '');
+    $upRoleId = (int)($_POST['role_id'] ?? 0); // PERBAIKAN: Menangkap role_id baru dari dropdown modal edit
+
+    $finalPhotoName = $oldPhoto; 
+    $uploadOk = true;
+    $updateError = '';
+
+    if (!empty($_FILES['photo']['name'])) {
+        $targetDir = "uploads/";
+        if (!file_exists($targetDir)) { mkdir($targetDir, 0777, true); }
+
+        $fileExtension = strtolower(pathinfo($_FILES["photo"]["name"], PATHINFO_EXTENSION));
+        $newFileName = time() . '_' . bin2hex(random_bytes(4)) . '.' . $fileExtension;
+        $targetFilePath = $targetDir . $newFileName;
+
+        if (in_array($fileExtension, ['jpg', 'jpeg', 'png', 'gif'])) {
+            if ($_FILES["photo"]["size"] <= 2 * 1024 * 1024) {
+                if (move_uploaded_file($_FILES["photo"]["tmp_name"], $targetFilePath)) {
+                    $finalPhotoName = $newFileName;
+                    if (!empty($oldPhoto) && file_exists("uploads/" . $oldPhoto)) {
+                        @unlink("uploads/" . $oldPhoto);
+                    }
+                } else { $uploadOk = false; $updateError = "Gagal memproses unggahan gambar baru."; }
+            } else { $uploadOk = false; $updateError = "Ukuran file foto maksimal 2MB."; }
+        } else { $uploadOk = false; $updateError = "Format gambar tidak valid."; }
+    }
+
+    // PERBAIKAN: Memastikan $upRoleId ikut divalidasi tidak boleh kosong sebelum kueri dieksekusi
+    if ($uploadOk && $targetId > 0 && !empty($upName) && !empty($upEmail) && $upRoleId > 0) {
+        try {
+            if (!empty($upPass)) {
+                $hashedPass = password_hash($upPass, PASSWORD_BCRYPT);
+                // PERBAIKAN: Menambahkan `role_id = ?` ke dalam kueri kueri UPDATE berserta parameter password
+                $updateStmt = $conn->prepare("UPDATE users SET name = ?, email = ?, phone = ?, photo = ?, password = ?, role_id = ? WHERE id = ?");
+                $updateStmt->bind_param("sssssii", $upName, $upEmail, $upPhone, $finalPhotoName, $hashedPass, $upRoleId, $targetId);
+            } else {
+                // PERBAIKAN: Menambahkan `role_id = ?` ke dalam kueri kueri UPDATE tanpa mengganti password
+                $updateStmt = $conn->prepare("UPDATE users SET name = ?, email = ?, phone = ?, photo = ?, role_id = ? WHERE id = ?");
+                $updateStmt->bind_param("ssssii", $upName, $upEmail, $upPhone, $finalPhotoName, $upRoleId, $targetId);
+            }
+            
+            if ($updateStmt->execute()) {
+                header("Location: user.php?status=success_update");
+                exit;
+            } else {
+                header("Location: user.php?status=error_update&msg=" . urlencode($updateStmt->error));
+                exit;
+            }
+            $updateStmt->close();
+        } catch (Throwable $e) {
+            header("Location: user.php?status=error_update&msg=" . urlencode($e->getMessage()));
+            exit;
+        }
+    } else {
+        $errorMsg = !empty($updateError) ? $updateError : "Semua kolom wajib atau Role Akses belum dipilih.";
+        header("Location: user.php?status=error_update&msg=" . urlencode($errorMsg));
+        exit;
+    }
+}
+
+// =========================================================================
+// 3. CRUD: LOGIKA UPDATE MANDIRI (PROFIL AKUN YANG SEDANG LOG IN)
+// =========================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
     $newName = trim($_POST['update_name'] ?? '');
     $newPhone = trim($_POST['update_phone'] ?? '');
     $newEmail = trim($_POST['update_email'] ?? '');
     
-    $uploadedPhotoPath = $photo; // Default gunakan path foto lama jika tidak ganti gambar
+    $uploadedPhotoPath = $photo; 
     $uploadOk = true;
 
-    // Logika pemrosesan file biner foto profil baru
     if (!empty($_FILES['update_photo']['name'])) {
         $targetDir = "uploads/";
-        
-        // Buat folder uploads otomatis jika belum tersedia di server htdocs
-        if (!file_exists($targetDir)) {
-            mkdir($targetDir, 0777, true);
-        }
+        if (!file_exists($targetDir)) { mkdir($targetDir, 0777, true); }
 
         $fileName = time() . '_' . basename($_FILES["update_photo"]["name"]);
         $targetFilePath = $targetDir . $fileName;
         $fileType = strtolower(pathinfo($targetFilePath, PATHINFO_EXTENSION));
         
-        // Validasi ekstensi tipe file gambar
         $allowTypes = array('jpg', 'png', 'jpeg', 'gif');
         if (in_array($fileType, $allowTypes)) {
             if (move_uploaded_file($_FILES["update_photo"]["tmp_name"], $targetFilePath)) {
                 $uploadedPhotoPath = $targetFilePath;
-                
-                // Hapus berkas foto fisik yang lama dari folder uploads agar hemat ruang disk
                 if (!empty($photo) && file_exists($photo) && strpos($photo, 'uploads/') === 0) {
                     @unlink($photo);
                 }
-            } else {
-                $updateError = "Terjadi kesalahan saat mengunggah foto profil fisik Anda.";
-                $uploadOk = false;
-            }
-        } else {
-            $updateError = "Format berkas tidak valid. Hanya JPG, JPEG, PNG, dan GIF yang diperbolehkan.";
-            $uploadOk = false;
-        }
+            } else { $updateError = "Terjadi kesalahan saat mengunggah foto profil."; $uploadOk = false; }
+        } else { $updateError = "Format berkas gambar tidak valid."; $uploadOk = false; }
     }
 
     if ($uploadOk && !empty($newName) && !empty($newEmail)) {
         try {
-            // Jalankan kueri SQL untuk memperbarui data ke dalam tabel database
             $updateStmt = $conn->prepare("UPDATE users SET name = ?, phone = ?, email = ?, photo = ? WHERE id = ?");
             $updateStmt->bind_param("ssssi", $newName, $newPhone, $newEmail, $uploadedPhotoPath, $userId);
             
             if ($updateStmt->execute()) {
-                // Perbarui Session global agar sinkron dengan perubahan terbaru
                 $_SESSION['name'] = $newName;
                 $_SESSION['phone'] = $newPhone;
                 $_SESSION['email'] = $newEmail;
@@ -109,19 +247,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                 
                 $updateSuccess = "Profil dan foto Anda berhasil diperbarui!";
                 
-                // Sinkronisasikan variabel lokal agar visual langsung berubah tanpa refresh
                 $name = $newName;
                 $phone = $newPhone;
                 $email = $newEmail;
                 $photo = $uploadedPhotoPath;
                 $photoUrl = $uploadedPhotoPath;
-            } else {
-                $updateError = "Gagal menyimpan perubahan data profil ke database.";
-            }
+            } else { $updateError = "Gagal menyimpan perubahan data profil."; }
             $updateStmt->close();
-        } catch (Throwable $e) {
-            $updateError = "Terjadi kesalahan sistem database: " . $e->getMessage();
-        }
+        } catch (Throwable $e) { $updateError = "Terjadi kesalahan database: " . $e->getMessage(); }
     }
 }
 ?>
@@ -165,7 +298,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
     <!-- HEADER TABEL & TOMBOL TAMBAH USER -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
       <div>
-        <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Manajemen Data User</h2>
+        <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;"> Data User </h2>
       </div>
       <div>
         <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalTambahUser">
@@ -293,11 +426,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             
-            <form method="POST" action="register.php" enctype="multipart/form-data">
+            <!-- Mengosongkan action agar form memproses datanya ke file user.php itu sendiri -->
+            <form method="POST" action="" enctype="multipart/form-data">
+                <!-- Elemen penanda pemicu kueri INSERT di PHP bagian atas user.php -->
+                <input type="hidden" name="action_register" value="1">
+
                 <div class="modal-body">
                     <div class="row g-3">
                         
-                        <!-- KOLOM KIRI: Identitas Utama -->
+                        <!-- KOLOM KIRI: Identitas Utama & Akses Level -->
                         <div class="col-md-6 d-flex flex-column gap-3">
                             <div>
                                 <label class="form-label text-white-50 small d-block fw-medium mb-2">Nama Lengkap</label>
@@ -313,6 +450,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                                 <label class="form-label text-white-50 small d-block fw-medium mb-2">Email</label>
                                 <input type="email" name="email" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2" placeholder="contoh@email.com" required>
                             </div>
+
+                            <!-- INPUT BARU: Dropdown dinamis mengambil data dari array $listRoles -->
+                            <div>
+                                <label class="form-label text-white-50 small d-block fw-medium mb-2">Role Akses</label>
+                                <select name="role_id" class="form-select bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2" style="color-scheme: dark;" required>
+                                    <option value="" disabled selected>-- Pilih Role Akses --</option>
+                                    <?php if (!empty($listRoles)): ?>
+                                        <?php foreach ($listRoles as $roleOption): ?>
+                                            <option value="<?= $roleOption['id']; ?>"><?= htmlspecialchars($roleOption['name']); ?></option>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </select>
+                            </div>
                         </div>
 
                         <!-- KOLOM KANAN: Kontak, Keamanan & Unggah Foto -->
@@ -326,12 +476,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                                 <label class="form-label text-white-50 small d-block fw-medium mb-2">Password Default</label>
                                 <input type="password" name="password" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2" placeholder="••••••••" required>
                             </div>
+                            
                             <div>
                                 <label class="form-label text-white-50 small d-block fw-medium mb-2">Foto Profil (Opsional)</label>
                                 <!-- Ditambahkan d-flex dan align-items-center agar teks berada di tengah vertikal -->
                                 <input type="file" name="photo" id="tambah_input_photo" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2 d-flex align-items-center" style="color-scheme: dark;" accept="image/*" onchange="previewImage(this)">
                             </div>
                         </div>
+                        
                         <!-- BARIS BAWAH: Area Pratinjau Foto Horizontal -->
                         <div class="col-12 text-center mt-3">
                             <div class="d-inline-block p-2 rounded-3" style="background: rgba(0,0,0,0.15); min-width: 120px;">
@@ -356,9 +508,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
     <!-- Style internal khusus untuk merombak tombol input file bawaan browser menjadi dark mode -->
     <style>
         #edit_input_photo::-webkit-file-upload-button,
-        #edit_input_photo::file-selector-button ,background-color: rgba(255, 255, 255, 0.08) !important;color: #e2e8f0 !important;border: 1px solid rgba(148, 163, 184, 0.25) !important;border-radius: 6px !important;padding: 0.25rem 0.75rem !important;margin-right: 10px !important;font-size: 0.82rem;transition: all 0.2s ease-in-out;}
+        #edit_input_photo::file-selector-button {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+            color: #e2e8f0 !important;
+            border: 1px solid rgba(148, 163, 184, 0.25) !important;
+            border-radius: 6px !important;
+            padding: 0.25rem 0.75rem !important;
+            margin-right: 10px !important;
+            font-size: 0.82rem;
+            transition: all 0.2s ease-in-out;
+        }
         #edit_input_photo::-webkit-file-upload-button:hover,
-        #edit_input_photo::file-selector-button:hover {background-color: rgba(255, 255, 255, 0.15) !important;cursor: pointer;}
+        #edit_input_photo::file-selector-button:hover {
+            background-color: rgba(255, 255, 255, 0.15) !important;
+            cursor: pointer;
+        }
     </style>
 
     <div class="modal-dialog modal-lg modal-dialog-centered"> <!-- Menggunakan modal-lg agar lebih lebar ke kanan -->
@@ -368,7 +532,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             
-            <form method="POST" action="update_user.php" enctype="multipart/form-data">
+            <!-- Mengosongkan action agar form memproses datanya ke file user.php itu sendiri -->
+            <form method="POST" action="" enctype="multipart/form-data">
+                <!-- Elemen penanda pemicu kueri UPDATE di PHP bagian atas user.php -->
+                <input type="hidden" name="action_update_admin" value="1">
                 <!-- ID User (Hidden) untuk parameter WHERE di query UPDATE -->
                 <input type="hidden" name="id" id="edit_id">
                 <!-- Path foto lama (Hidden) jika user tidak ingin mengganti fotonya -->
@@ -377,7 +544,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                 <div class="modal-body">
                     <div class="row g-3">
                         
-                        <!-- KOLOM KIRI: Identitas Utama -->
+                        <!-- KOLOM KIRI: Identitas Utama & Akses Level -->
                         <div class="col-md-6 d-flex flex-column gap-3">
                             <div>
                                 <label class="form-label text-white-50 small d-block fw-medium mb-2">Nama Lengkap</label>
@@ -393,6 +560,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                                 <label class="form-label text-white-50 small d-block fw-medium mb-2">Nomor Telepon</label>
                                 <input type="text" name="phone" id="edit_phone" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2">
                             </div>
+
+                            <!-- INPUT DROPDOWN ROLE: Otomatis memilih data sesuai id="edit_role_id" dari JS -->
+                            <div>
+                                <label class="form-label text-white-50 small d-block fw-medium mb-2">Role Akses</label>
+                                <select name="role_id" id="edit_role_id" class="form-select bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2" style="color-scheme: dark;" required>
+                                    <option value="" disabled>-- Pilih Role Akses --</option>
+                                    <?php if (!empty($listRoles)): ?>
+                                        <?php foreach ($listRoles as $roleOption): ?>
+                                            <option value="<?= $roleOption['id']; ?>"><?= htmlspecialchars($roleOption['name']); ?></option>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </select>
+                            </div>
                         </div>
 
                         <!-- KOLOM KANAN: Keamanan & Unggah Berkas Baru -->
@@ -407,6 +587,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                                 <input type="file" name="photo" id="edit_input_photo" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2 d-flex align-items-center" style="color-scheme: dark;" accept="image/*" onchange="previewEditImage(this)">
                                 <div class="form-text text-white-50" style="font-size: 0.72rem;">Biarkan kosong jika tidak ingin mengubah foto profil.</div>
                             </div>
+                        </div>
 
                         <!-- BARIS BAWAH: Area Pratinjau Foto Horizontal -->
                         <div class="col-12 text-center mt-3">
@@ -416,6 +597,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                                 <img id="edit_preview_photo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="" class="rounded-circle border border-secondary shadow-sm" style="width: 80px; height: 80px; object-fit: cover;">
                             </div>
                         </div>
+                        
                     </div>
                 </div>
                 <div class="modal-footer border-secondary border-opacity-25">

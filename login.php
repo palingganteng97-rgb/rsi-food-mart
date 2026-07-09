@@ -1,6 +1,7 @@
 <?php
-include "db.php";
+include "db.php"; // Memanggil koneksi database ($conn) & session_start()
 
+// Jika sesi user_id sudah aktif, langsung alihkan ke index.php agar tidak berputar-putar
 if (isset($_SESSION['user_id'])) {
     header("Location: index.php");
     exit;
@@ -9,13 +10,13 @@ if (isset($_SESSION['user_id'])) {
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $usernameOrEmail = trim($_POST['login_input'] ?? '');
+    $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    if (!empty($usernameOrEmail) && !empty($password)) {
+    if (!empty($username) && !empty($password)) {
         try {
-            $stmt = $conn->prepare("SELECT id, name, username, email, phone, photo, role_id, status, password FROM users WHERE username = ? OR email = ? LIMIT 1");
-            $stmt->bind_param("ss", $usernameOrEmail, $usernameOrEmail);
+            $stmt = $conn->prepare("SELECT id, name, username, phone, photo, role_id, status, password FROM users WHERE username = ? LIMIT 1");
+            $stmt->bind_param("s", $username);
             $stmt->execute();
             $res = $stmt->get_result();
 
@@ -24,11 +25,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['user_id']  = $row['id'];
                     $_SESSION['name']     = $row['name'];
                     $_SESSION['username'] = $row['username'];
-                    $_SESSION['email']    = $row['email'];
                     $_SESSION['phone']    = $row['phone'];
-                    $_SESSION['photo']    = $row['photo'];
                     $_SESSION['role_id']  = $row['role_id'];
                     $_SESSION['status']   = $row['status'];
+
+                    if (!empty($row['photo'])) {
+                        $_SESSION['photo'] = "uploads/" . $row['photo'];
+                    } else {
+                        $_SESSION['photo'] = "assets/img/default-avatar.png";
+                    }
 
                     header("Location: index.php");
                     exit;
@@ -36,65 +41,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = "Password yang Anda masukkan salah.";
                 }
             } else {
-                $error = "Username atau Email tidak ditemukan.";
+                $error = "Username tidak ditemukan.";
             }
             $stmt->close();
         } catch (Throwable $e) {
-            $error = "Terjadi kesalahan sistem.";
+            $error = "Terjadi kesalahan sistem: " . $e->getMessage();
         }
     } else {
         $error = "Kolom login tidak boleh kosong!";
     }
 }
-
-require __DIR__ . '/_auth_ui_shared.php';
-auth_ui_header('Login');
-require __DIR__ . '/_auth_ui_body_open.php';
 ?>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - RSI FOOD & MART</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
-<h5 class="mb-2">Silakan login untuk melanjutkan</h5>
-<p class="text-white-50 mb-4" style="line-height:1.45">
-  Redirect akan menuju halaman utama jika sesi login aktif.
-</p>
+</head>
+<body class="d-flex align-items-center justify-content-center min-vh-100" style="background: #0f172a;">
 
-<?php if (!empty($error)): ?>
-  <div class="alert alert-danger border-0 rounded-4" role="alert" style="background:rgba(239,68,68,.12); color:#fecaca;">
-    <?= htmlspecialchars($error) ?>
-  </div>
-<?php endif; ?>
+    <div class="card border-0 rounded-4 text-white shadow-lg p-4" style="background: #1e293b; width: 100%; max-width: 420px; border: 1px solid rgba(148,163,184,.15) !important;">
+        <div class="text-center mb-3">
+            <h4 class="fw-bold text-white mb-1"><i class="bi bi-shield-lock-fill text-success me-2"></i> RSI FOOD & MART</h4>
+            <span class="text-white-50 small">Silakan login untuk melanjutkan</span>
+        </div>
 
-<form method="POST" class="d-grid gap-3">
-  <div>
-    <label class="form-label text-white-50" style="font-size:.9rem">Username / Email</label>
-    <div class="input-group">
-      <span class="input-group-text bg-transparent border-0 text-white-50">
-        <i class="bi bi-person"></i>
-      </span>
-      <input type="text" name="login_input" class="form-control rounded-3" placeholder="Masukkan username atau email" required value="<?= isset($_POST['login_input']) ? htmlspecialchars((string)$_POST['login_input']) : '' ?>" />
+        <?php if (!empty($error)): ?>
+            <div class="alert alert-danger border-0 rounded-3 small py-2 mb-3" role="alert" style="background: rgba(239,68,68,.12); color: #fecaca;">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= htmlspecialchars($error) ?>
+            </div>
+        <?php endif; ?>
+
+        <form method="POST" class="d-grid gap-3">
+            <div>
+                <label class="form-label text-white-50 small fw-medium mb-2">Username</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-dark bg-opacity-25 border-secondary border-opacity-50 text-white-50"><i class="bi bi-person"></i></span>
+                    <input type="text" name="username" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 py-2" placeholder="Masukkan username" required value="<?= isset($_POST['username']) ? htmlspecialchars((string)$_POST['username']) : '' ?>" />
+                </div>
+            </div>
+
+            <div>
+                <label class="form-label text-white-50 small fw-medium mb-2">Password</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-dark bg-opacity-25 border-secondary border-opacity-50 text-white-50"><i class="bi bi-lock"></i></span>
+                    <input type="password" name="password" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 py-2" placeholder="Masukkan password" required />
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-success rounded-3 py-2 fw-medium mt-1">
+                <i class="bi bi-box-arrow-in-right me-2"></i> Login
+            </button>
+
+            <div class="d-flex align-items-center justify-content-between mt-2" style="font-size: 0.85rem;">
+                <a class="text-decoration-none text-white-50" href="lupa-password.php">Lupa Password?</a>
+                <a class="text-decoration-none text-white-50" href="register.php">Daftar Akun Baru</a>
+            </div>
+        </form>
     </div>
-  </div>
 
-  <div>
-    <label class="form-label text-white-50" style="font-size:.9rem">Password</label>
-    <div class="input-group">
-      <span class="input-group-text bg-transparent border-0 text-white-50">
-        <i class="bi bi-lock"></i>
-      </span>
-      <input type="password" name="password" class="form-control rounded-3" placeholder="Masukkan password" required />
-    </div>
-  </div>
-
-  <button type="submit" class="btn btn-success rounded-3">
-    <i class="bi bi-box-arrow-in-right me-2"></i> Login
-  </button>
-
-  <div class="d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between">
-    <a class="text-decoration-none text-white-50" href="lupa-password.php">Lupa Password?</a>
-    <a class="text-decoration-none text-white-50" href="register.php">Daftar Akun Baru</a>
-  </div>
-</form>
-
-<?php
-require __DIR__ . '/_auth_ui_body_close.php';
-auth_ui_footer();
-?>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
