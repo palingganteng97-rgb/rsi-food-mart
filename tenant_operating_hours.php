@@ -1,5 +1,5 @@
 <?php
-// tenant_holidays.php
+// tenant_operating_hours.php
 include "db.php"; // Memanggil koneksi database ($conn) & session_start()
 
 // Proteksi Halaman: Jika sesi user_id kosong, tendang kembali ke login.php
@@ -8,125 +8,77 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     exit;
 }
 
-// =========================================================================
-// 1. CRUD: LOGIKA INSERT DATA LIBUR TENANT BARU (DARI MODAL TAMBAH)
-// =========================================================================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_add_holiday'])) {
-    $tenantId    = (int)($_POST['tenant_id'] ?? 0);
-    $holidayDate = trim($_POST['holiday_date'] ?? '');
-    $description = trim($_POST['description'] ?? '');
+// ==========================================
+// 1. PROSES SIMPAN / TAMBAH DATA (CREATE)
+// ==========================================
+if (isset($_POST['action']) && $_POST['action'] == 'store') {
+    $tenant_id   = $_POST['tenant_id'];
+    $day_of_week = $_POST['day_of_week'];
+    $open_time   = $_POST['open_time'];
+    $close_time  = $_POST['close_time'];
+    $is_open     = isset($_POST['is_open']) ? 1 : 0; // Default di DB adalah '1' jika tidak diisi
 
-    if ($tenantId <= 0 || empty($holidayDate)) {
-        header("Location: tenant_holidays.php?status=error_insert&msg=" . urlencode("Nama tenant dan tanggal libur wajib diisi!"));
-        exit;
+    $query = "INSERT INTO tenant_operating_hours (tenant_id, day_of_week, open_time, close_time, is_open) VALUES (?, ?, ?, ?, ?)";
+    $stmt  = $conn->prepare($query);
+    $stmt->bind_param("iissi", $tenant_id, $day_of_week, $open_time, $close_time, $is_open);
+    
+    if ($stmt->execute()) {
+        $_SESSION['success'] = "Data berhasil ditambahkan!";
+    } else {
+        $_SESSION['error'] = "Gagal menambahkan data: " . $conn->error;
     }
-
-    try {
-        $insertStmt = $conn->prepare("INSERT INTO tenant_holidays (tenant_id, holiday_date, description) VALUES (?, ?, ?)");
-        $insertStmt->bind_param("iss", $tenantId, $holidayDate, $description);
-        
-        if ($insertStmt->execute()) {
-            header("Location: tenant_holidays.php?status=success_insert");
-            exit;
-        } else {
-            header("Location: tenant_holidays.php?status=error_insert&msg=" . urlencode($insertStmt->error));
-            exit;
-        }
-        $insertStmt->close();
-    } catch (Throwable $e) {
-        header("Location: tenant_holidays.php?status=error_insert&msg=" . urlencode($e->getMessage()));
-        exit;
-    }
+    header("Location: tenant_operating_hours.php");
+    exit;
 }
 
-// =========================================================================
-// 2. CRUD: LOGIKA UPDATE DATA LIBUR TENANT (DARI MODAL EDIT)
-// =========================================================================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_holiday'])) {
-    $targetId    = (int)($_POST['id'] ?? 0);
-    $tenantId    = (int)($_POST['tenant_id'] ?? 0);
-    $holidayDate = trim($_POST['holiday_date'] ?? '');
-    $description = trim($_POST['description'] ?? '');
+// ==========================================
+// 2. PROSES UPDATE DATA (UPDATE)
+// ==========================================
+if (isset($_POST['action']) && $_POST['action'] == 'update') {
+    $id          = $_POST['id'];
+    $tenant_id   = $_POST['tenant_id'];
+    $day_of_week = $_POST['day_of_week'];
+    $open_time   = $_POST['open_time'];
+    $close_time  = $_POST['close_time'];
+    $is_open     = isset($_POST['is_open']) ? 1 : 0;
 
-    if ($targetId <= 0 || $tenantId <= 0 || empty($holidayDate)) {
-        header("Location: tenant_holidays.php?status=error_update&msg=" . urlencode("Semua data wajib diisi dengan benar."));
-        exit;
+    $query = "UPDATE tenant_operating_hours SET tenant_id = ?, day_of_week = ?, open_time = ?, close_time = ?, is_open = ? WHERE id = ?";
+    $stmt  = $conn->prepare($query);
+    $stmt->bind_param("iissii", $tenant_id, $day_of_week, $open_time, $close_time, $is_open, $id);
+    
+    if ($stmt->execute()) {
+        $_SESSION['success'] = "Data berhasil diperbarui!";
+    } else {
+        $_SESSION['error'] = "Gagal memperbarui data: " . $conn->error;
     }
-
-    try {
-        $updateStmt = $conn->prepare("UPDATE tenant_holidays SET tenant_id = ?, holiday_date = ?, description = ? WHERE id = ?");
-        $updateStmt->bind_param("issi", $tenantId, $holidayDate, $description, $targetId);
-        
-        if ($updateStmt->execute()) {
-            header("Location: tenant_holidays.php?status=success_update");
-            exit;
-        } else {
-            header("Location: tenant_holidays.php?status=error_update&msg=" . urlencode($updateStmt->error));
-            exit;
-        }
-        $updateStmt->close();
-    } catch (Throwable $e) {
-        header("Location: tenant_holidays.php?status=error_update&msg=" . urlencode($e->getMessage()));
-        exit;
-    }
+    header("Location: tenant_operating_hours.php");
+    exit;
 }
 
-// =========================================================================
-// 3. CRUD: LOGIKA DELETE DATA LIBUR TENANT (HAPUS PERMANEN)
-// =========================================================================
-if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
-    $deleteId = (int)$_GET['id'];
-
-    if ($deleteId > 0) {
-        try {
-            $deleteStmt = $conn->prepare("DELETE FROM tenant_holidays WHERE id = ?");
-            $deleteStmt->bind_param("i", $deleteId);
-            
-            if ($deleteStmt->execute()) {
-                header("Location: tenant_holidays.php?status=success_delete");
-                exit;
-            } else {
-                header("Location: tenant_holidays.php?status=error_delete&msg=" . urlencode($deleteStmt->error));
-                exit;
-            }
-            $deleteStmt->close();
-        } catch (Throwable $e) {
-            header("Location: tenant_holidays.php?status=error_delete&msg=" . urlencode($e->getMessage()));
-            exit;
-        }
+// ==========================================
+// 3. PROSES HAPUS DATA (DELETE)
+// ==========================================
+if (isset($_GET['delete'])) {
+    $id = $_GET['delete'];
+    
+    $query = "DELETE FROM tenant_operating_hours WHERE id = ?";
+    $stmt  = $conn->prepare($query);
+    $stmt->bind_param("i", $id);
+    
+    if ($stmt->execute()) {
+        $_SESSION['success'] = "Data berhasil dihapus!";
+    } else {
+        $_SESSION['error'] = "Gagal menghapus data: " . $conn->error;
     }
+    header("Location: tenant_operating_hours.php");
+    exit;
 }
 
-// =========================================================================
-// 4. READ DATA: AMBIL DATA LIBUR (JOIN NAMA TENANT) & LIST DATA TENANTS
-// =========================================================================
-$listHolidays = [];
-$listActiveTenants = [];
-
-try {
-    // Mengambil data libur dengan LEFT JOIN ke tabel tenants untuk menarik nama tenant asli
-    $queryRead = "SELECT th.id, th.tenant_id, th.holiday_date, th.description, t.name AS tenant_name 
-                  FROM tenant_holidays th 
-                  LEFT JOIN tenants t ON th.tenant_id = t.id 
-                  ORDER BY th.holiday_date DESC";
-    $resultRead = $conn->query($queryRead);
-    if ($resultRead) {
-        while ($row = $resultRead->fetch_assoc()) {
-            $listHolidays[] = $row;
-        }
-    }
-
-    // Mengambil opsi data tenant untuk dimasukkan ke dalam elemen select option form modal input
-    $queryTenants = "SELECT id, name FROM tenants WHERE deleted_at IS NULL ORDER BY name ASC";
-    $resultTenants = $conn->query($queryTenants);
-    if ($resultTenants) {
-        while ($tRow = $resultTenants->fetch_assoc()) {
-            $listActiveTenants[] = $tRow;
-        }
-    }
-} catch (Throwable $e) {
-    // Mencegah crash patah halaman jika kueri bermasalah
-}
+// ==========================================
+// 4. AMBIL DATA UNTUK DITAMPILKAN (READ)
+// ==========================================
+$query  = "SELECT * FROM tenant_operating_hours ORDER BY tenant_id ASC, day_of_week ASC";
+$result = $conn->query($query);
 ?>
 
 <!DOCTYPE html>
@@ -174,14 +126,14 @@ try {
   <!-- Container tabel dengan tema gelap transparan yang selaras sempurna -->
   <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
     
-    <!-- HEADER TABEL & TOMBOL TAMBAH HARI LIBUR -->
+    <!-- HEADER TABEL & TOMBOL TAMBAH JAM OPERASIONAL -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
       <div>
-        <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;"> Tenant Holidays </h2>
+        <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;"> Tenant Operating Hours </h2>
       </div>
       <div>
-        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalHoliday" onclick="openTambahHoliday()">
-          <i class="bi bi-calendar-plus"></i> Tambah Hari Libur
+        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalOperatingHour" onclick="openTambahOperatingHour()">
+          <i class="bi bi-clock-history"></i> Tambah Jam Operasional
         </button>
       </div>
     </div>
@@ -191,9 +143,9 @@ try {
         <div class="alert <?= strpos($status, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
             <strong>
                 <?php 
-                if ($status == 'success_insert') echo "Data hari libur berhasil ditambahkan!";
-                elseif ($status == 'success_update') echo "Data hari libur berhasil diperbarui!";
-                elseif ($status == 'success_delete') echo "Data hari libur berhasil dihapus!";
+                if ($status == 'success_insert') echo "Data jam operasional berhasil ditambahkan!";
+                elseif ($status == 'success_update') echo "Data jam operasional berhasil diperbarui!";
+                elseif ($status == 'success_delete') echo "Data jam operasional berhasil dihapus!";
                 else echo "Operasi gagal: " . htmlspecialchars($msg);
                 ?>
             </strong>
@@ -201,34 +153,45 @@ try {
         </div>
     <?php endif; ?>
 
-    <!-- STRUKTUR TABEL LIST DATA HARI LIBUR (DRAG SCROLL & TRANSPARAN) -->
-    <div id="dragScrollHolidayContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
+    <!-- STRUKTUR TABEL LIST DATA JAM OPERASIONAL (DRAG SCROLL & TRANSPARAN) -->
+    <div id="dragScrollOperatingContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
       <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1000px; user-select: none; border-collapse: collapse !important;">
         <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
           <tr>
             <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;"> ID</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 250px;"> Tenant Name</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 200px;"> Holiday Date</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;"> Description</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 200px;"> Tenant ID</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 180px;"> Day of Week</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 180px;"> Open Time</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 180px;"> Close Time</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;"> Status</th>
             <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Aksi</th>
           </tr>
         </thead>
         <tbody style="background: transparent !important;">
-          <?php if (!empty($listHolidays)): 
-              foreach ($listHolidays as $row): ?>
+          <?php if (!empty($listOperatingHours)): 
+              $hari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+              foreach ($listOperatingHours as $row): ?>
                   <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
                     <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $row['id'] ?></td>
-                    <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($row['tenant_name'] ?? 'NULL (ID: '.$row['tenant_id'].')') ?></td>
-                    <td class="text-center" style="background: transparent !important; border: none !important;">
-                        <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem; background: rgba(220, 53, 69, 0.15);"><i class="bi bi-calendar3 me-1"></i><?= date('d M Y', strtotime($row['holiday_date'])) ?></span>
+                    <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($row['tenant_name'] ?? 'ID: '.$row['tenant_id']) ?></td>
+                    <td class="text-center fw-medium" style="background: transparent !important; border: none !important; color: #cbd5e1 !important;">
+                        <?= isset($hari[$row['day_of_week']]) ? $hari[$row['day_of_week']] : $row['day_of_week'] ?>
                     </td>
-                    <td class="text-white-50" style="background: transparent !important; border: none !important; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><?= htmlspecialchars($row['description'] ?: '-') ?></td>
+                    <td class="text-center text-white-50" style="background: transparent !important; border: none !important;"><?= substr($row['open_time'], 0, 5) ?></td>
+                    <td class="text-center text-white-50" style="background: transparent !important; border: none !important;"><?= substr($row['close_time'], 0, 5) ?></td>
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <?php if ($row['is_open'] == 1): ?>
+                            <span class="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem; background: rgba(25, 135, 84, 0.15);"><i class="bi bi-door-open-fill me-1"></i>Buka</span>
+                        <?php else: ?>
+                            <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem; background: rgba(220, 53, 69, 0.15);"><i class="bi bi-door-closed-fill me-1"></i>Tutup</span>
+                        <?php endif; ?>
+                    </td>
                     <td class="text-center" style="background: transparent !important; border: none !important;">
                       <div class="d-flex justify-content-center gap-1">
-                        <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditHoliday(<?= json_encode($row) ?>)'>
+                        <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditOperatingHour(<?= json_encode($row) ?>)'>
                           <i class="bi bi-pencil-square"></i>
                         </button>
-                        <a href="tenant_holidays.php?action=delete&id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick="return confirm('Apakah Anda yakin ingin menghapus data hari libur ini?')">
+                        <a href="tenant_operating_hours.php?action=delete&id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick="return confirm('Apakah Anda yakin ingin menghapus data operasional ini?')">
                           <i class="bi bi-trash-fill"></i>
                         </a>
                       </div>
@@ -237,9 +200,9 @@ try {
               <?php endforeach; 
           else: ?>
               <tr>
-                <td colspan="5" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">
+                <td colspan="7" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">
                   <i class="bi bi-folder-x d-block mb-2" style="font-size: 2rem; color: rgba(148, 163, 184, 0.4);"></i>
-                  Tidak ada data hari libur tenant saat ini.
+                  Tidak ada data jam operasional tenant saat ini.
                 </td>
               </tr>
           <?php endif; ?>
@@ -250,39 +213,71 @@ try {
 </main>
 
 <!-- MODAL FORM INPUT MELEBAR DI TENGAH (WIDE MODE & BEBAS SCROLLBAR) -->
-<div class="modal fade" id="modalHoliday" tabindex="-1" aria-labelledby="modalHolidayLabel" aria-hidden="true">
+<div class="modal fade" id="modalOperatingHour" tabindex="-1" aria-labelledby="modalOperatingHourLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content" style="background: rgba(15, 23, 42, 0.93) !important; backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.2); color: #e5e7eb; border-radius: 16px;">
             <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
-                <h5 class="modal-title fw-bold text-white" id="modalHolidayLabel">Form Hari Libur</h5>
+                <h5 class="modal-title fw-bold text-white" id="modalOperatingHourLabel">Form Jam Operasional</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="formHoliday" action="tenant_holidays.php" method="POST">
-                <input type="hidden" name="id" id="holiday_id"><div id="holiday_action_flag"></div>
+            <form id="formOperatingHour" action="tenant_operating_hours.php" method="POST">
+                <input type="hidden" name="id" id="operating_id">
+                <div id="operating_action_flag"></div>
+                
                 <div class="modal-body" style="overflow: visible !important;">
                     <div class="row g-3">
+                        <!-- PILIH TENANT -->
                         <div class="col-md-6">
                             <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Pilih Tenant <span class="text-danger">*</span></label>
-                            <select class="form-select" name="tenant_id" id="holiday_tenant_id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                            <select class="form-select" name="tenant_id" id="operating_tenant_id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
                                 <option value="" disabled selected>-- Pilih Tenant --</option>
                                 <?php foreach ($listActiveTenants as $tOption): ?>
                                     <option value="<?= $tOption['id'] ?>"><?= htmlspecialchars($tOption['name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
+
+                        <!-- PILIH HARI -->
                         <div class="col-md-6">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Tanggal Libur <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" name="holiday_date" id="holiday_date" onclick="this.showPicker()" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Hari <span class="text-danger">*</span></label>
+                            <select class="form-select" name="day_of_week" id="operating_day_of_week" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                                <option value="" disabled selected>-- Pilih Hari --</option>
+                                <option value="1">Senin</option>
+                                <option value="2">Selasa</option>
+                                <option value="3">Rabu</option>
+                                <option value="4">Kamis</option>
+                                <option value="5">Jumat</option>
+                                <option value="6">Sabtu</option>
+                                <option value="0">Minggu</option>
+                            </select>
                         </div>
-                        <div class="col-12">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Keterangan / Alasan Libur</label>
-                            <textarea class="form-control" name="description" id="holiday_description" rows="3" placeholder="Contoh: Libur Hari Raya Idul Fitri..." style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;"></textarea>
+
+                        <!-- JAM BUKA -->
+                        <div class="col-md-4">
+                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Jam Buka <span class="text-danger">*</span></label>
+                            <input type="time" class="form-control" name="open_time" id="operating_open_time" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                        </div>
+
+                        <!-- JAM TUTUP -->
+                        <div class="col-md-4">
+                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Jam Tutup <span class="text-danger">*</span></label>
+                            <input type="time" class="form-control" name="close_time" id="operating_close_time" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                        </div>
+
+                        <!-- STATUS (IS OPEN) -->
+                        <div class="col-md-4">
+                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Status Operasional <span class="text-danger">*</span></label>
+                            <select class="form-select" name="is_open" id="operating_is_open" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                                <option value="1" selected>Buka</option>
+                                <option value="0">Tutup / Libur Rutin</option>
+                            </select>
                         </div>
                     </div>
                 </div>
+                
                 <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.15); background: rgba(15, 23, 42, 0.95); border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-success" id="btnSubmitHoliday">Simpan Data</button>
+                    <button type="submit" class="btn btn-success" id="btnSubmitOperatingHour">Simpan Data</button>
                 </div>
             </form>
         </div>

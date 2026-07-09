@@ -8,10 +8,11 @@ $currentFile = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
 $menu = [
     'home.php'        => [ 'href' => 'home.php', 'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
     'tenants_group'   => [
-        'label' => 'Tenants', 'icon' => 'bi-house-lock-fill', // Menggunakan ikon utama Tenant bertingkat
+        'label' => 'Tenants', 'icon' => 'bi-house-lock-fill', 
         'sub'   => [
-            'tenants.php'         => [ 'href' => 'tenants.php',         'label' => 'Data Tenant',    'icon' => 'bi-house-lock-fill' ], // Ikon baru untuk Data Tenant
-            'tenant_holidays.php' => [ 'href' => 'tenant_holidays.php', 'label' => 'Tenant Holidays', 'icon' => 'bi-calendar-x' ],
+            'tenants.php'               => [ 'href' => 'tenants.php',               'label' => 'Data Tenant',            'icon' => 'bi-house-lock-fill' ],
+            'tenant_operating_hours.php'=> [ 'href' => 'tenant_operating_hours.php','label' => 'Tenant Operating Hours', 'icon' => 'bi-clock-history' ], // Menggunakan ikon Jam Riwayat
+            'tenant_holidays.php'       => [ 'href' => 'tenant_holidays.php',       'label' => 'Tenant Holidays',        'icon' => 'bi-calendar-x' ],
         ]
     ],
     'user.php'        => [ 'href' => 'user.php',        'label' => 'User',        'icon' => 'bi-person' ],

@@ -270,7 +270,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
 
 <style>
     :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
-    body { background:var(--bg) !important; color:var(--text); overflow-y: hidden !important; } /* Menyembunyikan scrollbar halaman utama */
+    body { background:var(--bg) !important; color:var(--text); }
     .content-bg { background: transparent; }
     .search-box { background: rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.25); border-radius: 18px; }
     .diet-pill { border:1px solid rgba(34,197,94,.35); background: rgba(34,197,94,.08); color:#86efac; }
@@ -281,17 +281,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
     .food-img img { width:100%; height:100%; object-fit: cover; }
     .price-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.35rem .7rem; background: rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.25); border-radius: 999px; color: var(--text); }
     .bottom-nav { position: fixed; left:0; right:0; bottom:0; z-index: 1035; background: rgba(15,23,42,.88); backdrop-filter: blur(10px); border-top: 1px solid rgba(148,163,184,.25); display:block; }
-    /* Penyelarasan Tabel & Sembunyikan Scrollbar Horizontal */
     #dragScrollUserContainer::-webkit-scrollbar, #dragScrollContainer::-webkit-scrollbar, .drag-scroll-container::-webkit-scrollbar { display: none !important; }
     #dragScrollUserContainer, #dragScrollContainer, .drag-scroll-container { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow-x: auto !important; cursor: grab !important; border: none !important; box-shadow: none !important; -webkit-box-shadow: none !important; }
     #dragScrollUserContainer:active, #dragScrollContainer:active, .drag-scroll-container:active { cursor: grabbing !important; }
     #dragScrollUserContainer table, #dragScrollContainer table, .drag-scroll-container table { border-collapse: collapse !important; border: none !important; }
     #dragScrollUserContainer table th, #dragScrollUserContainer table td, #dragScrollContainer table th, #dragScrollContainer table td, .drag-scroll-container table th, .drag-scroll-container table td { border-left: none !important; border-right: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; }
     .text-white-element { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
-    /* Kustomisasi Modal Tengah Melebar & Sembunyikan Semua Scrollbar Dalam Modal */
     .modal-dialog { max-width: 800px !important; }
-    .modal, .modal-body, .modal-open { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow-y: hidden !important; }
-    .modal::-webkit-scrollbar, .modal-body::-webkit-scrollbar { display: none !important; }
+    .modal-body::-webkit-scrollbar { display: none !important; }
+    .modal-body { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow: visible !important; }
+    .bi-clock-history, .text-white-icon { color: #ffffff !important; opacity: 1 !important; filter: drop-shadow(0 0 1px rgba(255,255,255,0.2)); }
+    input[type="time"]::-webkit-calendar-picker-indicator,
+    input[type="date"]::-webkit-calendar-picker-indicator {filter: invert(1) brightness(100%) contrast(100%) !important;cursor: pointer;}
     @media (min-width: 992px) { main.content-shift { margin-left: 280px; } .bottom-nav { display:none; } }
 </style>
 
