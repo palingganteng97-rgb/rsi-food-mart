@@ -246,20 +246,20 @@ $menu = [
     <div id="dragScrollContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
       <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1500px; user-select: none; border-collapse: collapse !important;">
         <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
-          <tr>
-            <th class="py-3 px-2 text-center text-white" style="background: transparent !important; border: none !important;">#1 ID</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#2 Name</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">#3 Type</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#4 Description</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">#5 Logo</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#6 Phone</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#7 Email</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">#8 Prep Time</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">#9 Status</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#10 Created At</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#11 Updated At</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#12 Deleted At</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Aksi</th>
+          <tr> 
+              <th class="py-3 px-2 text-center text-white" style="background: transparent !important; border: none !important;"> ID</th> 
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;"> Name</th> 
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Type</th> 
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Description</th> 
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Logo</th> 
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Phone</th> 
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Email</th> 
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Prep Time</th> 
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Status</th> 
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Created At</th> 
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Updated At</th> 
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Deleted At</th> 
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Aksi</th> 
           </tr>
         </thead>
         <tbody style="background: transparent !important;">

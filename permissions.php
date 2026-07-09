@@ -127,13 +127,13 @@ $permissionsData = getPermissions($conn);
     <div id="dragScrollAddonContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
       <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1000px; user-select: none; border-collapse: collapse !important;">
         <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
-          <tr>
-            <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;">#1 ID</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">#2 Product ID</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#3 Addon Name</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 180px;">#4 Required</th>
+            <tr>
+            <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;">ID</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Product ID</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Addon Name</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 180px;">Required</th>
             <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Aksi</th>
-          </tr>
+            </tr>
         </thead>
         <tbody style="background: transparent !important;">
           <?php

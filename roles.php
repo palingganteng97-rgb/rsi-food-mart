@@ -173,13 +173,13 @@ if (isset($_GET['action_delete'])) {
     <div class="table-responsive border rounded-3" style="border-color: rgba(148, 163, 184, 0.15) !important; background: transparent !important;">
       <table class="table table-hover align-middle mb-0 text-white" style="background: transparent !important; color: #e5e7eb !important;">
         <thead class="text-uppercase" style="font-size: 0.85rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
-          <tr>
-            <th class="py-3 px-3 text-center text-white" style="width: 80px; background: transparent !important;">#1 id</th>
-            <th class="py-3 text-white" style="background: transparent !important;">#2 name</th>
-            <th class="py-3 text-white" style="background: transparent !important;">#3 created_at</th>
-            <th class="py-3 text-white" style="background: transparent !important;">#4 updated_at</th>
+            <tr>
+            <th class="py-3 px-3 text-center text-white" style="width: 80px; background: transparent !important;">id</th>
+            <th class="py-3 text-white" style="background: transparent !important;">name</th>
+            <th class="py-3 text-white" style="background: transparent !important;">created_at</th>
+            <th class="py-3 text-white" style="background: transparent !important;">updated_at</th>
             <th class="py-3 text-center text-white" style="width: 120px; background: transparent !important;">Aksi</th>
-          </tr>
+            </tr>
         </thead>
         <tbody style="background: transparent !important;">
           <?php

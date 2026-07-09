@@ -320,21 +320,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
       <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1500px; user-select: none; border-collapse: collapse !important;">
         <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
           <tr>
-            <th class="py-3 px-2 text-center text-white" style="background: transparent !important; border: none !important;">#1 ID</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">#2 Role ID</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">#3 Tenant ID</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">#9 Photo</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#4 Name</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#5 Username</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#6 Email</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#7 Phone</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">#10 Status</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#11 Last Login</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#12 Created At</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#13 Updated At</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#14 Deleted At</th>
+            <th class="py-3 px-2 text-center text-white" style="background: transparent !important; border: none !important;">ID</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Role ID</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Tenant ID</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Photo</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Name</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Username</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Email</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Phone</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Status</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Last Login</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Created At</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Updated At</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Deleted At</th>
             <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Aksi</th>
           </tr>
+
         </thead>
         <tbody style="background: transparent !important;">
           <?php
