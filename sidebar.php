@@ -22,120 +22,30 @@ function activeClass(string $file, string $currentFile): string {
   :root { --sidebar-w: 280px; --bg: #0f172a; --text: #e5e7eb; --muted:#94a3b8; --green:#22c55e; }
   body { background: var(--bg) !important; color: var(--text); }
 
-  /* FIX: Menggunakan Flexbox layout agar tombol bawah terkunci sempurna */
-  .sidebar-fixed {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: var(--sidebar-w);
-      height: 100vh;
-      background: #0b1223;
-      border-right: 1px solid rgba(148,163,184,.25);
-      padding-top: 1rem;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      z-index: 1000;
-  }
-  .sidebar-fixed .app-brand {
-      padding: 0 1rem;
-      display:flex;
-      align-items:center;
-      gap:.75rem;
-      color: var(--text);
-      margin-bottom: 1.25rem;
-      flex-shrink: 0;
-  }
-  .sidebar-fixed .app-brand .logo-badge{
-      width: 42px; height:42px;
-      border-radius: 12px;
-      background: linear-gradient(180deg, rgba(34,197,94,.25), rgba(34,197,94,.06));
-      border: 1px solid rgba(34,197,94,.35);
-      display:flex; align-items:center; justify-content:center;
-      color: var(--green);
-      font-size: 1.25rem;
-  }
+  /* KUNCI UTAMA: Ditambahkan !important pada flex layout agar tidak tertimpa kelas d-none bawaan */
+  .sidebar-fixed { position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100vh; background: #0b1223; border-right: 1px solid rgba(148,163,184,.25); padding-top: 1rem; display: flex !important; flex-direction: column !important; justify-content: space-between !important; z-index: 1000; }
+  .sidebar-fixed .app-brand { padding: 0 1rem; display: flex; align-items: center; gap: .75rem; color: var(--text); margin-bottom: 1.25rem; flex-shrink: 0; }
+  .sidebar-fixed .app-brand .logo-badge { width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(180deg, rgba(34,197,94,.25), rgba(34,197,94,.06)); border: 1px solid rgba(34,197,94,.35); display: flex; align-items: center; justify-content: center; color: var(--green); font-size: 1.25rem; }
 
-  /* FIX: Container scroll untuk menu dan menyembunyikan scrollbar */
-  .sidebar-scroll-container {
-      flex-grow: 1;
-      overflow-y: auto;
-      scrollbar-width: none; /* Hide scrollbar Firefox */
-      -ms-overflow-style: none;  /* Hide scrollbar IE/Edge */
-  }
-  .sidebar-scroll-container::-webkit-scrollbar {
-      display: none; /* Hide scrollbar Chrome, Safari, Opera */
-  }
+  /* FIX: Komponen container scroll menu */
+  .sidebar-scroll-container { flex-grow: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+  .sidebar-scroll-container::-webkit-scrollbar { display: none; }
 
-  .navmenu .nav-link {
-      color: rgba(229,231,235,.82);
-      border-radius: 12px;
-      padding: .7rem .85rem;
-      display:flex;
-      align-items:center;
-      gap:.65rem;
-      margin: .25rem .5rem;
-      transition: background-color .15s ease, color .15s ease, border-color .15s ease;
-      border: 1px solid transparent;
-  }
-  .navmenu .nav-link:hover {
-      background: rgba(148,163,184,.12);
-      color: var(--text);
-  }
-  .navmenu .nav-link.active {
-      color: #052e16;
-      background: rgba(34,197,94,.9);
-      border-color: rgba(34,197,94,.55);
-  }
+  /* Navigasi Menu List */
+  .navmenu .nav-link { color: rgba(229,231,235,.82); border-radius: 12px; padding: .7rem .85rem; display: flex; align-items: center; gap: .65rem; margin: .25rem .5rem; transition: background-color .15s ease, color .15s ease, border-color .15s ease; border: 1px solid transparent; }
+  .navmenu .nav-link:hover { background: rgba(148,163,184,.12); color: var(--text); }
+  .navmenu .nav-link.active { color: #052e16; background: rgba(34,197,94,.9); border-color: rgba(34,197,94,.55); }
 
-  /* FIX: Komponen tombol logout terkunci di bagian paling bawah */
-  .sidebar-footer {
-      padding: 1rem;
-      border-top: 1px solid rgba(148,163,184,.12);
-      background: #0b1223;
-      flex-shrink: 0;
-  }
-  .btn-logout {
-      color: #f87171;
-      background: rgba(239, 68, 68, 0.08);
-      border: 1px solid rgba(239, 68, 68, 0.15);
-      width: 100%;
-      border-radius: 12px;
-      padding: .7rem .85rem;
-      display: flex;
-      align-items: center;
-      gap: .65rem;
-      text-decoration: none;
-      transition: all 0.15s ease;
-  }
-  .btn-logout:hover {
-      background: rgba(239, 68, 68, 0.2);
-      color: #f87171;
-      border-color: rgba(239, 68, 68, 0.3);
-  }
+  /* Komponen Tombol Kaki (Footer) Sidebar */
+  .sidebar-footer { padding: 1rem; border-top: 1px solid rgba(148,163,184,.12); background: #0b1223; flex-shrink: 0; }
+  .btn-logout { color: #f87171; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.15); width: 100%; border-radius: 12px; padding: .7rem .85rem; display: flex; align-items: center; gap: .65rem; text-decoration: none; transition: all 0.15s ease; }
+  .btn-logout:hover { background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.3); }
 
-  .mobile-topbar {
-      position: sticky;
-      top: 0;
-      z-index: 1030;
-      background: rgba(15,23,42,.85);
-      backdrop-filter: blur(10px);
-      border-bottom: 1px solid rgba(148,163,184,.25);
-  }
-
-  /* Reserve layout space to avoid overlap */
-  .page-body {
-      min-height: 100vh;
-      padding-bottom: 84px; /* room for mobile bottom nav */
-  }
-  @media (min-width: 992px) {
-      .page-body { padding-bottom: 0; }
-      .content-shift { margin-left: var(--sidebar-w); }
-  }
-  @media (max-width: 991.98px) {
-      .desktop-sidebar { display:none !important; }
-      .content-shift { margin-left: 0 !important; }
-  }
+  /* Komponen Responsif Layout */
+  .mobile-topbar { position: sticky; top: 0; z-index: 1030; background: rgba(15,23,42,.85); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(148,163,184,.25); }
+  .page-body { min-height: 100vh; padding-bottom: 84px; }
+  @media (min-width: 992px) { .page-body { padding-bottom: 0; } .content-shift { margin-left: var(--sidebar-w); } }
+  @media (max-width: 991.98px) { .desktop-sidebar { display: none !important; } .content-shift { margin-left: 0 !important; } }
 </style>
 
 <!-- Mobile Topbar -->
@@ -161,7 +71,8 @@ function activeClass(string $file, string $currentFile): string {
 
 <!-- Desktop Sidebar -->
 <aside class="desktop-sidebar sidebar-fixed d-none d-lg-block">
-  <!-- Pembungkus Atas (Brand + Scrollable Menu) -->
+  
+  <!-- Bagian Atas: Menampung Brand dan Menu List yang bisa di-scroll -->
   <div class="d-flex flex-column flex-grow-1 overflow-hidden">
     <div class="app-brand">
       <div class="logo-badge" aria-hidden="true">
@@ -173,7 +84,7 @@ function activeClass(string $file, string $currentFile): string {
       </div>
     </div>
 
-    <!-- Area Ter-scroll Tanpa Memunculkan Batang Scroll -->
+    <!-- Area Menu Utama dengan Scroll Bar Tersembunyi -->
     <div class="sidebar-scroll-container">
       <div class="navmenu mt-1">
         <?php foreach ($menu as $file => $item): ?>
@@ -186,8 +97,8 @@ function activeClass(string $file, string $currentFile): string {
     </div>
   </div>
 
-  <!-- Pembungkus Bawah (Tombol Logout Terkunci Permanen) -->
-  <div class="sidebar-footer">
+  <!-- Bagian Bawah: Mengunci tombol logout permanen di ujung bawah layar desktop -->
+  <div class="sidebar-footer w-100">
       <a href="logout.php" class="btn-logout" onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?')">
           <i class="bi bi-box-arrow-left"></i>
           <span>Logout</span>
