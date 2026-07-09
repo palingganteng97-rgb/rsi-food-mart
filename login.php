@@ -1,14 +1,13 @@
-<?php 
-  // Ambil pesan error dari session flash jika ada kegagalan otentikasi di index.php
-  $flashError = $_SESSION['flash_error'] ?? '';
-  if (!empty($flashError)): 
-?>
-    <div class="alert alert-danger border-0 rounded-3 small py-2 mb-3" role="alert" style="background: rgba(239,68,68,.12); color: #fecaca;">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= htmlspecialchars($flashError) ?>
-    </div>
-<?php 
-    unset($_SESSION['flash_error']);
-  endif; 
+<?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// BYPASS: Jika user sebenarnya sudah login, jangan tampilkan form login lagi, langsung lempar ke Etalase Toko
+if (isset($_SESSION['id'])) {
+    header("Location: index.php");
+    exit();
+}
 ?>
 
 <!DOCTYPE html>

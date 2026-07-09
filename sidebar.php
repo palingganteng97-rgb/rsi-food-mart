@@ -4,20 +4,63 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// ===================================================
+// UTALITAS: ROUTER DETEKSI PERANGKAT & NAVIGASI DINAMIS BERPENGAMAN SESSIONS
+// ===================================================
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 $currentFile = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
+
 $menu = [
-    'home.php'        => [ 'href' => 'home.php', 'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
-    'tenants_group'   => [
-        'label' => 'Tenants', 'icon' => 'bi-house-lock-fill', 
+    'home.php' => [ 
+        'href'  => 'home.php', 
+        'label' => 'Etalase Menu', 
+        'icon'  => 'bi-shop' 
+    ],
+    
+    'tenants_group' => [
+        'label' => 'Tenants', 
+        'icon'  => 'bi-house-lock-fill', 
+        'class' => 'd-mobile-none',
         'sub'   => [
-            'tenants.php'               => [ 'href' => 'tenants.php',               'label' => 'Data Tenant',            'icon' => 'bi-house-lock-fill' ],
-            'tenant_operating_hours.php'=> [ 'href' => 'tenant_operating_hours.php','label' => 'Tenant Operating Hours', 'icon' => 'bi-clock-history' ], // Menggunakan ikon Jam Riwayat
-            'tenant_holidays.php'       => [ 'href' => 'tenant_holidays.php',       'label' => 'Tenant Holidays',        'icon' => 'bi-calendar-x' ],
+            'tenants.php'                => [ 'href' => 'tenants.php',                'label' => 'Data Tenant',            'icon' => 'bi-house-lock-fill' ],
+            'tenant_operating_hours.php' => [ 'href' => 'tenant_operating_hours.php', 'label' => 'Tenant Operating Hours', 'icon' => 'bi-clock-history' ],
+            'tenant_holidays.php'        => [ 'href' => 'tenant_holidays.php',        'label' => 'Tenant Holidays',        'icon' => 'bi-calendar-x' ],
+            'tenant_settings.php'        => [ 'href' => 'tenant_settings.php',        'label' => 'Tenant Settings',        'icon' => 'bi-gear-fill' ],
         ]
     ],
-    'user.php'        => [ 'href' => 'user.php',        'label' => 'User',        'icon' => 'bi-person' ],
-    'roles.php'       => [ 'href' => 'roles.php',       'label' => 'Roles',       'icon' => 'bi-shield-lock' ],
-    'permissions.php' => [ 'href' => 'permissions.php', 'label' => 'Permissions', 'icon' => 'bi-key' ],
+    
+    // 1. MENU USER PC: Ditambahkan class d-none d-lg-block agar SEMBUNYI TOTAL di layar HP
+    'user.php' => [ 
+        'href'  => 'user.php',        
+        'label' => 'User',        
+        'icon'  => 'bi-person',
+        'class' => 'd-none d-lg-block'
+    ], 
+
+    // 2. MENU PROFIL MOBILE BARU: Ditambahkan class d-block d-lg-none agar HANYA MUNCUL DI HP menggantikan posisi menu User
+    'profile.php' => [ 
+        'href'  => 'profile.php',        
+        'label' => 'User',        
+        'icon'  => 'bi-person',
+        'class' => 'd-block d-lg-none'
+    ], 
+    
+    'roles.php' => [ 
+        'href'  => 'roles.php',       
+        'label' => 'Roles',       
+        'icon'  => 'bi-shield-lock', 
+        'class' => 'd-mobile-none' 
+    ], 
+    
+    'permissions.php' => [ 
+        'href'  => 'permissions.php', 
+        'label' => 'Permissions', 
+        'icon'  => 'bi-key',         
+        'class' => 'd-mobile-none' 
+    ], 
 ];
 
 function activeClass(string $file, string $currentFile): string {
@@ -52,8 +95,18 @@ function activeClass(string $file, string $currentFile): string {
   /* Komponen Responsif Layout */
   .mobile-topbar { position: sticky; top: 0; z-index: 1030; background: rgba(15,23,42,.85); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(148,163,184,.25); }
   .page-body { min-height: 100vh; padding-bottom: 84px; }
-  @media (min-width: 992px) { .page-body { padding-bottom: 0; } .content-shift { margin-left: var(--sidebar-w); } }
-  @media (max-width: 991.98px) { .desktop-sidebar { display: none !important; } .content-shift { margin-left: 0 !important; } }
+  
+  @media (min-width: 992px) { 
+      .page-body { padding-bottom: 0; } 
+      .content-shift { margin-left: var(--sidebar-w); } 
+  }
+  
+  /* RESPONSIVE FILTER: Sembunyikan sidebar desktop menetap, tetapi pertahankan topbar seluler tetap terlihat */
+  @media (max-width: 991.98px) { 
+      .desktop-sidebar, .sidebar-fixed { display: none !important; } 
+      .content-shift { margin-left: 0 !important; } 
+      .d-mobile-none { display: none !important; } /* Menyembunyikan item menu khusus admin di dalam offcanvas */
+  }
 </style>
 
 <!-- Mobile Topbar -->
@@ -137,7 +190,8 @@ function activeClass(string $file, string $currentFile): string {
       <div class="navmenu">
         <?php foreach ($menu as $key => $item): ?>
           <?php if (isset($item['sub'])): $isSubActive = array_key_exists($currentFile, $item['sub']); ?>
-            <div class="w-100 mb-1">
+            <!-- Menambahkan class pendeteksi layar mobile untuk menyembunyikan grup dropdown -->
+            <div class="w-100 mb-1 <?= $item['class'] ?? ''; ?>">
               <button class="nav-link w-100 border-0 text-start d-flex align-items-center gap-2 <?= $isSubActive ? 'active' : ''; ?>" data-bs-toggle="collapse" data-bs-target="#dropMobileTenantsMenu" aria-expanded="<?= $isSubActive ? 'true' : 'false'; ?>" style="background:transparent; color:inherit;" data-mobile-nav="1">
                 <i class="bi <?= $item['icon']; ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
                 <i class="bi bi-chevron-down small transition-arrow" style="transition: transform 0.2s; font-size: 0.75rem; opacity: 0.7;"></i>
@@ -151,7 +205,8 @@ function activeClass(string $file, string $currentFile): string {
               </div>
             </div>
           <?php else: ?>
-            <a class="nav-link <?= ($currentFile === $key) ? 'active' : ''; ?>" href="<?= htmlspecialchars($item['href']); ?>" data-mobile-nav="1">
+            <!-- Menambahkan class pendeteksi layar mobile untuk menyembunyikan menu tunggal -->
+            <a class="nav-link <?= ($currentFile === $key) ? 'active' : ''; ?> <?= $item['class'] ?? ''; ?>" href="<?= htmlspecialchars($item['href']); ?>" data-mobile-nav="1">
               <i class="bi <?= htmlspecialchars($item['icon']); ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
             </a>
           <?php endif; ?>

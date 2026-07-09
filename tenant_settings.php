@@ -1,5 +1,5 @@
 <?php
-// tenant_operating_hours.php
+// tenant_settings.php
 include "db.php"; // Memanggil koneksi database ($conn) & session_start()
 
 // Proteksi Halaman: Jika sesi user_id kosong, tendang kembali ke login.php
@@ -8,26 +8,36 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     exit;
 }
 
+// Inisialisasi variabel status notifikasi
+$status = "";
+$msg = "";
+if (isset($_SESSION['status'])) {
+    $status = $_SESSION['status'];
+    $msg = $_SESSION['msg'] ?? "";
+    unset($_SESSION['status'], $_SESSION['msg']);
+}
+
 // ==========================================
 // 1. PROSES SIMPAN / TAMBAH DATA (CREATE)
 // ==========================================
 if (isset($_POST['action']) && $_POST['action'] == 'store') {
-    $tenant_id   = $_POST['tenant_id'];
-    $day_of_week = $_POST['day_of_week'];
-    $open_time   = $_POST['open_time'];
-    $close_time  = $_POST['close_time'];
-    $is_open     = isset($_POST['is_open']) ? 1 : 0; // Default di DB adalah '1' jika tidak diisi
+    $tenant_id     = $_POST['tenant_id'];
+    $auto_accept   = isset($_POST['auto_accept']) ? (int)$_POST['auto_accept'] : 0;
+    $accept_order  = isset($_POST['accept_order']) ? (int)$_POST['accept_order'] : 1;
+    $minimum_order = $_POST['minimum_order'] ?: '0.00';
+    $maximum_order = $_POST['maximum_order'] ?: '0.00';
 
-    $query = "INSERT INTO tenant_operating_hours (tenant_id, day_of_week, open_time, close_time, is_open) VALUES (?, ?, ?, ?, ?)";
+    $query = "INSERT INTO tenant_settings (tenant_id, auto_accept, accept_order, minimum_order, maximum_order) VALUES (?, ?, ?, ?, ?)";
     $stmt  = $conn->prepare($query);
-    $stmt->bind_param("iissi", $tenant_id, $day_of_week, $open_time, $close_time, $is_open);
+    $stmt->bind_param("iiidd", $tenant_id, $auto_accept, $accept_order, $minimum_order, $maximum_order);
     
     if ($stmt->execute()) {
-        $_SESSION['success'] = "Data berhasil ditambahkan!";
+        $_SESSION['status'] = 'success_insert';
     } else {
-        $_SESSION['error'] = "Gagal menambahkan data: " . $conn->error;
+        $_SESSION['status'] = 'failed';
+        $_SESSION['msg'] = $conn->error;
     }
-    header("Location: tenant_operating_hours.php");
+    header("Location: tenant_settings.php");
     exit;
 }
 
@@ -35,50 +45,71 @@ if (isset($_POST['action']) && $_POST['action'] == 'store') {
 // 2. PROSES UPDATE DATA (UPDATE)
 // ==========================================
 if (isset($_POST['action']) && $_POST['action'] == 'update') {
-    $id          = $_POST['id'];
-    $tenant_id   = $_POST['tenant_id'];
-    $day_of_week = $_POST['day_of_week'];
-    $open_time   = $_POST['open_time'];
-    $close_time  = $_POST['close_time'];
-    $is_open     = isset($_POST['is_open']) ? 1 : 0;
+    $id            = $_POST['id'];
+    $tenant_id     = $_POST['tenant_id'];
+    $auto_accept   = isset($_POST['auto_accept']) ? (int)$_POST['auto_accept'] : 0;
+    $accept_order  = isset($_POST['accept_order']) ? (int)$_POST['accept_order'] : 0;
+    $minimum_order = $_POST['minimum_order'] ?: '0.00';
+    $maximum_order = $_POST['maximum_order'] ?: '0.00';
 
-    $query = "UPDATE tenant_operating_hours SET tenant_id = ?, day_of_week = ?, open_time = ?, close_time = ?, is_open = ? WHERE id = ?";
+    $query = "UPDATE tenant_settings SET tenant_id = ?, auto_accept = ?, accept_order = ?, minimum_order = ?, maximum_order = ? WHERE id = ?";
     $stmt  = $conn->prepare($query);
-    $stmt->bind_param("iissii", $tenant_id, $day_of_week, $open_time, $close_time, $is_open, $id);
+    $stmt->bind_param("iiiddi", $tenant_id, $auto_accept, $accept_order, $minimum_order, $maximum_order, $id);
     
     if ($stmt->execute()) {
-        $_SESSION['success'] = "Data berhasil diperbarui!";
+        $_SESSION['status'] = 'success_update';
     } else {
-        $_SESSION['error'] = "Gagal memperbarui data: " . $conn->error;
+        $_SESSION['status'] = 'failed';
+        $_SESSION['msg'] = $conn->error;
     }
-    header("Location: tenant_operating_hours.php");
+    header("Location: tenant_settings.php");
     exit;
 }
 
 // ==========================================
 // 3. PROSES HAPUS DATA (DELETE)
 // ==========================================
-if (isset($_GET['delete'])) {
-    $id = $_GET['delete'];
+if (isset($_GET['action']) && $_GET['action'] == 'delete') {
+    $id = $_GET['id'];
     
-    $query = "DELETE FROM tenant_operating_hours WHERE id = ?";
+    $query = "DELETE FROM tenant_settings WHERE id = ?";
     $stmt  = $conn->prepare($query);
     $stmt->bind_param("i", $id);
     
     if ($stmt->execute()) {
-        $_SESSION['success'] = "Data berhasil dihapus!";
+        $_SESSION['status'] = 'success_delete';
     } else {
-        $_SESSION['error'] = "Gagal menghapus data: " . $conn->error;
+        $_SESSION['status'] = 'failed';
+        $_SESSION['msg'] = $conn->error;
     }
-    header("Location: tenant_operating_hours.php");
+    header("Location: tenant_settings.php");
     exit;
 }
 
 // ==========================================
 // 4. AMBIL DATA UNTUK DITAMPILKAN (READ)
 // ==========================================
-$query  = "SELECT * FROM tenant_operating_hours ORDER BY tenant_id ASC, day_of_week ASC";
+// Query gabungan (JOIN) diasumsikan ada tabel master 'tenants' untuk mengambil 'tenant_name'
+$query  = "SELECT ts.*, t.name AS tenant_name 
+           FROM tenant_settings ts 
+           LEFT JOIN tenants t ON ts.tenant_id = t.id 
+           ORDER BY ts.id DESC";
 $result = $conn->query($query);
+$listSettings = [];
+if ($result && $result->num_rows > 0) {
+    while ($row = $result->fetch_assoc()) {
+        $listSettings[] = $row;
+    }
+}
+
+// Mengambil list tenant aktif untuk pilihan dropdown di modal form
+$listActiveTenants = [];
+$tResult = $conn->query("SELECT id, name FROM tenants ORDER BY name ASC");
+if ($tResult && $tResult->num_rows > 0) {
+    while ($tRow = $tResult->fetch_assoc()) {
+        $listActiveTenants[] = $tRow;
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -126,14 +157,14 @@ $result = $conn->query($query);
   <!-- Container tabel dengan tema gelap transparan yang selaras sempurna -->
   <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
     
-    <!-- HEADER TABEL & TOMBOL TAMBAH JAM OPERASIONAL -->
+    <!-- HEADER TABEL & TOMBOL TAMBAH PENGATURAN -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
       <div>
-        <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;"> Tenant Operating Hours </h2>
+        <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;"> Tenant Settings </h2>
       </div>
       <div>
-        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalOperatingHour" onclick="openTambahOperatingHour()">
-          <i class="bi bi-clock-history"></i> Tambah Jam Operasional
+        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalTenantSetting" onclick="openTambahTenantSetting()">
+          <i class="bi bi-sliders"></i> Konfigurasi Tenant
         </button>
       </div>
     </div>
@@ -143,9 +174,9 @@ $result = $conn->query($query);
         <div class="alert <?= strpos($status, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
             <strong>
                 <?php 
-                if ($status == 'success_insert') echo "Data jam operasional berhasil ditambahkan!";
-                elseif ($status == 'success_update') echo "Data jam operasional berhasil diperbarui!";
-                elseif ($status == 'success_delete') echo "Data jam operasional berhasil dihapus!";
+                if ($status == 'success_insert') echo "Konfigurasi tenant berhasil ditambahkan!";
+                elseif ($status == 'success_update') echo "Konfigurasi tenant berhasil diperbarui!";
+                elseif ($status == 'success_delete') echo "Konfigurasi tenant berhasil dihapus!";
                 else echo "Operasi gagal: " . htmlspecialchars($msg);
                 ?>
             </strong>
@@ -153,45 +184,60 @@ $result = $conn->query($query);
         </div>
     <?php endif; ?>
 
-    <!-- STRUKTUR TABEL LIST DATA JAM OPERASIONAL (DRAG SCROLL & TRANSPARAN) -->
-    <div id="dragScrollOperatingContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
+    <!-- STRUKTUR TABEL LIST DATA CONFIG TENANT (DRAG SCROLL & TRANSPARAN) -->
+    <div id="dragScrollSettingContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
       <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1000px; user-select: none; border-collapse: collapse !important;">
         <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
           <tr>
-            <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;"> ID</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 200px;"> Tenant ID</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 180px;"> Day of Week</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 180px;"> Open Time</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 180px;"> Close Time</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;"> Status</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Aksi</th>
+            <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 80px;"> ID</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 220px;"> Tenant Name</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;"> Auto Accept</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;"> Accept Order</th>
+            <th class="py-3 text-end text-white" style="background: transparent !important; border: none !important; width: 180px;"> Min Order</th>
+            <th class="py-3 text-end text-white" style="background: transparent !important; border: none !important; width: 180px;"> Max Order</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 120px;">Aksi</th>
           </tr>
         </thead>
         <tbody style="background: transparent !important;">
-          <?php if (!empty($listOperatingHours)): 
-              $hari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-              foreach ($listOperatingHours as $row): ?>
+          <?php if (!empty($listTenantSettings)): 
+              foreach ($listTenantSettings as $row): ?>
                   <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
                     <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $row['id'] ?></td>
                     <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($row['tenant_name'] ?? 'ID: '.$row['tenant_id']) ?></td>
-                    <td class="text-center fw-medium" style="background: transparent !important; border: none !important; color: #cbd5e1 !important;">
-                        <?= isset($hari[$row['day_of_week']]) ? $hari[$row['day_of_week']] : $row['day_of_week'] ?>
-                    </td>
-                    <td class="text-center text-white-50" style="background: transparent !important; border: none !important;"><?= substr($row['open_time'], 0, 5) ?></td>
-                    <td class="text-center text-white-50" style="background: transparent !important; border: none !important;"><?= substr($row['close_time'], 0, 5) ?></td>
+                    
+                    <!-- Status Auto Accept -->
                     <td class="text-center" style="background: transparent !important; border: none !important;">
-                        <?php if ($row['is_open'] == 1): ?>
-                            <span class="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem; background: rgba(25, 135, 84, 0.15);"><i class="bi bi-door-open-fill me-1"></i>Buka</span>
+                        <?php if ($row['auto_accept'] == 1): ?>
+                            <span class="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem; background: rgba(25, 135, 84, 0.15);"><i class="bi bi-lightning-charge-fill me-1"></i>Aktif</span>
                         <?php else: ?>
-                            <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem; background: rgba(220, 53, 69, 0.15);"><i class="bi bi-door-closed-fill me-1"></i>Tutup</span>
+                            <span class="badge bg-secondary-subtle text-muted border border-secondary border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem; background: rgba(148, 163, 184, 0.1);"><i class="bi bi-dash-circle me-1"></i>Nonaktif</span>
                         <?php endif; ?>
                     </td>
+
+                    <!-- Status Accept Order -->
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <?php if ($row['accept_order'] == 1): ?>
+                            <span class="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem; background: rgba(25, 135, 84, 0.15);"><i class="bi bi-check-circle-fill me-1"></i>Bisa Order</span>
+                        <?php else: ?>
+                            <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem; background: rgba(220, 53, 69, 0.15);"><i class="bi bi-x-circle-fill me-1"></i>Tutup Order</span>
+                        <?php endif; ?>
+                    </td>
+
+                    <!-- Nilai Minimum & Maximum Order dengan Format Rupiah/Mata Uang -->
+                    <td class="text-end fw-medium text-white-50" style="background: transparent !important; border: none !important;">
+                        Rp <?= number_format($row['minimum_order'], 2, ',', '.') ?>
+                    </td>
+                    <td class="text-end fw-medium text-white-50" style="background: transparent !important; border: none !important;">
+                        Rp <?= number_format($row['maximum_order'], 2, ',', '.') ?>
+                    </td>
+
+                    <!-- Tombol Aksi -->
                     <td class="text-center" style="background: transparent !important; border: none !important;">
                       <div class="d-flex justify-content-center gap-1">
-                        <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditOperatingHour(<?= json_encode($row) ?>)'>
+                        <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditTenantSetting(<?= json_encode($row) ?>)'>
                           <i class="bi bi-pencil-square"></i>
                         </button>
-                        <a href="tenant_operating_hours.php?action=delete&id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick="return confirm('Apakah Anda yakin ingin menghapus data operasional ini?')">
+                        <a href="tenant_settings.php?action=delete&id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick="return confirm('Apakah Anda yakin ingin menghapus konfigurasi tenant ini?')">
                           <i class="bi bi-trash-fill"></i>
                         </a>
                       </div>
@@ -202,7 +248,7 @@ $result = $conn->query($query);
               <tr>
                 <td colspan="7" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">
                   <i class="bi bi-folder-x d-block mb-2" style="font-size: 2rem; color: rgba(148, 163, 184, 0.4);"></i>
-                  Tidak ada data jam operasional tenant saat ini.
+                  Tidak ada data konfigurasi tenant saat ini.
                 </td>
               </tr>
           <?php endif; ?>
@@ -213,23 +259,23 @@ $result = $conn->query($query);
 </main>
 
 <!-- MODAL FORM INPUT MELEBAR DI TENGAH (WIDE MODE & BEBAS SCROLLBAR) -->
-<div class="modal fade" id="modalOperatingHour" tabindex="-1" aria-labelledby="modalOperatingHourLabel" aria-hidden="true">
+<div class="modal fade" id="modalTenantSetting" tabindex="-1" aria-labelledby="modalTenantSettingLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content" style="background: rgba(15, 23, 42, 0.93) !important; backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.2); color: #e5e7eb; border-radius: 16px;">
             <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
-                <h5 class="modal-title fw-bold text-white" id="modalOperatingHourLabel">Form Jam Operasional</h5>
+                <h5 class="modal-title fw-bold text-white" id="modalTenantSettingLabel">Form Konfigurasi Tenant</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="formOperatingHour" action="tenant_operating_hours.php" method="POST">
-                <input type="hidden" name="id" id="operating_id">
-                <div id="operating_action_flag"></div>
+            <form id="formTenantSetting" action="tenant_settings.php" method="POST">
+                <input type="hidden" name="id" id="setting_id">
+                <div id="setting_action_flag"></div>
                 
                 <div class="modal-body" style="overflow: visible !important;">
                     <div class="row g-3">
                         <!-- PILIH TENANT -->
-                        <div class="col-md-6">
+                        <div class="col-12">
                             <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Pilih Tenant <span class="text-danger">*</span></label>
-                            <select class="form-select" name="tenant_id" id="operating_tenant_id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                            <select class="form-select" name="tenant_id" id="setting_tenant_id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
                                 <option value="" disabled selected>-- Pilih Tenant --</option>
                                 <?php foreach ($listActiveTenants as $tOption): ?>
                                     <option value="<?= $tOption['id'] ?>"><?= htmlspecialchars($tOption['name']) ?></option>
@@ -237,47 +283,41 @@ $result = $conn->query($query);
                             </select>
                         </div>
 
-                        <!-- PILIH HARI -->
+                        <!-- AUTO ACCEPT -->
                         <div class="col-md-6">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Hari <span class="text-danger">*</span></label>
-                            <select class="form-select" name="day_of_week" id="operating_day_of_week" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                                <option value="" disabled selected>-- Pilih Hari --</option>
-                                <option value="1">Senin</option>
-                                <option value="2">Selasa</option>
-                                <option value="3">Rabu</option>
-                                <option value="4">Kamis</option>
-                                <option value="5">Jumat</option>
-                                <option value="6">Sabtu</option>
-                                <option value="0">Minggu</option>
+                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Auto Accept Order <span class="text-danger">*</span></label>
+                            <select class="form-select" name="auto_accept" id="setting_auto_accept" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                                <option value="0" selected>Nonaktif (Manual)</option>
+                                <option value="1">Aktif (Otomatis Terima)</option>
                             </select>
                         </div>
 
-                        <!-- JAM BUKA -->
-                        <div class="col-md-4">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Jam Buka <span class="text-danger">*</span></label>
-                            <input type="time" class="form-control" name="open_time" id="operating_open_time" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                        </div>
-
-                        <!-- JAM TUTUP -->
-                        <div class="col-md-4">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Jam Tutup <span class="text-danger">*</span></label>
-                            <input type="time" class="form-control" name="close_time" id="operating_close_time" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                        </div>
-
-                        <!-- STATUS (IS OPEN) -->
-                        <div class="col-md-4">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Status Operasional <span class="text-danger">*</span></label>
-                            <select class="form-select" name="is_open" id="operating_is_open" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                                <option value="1" selected>Buka</option>
-                                <option value="0">Tutup / Libur Rutin</option>
+                        <!-- ACCEPT ORDER -->
+                        <div class="col-md-6">
+                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Status Terima Pesanan <span class="text-danger">*</span></label>
+                            <select class="form-select" name="accept_order" id="setting_accept_order" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                                <option value="1" selected>Buka (Bisa Menerima Order)</option>
+                                <option value="0">Tutup (Blokir Order Masuk)</option>
                             </select>
+                        </div>
+
+                        <!-- MINIMUM ORDER -->
+                        <div class="col-md-6">
+                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Minimum Order (Rp) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" min="0" class="form-control" name="minimum_order" id="setting_minimum_order" placeholder="0.00" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                        </div>
+
+                        <!-- MAXIMUM ORDER -->
+                        <div class="col-md-6">
+                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Maximum Order (Rp) <span class="text-danger">*</span></label>
+                            <input type="number" step="0.01" min="0" class="form-control" name="maximum_order" id="setting_maximum_order" placeholder="0.00" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
                         </div>
                     </div>
                 </div>
                 
                 <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.15); background: rgba(15, 23, 42, 0.95); border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-success" id="btnSubmitOperatingHour">Simpan Data</button>
+                    <button type="submit" class="btn btn-success" id="btnSubmitTenantSetting">Simpan Data</button>
                 </div>
             </form>
         </div>
@@ -318,8 +358,10 @@ function openEditTenantSetting(data) {
     var myModal = new bootstrap.Modal(document.getElementById('modalTenantSetting'));
     myModal.show();
 }
+
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+

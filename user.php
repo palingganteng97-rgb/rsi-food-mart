@@ -1,22 +1,25 @@
 <?php
-// user.php
-include "db.php"; // Memanggil koneksi database ($conn) & session_start()
+// ====================================================================
+// TAHAP 1: STRUKTUR OTENTIKASI & PROTEKSI BACKEND AMAN (ANTI KEPENTAL)
+// ====================================================================
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Proteksi Halaman: Jika sesi user_id kosong, tendang kembali ke login.php
+// Menyertakan file database utama
+include 'db.php';
+
+// Proteksi tunggal: Memastikan variabel kunci pendeteksi akun login aktif terisi
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
-// Cukup panggil file handler di sini setelah koneksi database ($conn) aktif
+// Memproses file hapus data jika pemicu action delete dipanggil
 include "delete_handler.php";
 
-// =========================================================================
-// PERBAIKAN: AMBIL DATA ROLES DI SINI (SETELAH $conn SUDAH PASTI TERSEDIA)
-// =========================================================================
 $listRoles = [];
 try {
-    // Memastikan koneksi database aktif menggunakan mysqli
     $roleQuery = $conn->query("SELECT id, name FROM roles ORDER BY name ASC");
     if ($roleQuery) {
         while ($rRow = $roleQuery->fetch_assoc()) {
@@ -24,23 +27,21 @@ try {
         }
     }
 } catch (Throwable $e) {
-    // Meredam eror jika tabel roles belum memiliki data
 }
 
 $userId = (int)$_SESSION['user_id'];
 
-// Inisialisasi awal variabel dengan data Session (sebagai Fallback)
-$roleId = $_SESSION['role_id'] ?? '-';
-$tenantId = $_SESSION['tenant_id'] ?? '-';
-$name = $_SESSION['name'] ?? 'Pasien';
-$username = $_SESSION['username'] ?? '-';
-$email = $_SESSION['email'] ?? '-';
-$phone = $_SESSION['phone'] ?? '-';
-$photo = $_SESSION['photo'] ?? '';
-$status = $_SESSION['status'] ?? 0;
+// Inisialisasi awal variabel parameter profil dengan data Session (Fallback)
+$roleId    = $_SESSION['role_id'] ?? '-';
+$tenantId  = $_SESSION['tenant_id'] ?? '-';
+$name      = $_SESSION['name'] ?? 'Pasien';
+$username  = $_SESSION['username'] ?? '-';
+$email     = $_SESSION['email'] ?? '-';
+$phone     = $_SESSION['phone'] ?? '-';
+$photo     = $_SESSION['photo'] ?? '';
+$status    = $_SESSION['status'] ?? 0;
 $lastLogin = '-';
 
-// READ DATA: Mengambil data lengkap user dari database berdasarkan ID Sesi (User Logged In)
 try {
     $stmt = $conn->prepare('SELECT id, role_id, tenant_id, name, username, email, phone, photo, status, last_login FROM users WHERE id = ? LIMIT 1');
     $stmt->bind_param('i', $userId);
@@ -59,28 +60,25 @@ try {
     }
     $stmt->close();
 } catch (Throwable $e) {
-    // Tetap menggunakan data dari session jika query bermasalah
 }
 
 $isVerified = (int)$status === 1;
 $photoUrl = $photo ? (strpos($photo, 'uploads/') === 0 ? $photo : 'uploads/' . $photo) : 'assets/img/default-avatar.png';
 
-// Variabel status notifikasi global halaman
 $updateError = '';
 $updateSuccess = '';
 
-// =========================================================================
-// 1. CRUD: LOGIKA INSERT DATA USER BARU (DARI MODAL TAMBAH)
-// =========================================================================
+// ====================================================================
+// TAHAP 2: PROSES COUPLING FORM DATA TAMBAH USER (INSERT)
+// ====================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_register'])) {
     $newName     = trim($_POST['name'] ?? '');
     $newUsername = trim($_POST['username'] ?? '');
     $newEmail    = trim($_POST['email'] ?? '');
     $newPhone    = trim($_POST['phone'] ?? '');
     $newPassword = $_POST['password'] ?? '';
-    $newRoleId   = (int)($_POST['role_id'] ?? 0); // PERBAIKAN: Menangkap role_id dinamis dari dropdown modal tambah
+    $newRoleId   = (int)($_POST['role_id'] ?? 0);
 
-    // Validasi input wajib di sisi PHP (Sekarang memeriksa apakah role_id sudah dipilih)
     if (empty($newName) || empty($newUsername) || empty($newEmail) || empty($newPassword) || $newRoleId <= 0) {
         header("Location: user.php?status=error_insert&msg=" . urlencode("Semua kolom wajib termasuk Role Akses harus diisi!"));
         exit;
@@ -90,7 +88,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_register'])) {
     $uploadOk = true;
     $updateError = '';
 
-    // Proses upload foto
     if (!empty($_FILES['photo']['name'])) {
         $targetDir = "uploads/";
         if (!file_exists($targetDir)) { mkdir($targetDir, 0777, true); }
@@ -111,9 +108,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_register'])) {
     if ($uploadOk) {
         try {
             $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT);
-            $defaultStatus = 1; // Menyesuaikan TINYINT status default '1'
+            $defaultStatus = 1;
 
-            // PERBAIKAN: Mengikat variabel $newRoleId dari dropdown select modal ke query INSERT
             $insertStmt = $conn->prepare("INSERT INTO users (role_id, name, username, email, phone, password, photo, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             $insertStmt->bind_param("issssssi", $newRoleId, $newName, $newUsername, $newEmail, $newPhone, $hashedPassword, $uploadedPhotoName, $defaultStatus);
             
@@ -135,9 +131,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_register'])) {
     }
 }
 
-// =========================================================================
-// 2. CRUD: LOGIKA UPDATE DATA USER OLEH ADMIN (DARI MODAL EDIT)
-// =========================================================================
+// ====================================================================
+// TAHAP 3: PROSES COUPLING FORM DATA EDIT USER (UPDATE LENGKAP)
+// ====================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_admin'])) {
     $targetId = (int)($_POST['id'] ?? 0);
     $upName   = trim($_POST['name'] ?? '');
@@ -145,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_admin']
     $upPhone  = trim($_POST['phone'] ?? '');
     $upPass   = $_POST['password'] ?? '';
     $oldPhoto = trim($_POST['old_photo'] ?? '');
-    $upRoleId = (int)($_POST['role_id'] ?? 0); // PERBAIKAN: Menangkap role_id baru dari dropdown modal edit
+    $upRoleId = (int)($_POST['role_id'] ?? 0);
 
     $finalPhotoName = $oldPhoto; 
     $uploadOk = true;
@@ -171,17 +167,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_admin']
         } else { $uploadOk = false; $updateError = "Format gambar tidak valid."; }
     }
 
-    // PERBAIKAN: Memastikan $upRoleId ikut divalidasi tidak boleh kosong sebelum kueri dieksekusi
     if ($uploadOk && $targetId > 0 && !empty($upName) && !empty($upEmail) && $upRoleId > 0) {
         try {
             if (!empty($upPass)) {
+                // Eksekusi Update lengkap jika admin ikut mengubah kata sandi baru
                 $hashedPass = password_hash($upPass, PASSWORD_BCRYPT);
-                // PERBAIKAN: Menambahkan `role_id = ?` ke dalam kueri kueri UPDATE berserta parameter password
-                $updateStmt = $conn->prepare("UPDATE users SET name = ?, email = ?, phone = ?, photo = ?, password = ?, role_id = ? WHERE id = ?");
-                $updateStmt->bind_param("sssssii", $upName, $upEmail, $upPhone, $finalPhotoName, $hashedPass, $upRoleId, $targetId);
+                $updateStmt = $conn->prepare("UPDATE users SET name = ?, email = ?, phone = ?, password = ?, photo = ?, role_id = ?, updated_at = NOW() WHERE id = ?");
+                $updateStmt->bind_param("sssssii", $upName, $upEmail, $upPhone, $hashedPass, $finalPhotoName, $upRoleId, $targetId);
             } else {
-                // PERBAIKAN: Menambahkan `role_id = ?` ke dalam kueri kueri UPDATE tanpa mengganti password
-                $updateStmt = $conn->prepare("UPDATE users SET name = ?, email = ?, phone = ?, photo = ?, role_id = ? WHERE id = ?");
+                // Eksekusi Update biasa jika password dikosongkan (tidak diubah)
+                $updateStmt = $conn->prepare("UPDATE users SET name = ?, email = ?, phone = ?, photo = ?, role_id = ?, updated_at = NOW() WHERE id = ?");
                 $updateStmt->bind_param("ssssii", $upName, $upEmail, $upPhone, $finalPhotoName, $upRoleId, $targetId);
             }
             
@@ -198,63 +193,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_admin']
             exit;
         }
     } else {
-        $errorMsg = !empty($updateError) ? $updateError : "Semua kolom wajib atau Role Akses belum dipilih.";
-        header("Location: user.php?status=error_update&msg=" . urlencode($errorMsg));
+        header("Location: user.php?status=error_update&msg=" . urlencode("Gagal validasi data form atau file unggahan."));
         exit;
-    }
-}
-
-// =========================================================================
-// 3. CRUD: LOGIKA UPDATE MANDIRI (PROFIL AKUN YANG SEDANG LOG IN)
-// =========================================================================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
-    $newName = trim($_POST['update_name'] ?? '');
-    $newPhone = trim($_POST['update_phone'] ?? '');
-    $newEmail = trim($_POST['update_email'] ?? '');
-    
-    $uploadedPhotoPath = $photo; 
-    $uploadOk = true;
-
-    if (!empty($_FILES['update_photo']['name'])) {
-        $targetDir = "uploads/";
-        if (!file_exists($targetDir)) { mkdir($targetDir, 0777, true); }
-
-        $fileName = time() . '_' . basename($_FILES["update_photo"]["name"]);
-        $targetFilePath = $targetDir . $fileName;
-        $fileType = strtolower(pathinfo($targetFilePath, PATHINFO_EXTENSION));
-        
-        $allowTypes = array('jpg', 'png', 'jpeg', 'gif');
-        if (in_array($fileType, $allowTypes)) {
-            if (move_uploaded_file($_FILES["update_photo"]["tmp_name"], $targetFilePath)) {
-                $uploadedPhotoPath = $targetFilePath;
-                if (!empty($photo) && file_exists($photo) && strpos($photo, 'uploads/') === 0) {
-                    @unlink($photo);
-                }
-            } else { $updateError = "Terjadi kesalahan saat mengunggah foto profil."; $uploadOk = false; }
-        } else { $updateError = "Format berkas gambar tidak valid."; $uploadOk = false; }
-    }
-
-    if ($uploadOk && !empty($newName) && !empty($newEmail)) {
-        try {
-            $updateStmt = $conn->prepare("UPDATE users SET name = ?, phone = ?, email = ?, photo = ? WHERE id = ?");
-            $updateStmt->bind_param("ssssi", $newName, $newPhone, $newEmail, $uploadedPhotoPath, $userId);
-            
-            if ($updateStmt->execute()) {
-                $_SESSION['name'] = $newName;
-                $_SESSION['phone'] = $newPhone;
-                $_SESSION['email'] = $newEmail;
-                $_SESSION['photo'] = $uploadedPhotoPath;
-                
-                $updateSuccess = "Profil dan foto Anda berhasil diperbarui!";
-                
-                $name = $newName;
-                $phone = $newPhone;
-                $email = $newEmail;
-                $photo = $uploadedPhotoPath;
-                $photoUrl = $uploadedPhotoPath;
-            } else { $updateError = "Gagal menyimpan perubahan data profil."; }
-            $updateStmt->close();
-        } catch (Throwable $e) { $updateError = "Terjadi kesalahan database: " . $e->getMessage(); }
     }
 }
 ?>
@@ -270,7 +210,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
 
 <style>
     :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
-    body { background:var(--bg) !important; color:var(--text); }
+    body { background:var(--bg) !important; color:var(--text); overflow-y: hidden !important; } /* Menyembunyikan scrollbar halaman utama */
     .content-bg { background: transparent; }
     .search-box { background: rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.25); border-radius: 18px; }
     .diet-pill { border:1px solid rgba(34,197,94,.35); background: rgba(34,197,94,.08); color:#86efac; }
@@ -281,18 +221,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
     .food-img img { width:100%; height:100%; object-fit: cover; }
     .price-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.35rem .7rem; background: rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.25); border-radius: 999px; color: var(--text); }
     .bottom-nav { position: fixed; left:0; right:0; bottom:0; z-index: 1035; background: rgba(15,23,42,.88); backdrop-filter: blur(10px); border-top: 1px solid rgba(148,163,184,.25); display:block; }
+    
+    /* Penyelarasan Tabel & Sembunyikan Scrollbar Horizontal */
     #dragScrollUserContainer::-webkit-scrollbar, #dragScrollContainer::-webkit-scrollbar, .drag-scroll-container::-webkit-scrollbar { display: none !important; }
     #dragScrollUserContainer, #dragScrollContainer, .drag-scroll-container { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow-x: auto !important; cursor: grab !important; border: none !important; box-shadow: none !important; -webkit-box-shadow: none !important; }
     #dragScrollUserContainer:active, #dragScrollContainer:active, .drag-scroll-container:active { cursor: grabbing !important; }
     #dragScrollUserContainer table, #dragScrollContainer table, .drag-scroll-container table { border-collapse: collapse !important; border: none !important; }
     #dragScrollUserContainer table th, #dragScrollUserContainer table td, #dragScrollContainer table th, #dragScrollContainer table td, .drag-scroll-container table th, .drag-scroll-container table td { border-left: none !important; border-right: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; }
     .text-white-element { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
-    .modal-dialog { max-width: 800px !important; }
+    
+    /* PERBAIKAN: MODAL TENGAH MELEBAR BERSIH TANPA SCROLLBAR FISIK BROWSER */
+    .modal, .modal-open { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow-y: hidden !important; }
+    .modal::-webkit-scrollbar { display: none !important; }
+    
+    /* MENGUBAH overflow-y JADI auto AGAR KONTEKS SCROLLABLE BOOTSTRAP BEKERJA DI DALAM MODAL-BODY */
+    .modal-body { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow-y: auto !important; }
     .modal-body::-webkit-scrollbar { display: none !important; }
-    .modal-body { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow: visible !important; }
-    .bi-clock-history, .text-white-icon { color: #ffffff !important; opacity: 1 !important; filter: drop-shadow(0 0 1px rgba(255,255,255,0.2)); }
-    input[type="time"]::-webkit-calendar-picker-indicator,
-    input[type="date"]::-webkit-calendar-picker-indicator {filter: invert(1) brightness(100%) contrast(100%) !important;cursor: pointer;}
+
     @media (min-width: 992px) { main.content-shift { margin-left: 280px; } .bottom-nav { display:none; } }
 </style>
 
@@ -300,6 +245,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
 <body>
   <?php require __DIR__ . '/sidebar.php'; ?>
 
+<!-- TAHAP 1: PEMBUNGKUS LUAR UTAMA (MAIN CONTAINER)    -->
 <main class="content-shift p-4">
   <!-- Container tabel dengan tema gelap transparan -->
   <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
@@ -336,7 +282,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
             <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Deleted At</th>
             <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Aksi</th>
           </tr>
-
         </thead>
         <tbody style="background: transparent !important;">
           <?php
@@ -378,10 +323,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                         
                         <td class="text-center" style="background: transparent !important; border: none !important;">
                           <div class="d-flex justify-content-center gap-1">
-                            <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit User" data-bs-toggle="modal" data-bs-target="#modalEditUser" onclick="populateEditModal(<?= htmlspecialchars(json_encode($userRow)) ?>)">
+                            <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit User" onclick='openEditUser(<?= json_encode($userRow) ?>)'>
                               <i class="bi bi-pencil-square"></i>
                             </button>
-                            <a href="user.php?action=delete&id=<?= $userRow['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete User" onclick="return confirm('Apakah Anda yakin ingin menghapus user ini?')">
+                            <a href="user.php?action=delete&id=<?= $userRow['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete User" onclick="return confirm('Apakah Anda yakin ingin menghapus data pengguna ini?')">
                               <i class="bi bi-trash-fill"></i>
                             </a>
                           </div>
@@ -392,12 +337,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
               } else {
                   ?>
                   <tr>
-                    <td colspan="14" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">Tidak ada data user saat ini.</td>
+                    <td colspan="14" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">
+                      <i class="bi bi-folder-x d-block mb-2" style="font-size: 2rem; color: rgba(148, 163, 184, 0.4);"></i>
+                      Data user tidak ditemukan.
+                    </td>
                   </tr>
                   <?php
               }
-          } catch (Throwable $e) {
-              echo "<tr><td colspan='14' class='text-danger text-center py-3' style='background: transparent !important; border: none !important;'>Gagal memuat data: " . htmlspecialchars($e->getMessage()) . "</td></tr>";
+          } catch (Exception $e) {
+              echo '<tr><td colspan="14" class="text-danger text-center py-3">Terjadi Kesalahan: ' . htmlspecialchars($e->getMessage()) . '</td></tr>';
           }
           ?>
         </tbody>
@@ -406,17 +354,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
   </div>
 </main>
 
-<!-- 1. MODAL DIALOG: TAMBAH USER BARU (2-KOLOM HORIZONTAL) -->
+<!-- 1. MODAL DIALOG: TAMBAH USER BARU (2-KOLOM HORIZONTAL EXTRA LEBAR & BISA SCROLL) -->
 <div class="modal fade" id="modalTambahUser" tabindex="-1" aria-hidden="true">
     <!-- Style internal khusus untuk merombak tombol input file bawaan browser menjadi dark mode -->
     <style>
         #tambah_input_photo::-webkit-file-upload-button,
-        #tambah_input_photo::file-selector-button {background-color: rgba(255, 255, 255, 0.08) !important;color: #e2e8f0 !important;border: 1px solid rgba(148, 163, 184, 0.25) !important;border-radius: 6px !important;padding: 0.25rem 0.75rem !important;margin-right: 10px !important;font-size: 0.82rem;transition: all 0.2s ease-in-out;}
+        #tambah_input_photo::file-selector-button {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+            color: #e2e8f0 !important;
+            border: 1px solid rgba(148, 163, 184, 0.25) !important;
+            border-radius: 6px !important;
+            padding: 0.25rem 0.75rem !important;
+            margin-right: 10px !important;
+            font-size: 0.82rem;
+            transition: all 0.2s ease-in-out;
+        }
         #tambah_input_photo::-webkit-file-upload-button:hover,
-        #tambah_input_photo::file-selector-button:hover {background-color: rgba(255, 255, 255, 0.15) !important;cursor: pointer;}
+        #tambah_input_photo::file-selector-button:hover {
+            background-color: rgba(255, 255, 255, 0.15) !important;
+            cursor: pointer;
+        }
     </style>
 
-    <div class="modal-dialog modal-lg modal-dialog-centered"> <!-- Menggunakan modal-lg agar lebih lebar ke kanan -->
+    <!-- MEMPERBESAR UKURAN KE KANAN DAN MENAMBAHKAN SCROLL AGAR NYAMAN DI LAYAR KECIL -->
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" style="max-width: 1140px;"> 
         <div class="modal-content border-0 rounded-4 text-white shadow-lg" style="background: #1e293b; border: 1px solid rgba(148,163,184,.15) !important;">
             <div class="modal-header border-secondary border-opacity-25">
                 <h5 class="modal-title fw-bold text-white"><i class="bi bi-person-plus-fill me-2 text-success"></i> Tambah User Baru</h5>
@@ -429,7 +390,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                 <input type="hidden" name="action_register" value="1">
 
                 <div class="modal-body">
-                    <div class="row g-3">
+                    <div class="row g-4"> <!-- Menggunakan g-4 agar jarak padding antar kolom lebih proporsional saat melebar -->
                         
                         <!-- KOLOM KIRI: Identitas Utama & Akses Level -->
                         <div class="col-md-6 d-flex flex-column gap-3">
@@ -500,9 +461,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
     </div>
 </div>
 
-<!-- 2. MODAL DIALOG: EDIT USER (2-KOLOM HORIZONTAL) -->
+<!-- 2. MODAL DIALOG: EDIT USER (EXTRA LEBAR & BISA SCROLL - USERNAME, STATUS & LOG LENGKAP) -->
 <div class="modal fade" id="modalEditUser" tabindex="-1" aria-hidden="true">
-    <!-- Style internal khusus untuk merombak tombol input file bawaan browser menjadi dark mode -->
+    <!-- Style internal khusus untuk merombak tombol input file membawaan browser menjadi dark mode -->
     <style>
         #edit_input_photo::-webkit-file-upload-button,
         #edit_input_photo::file-selector-button {
@@ -522,30 +483,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
         }
     </style>
 
-    <div class="modal-dialog modal-lg modal-dialog-centered"> <!-- Menggunakan modal-lg agar lebih lebar ke kanan -->
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" style="max-width: 1140px;"> 
         <div class="modal-content border-0 rounded-4 text-white shadow-lg" style="background: #1e293b; border: 1px solid rgba(148,163,184,.15) !important;">
             <div class="modal-header border-secondary border-opacity-25">
                 <h5 class="modal-title fw-bold text-white"><i class="bi bi-pencil-square me-2 text-warning"></i> Edit Data User</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             
-            <!-- Mengosongkan action agar form memproses datanya ke file user.php itu sendiri -->
             <form method="POST" action="" enctype="multipart/form-data">
-                <!-- Elemen penanda pemicu kueri UPDATE di PHP bagian atas user.php -->
                 <input type="hidden" name="action_update_admin" value="1">
-                <!-- ID User (Hidden) untuk parameter WHERE di query UPDATE -->
                 <input type="hidden" name="id" id="edit_id">
-                <!-- Path foto lama (Hidden) jika user tidak ingin mengganti fotonya -->
                 <input type="hidden" name="old_photo" id="edit_old_photo">
 
                 <div class="modal-body">
-                    <div class="row g-3">
+                    <div class="row g-4">
                         
                         <!-- KOLOM KIRI: Identitas Utama & Akses Level -->
                         <div class="col-md-6 d-flex flex-column gap-3">
                             <div>
                                 <label class="form-label text-white-50 small d-block fw-medium mb-2">Nama Lengkap</label>
                                 <input type="text" name="name" id="edit_name" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2" required>
+                            </div>
+
+                            <div>
+                                <label class="form-label text-white-50 small d-block fw-medium mb-2">Username</label>
+                                <input type="text" name="username" id="edit_username" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2" required>
                             </div>
 
                             <div>
@@ -558,7 +520,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                                 <input type="text" name="phone" id="edit_phone" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2">
                             </div>
 
-                            <!-- INPUT DROPDOWN ROLE: Otomatis memilih data sesuai id="edit_role_id" dari JS -->
                             <div>
                                 <label class="form-label text-white-50 small d-block fw-medium mb-2">Role Akses</label>
                                 <select name="role_id" id="edit_role_id" class="form-select bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2" style="color-scheme: dark;" required>
@@ -570,27 +531,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                                     <?php endif; ?>
                                 </select>
                             </div>
+
+                            <div>
+                                <label class="form-label text-white-50 small d-block fw-medium mb-2">Status Akun</label>
+                                <select name="status" id="edit_status" class="form-select bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2" style="color-scheme: dark;" required>
+                                    <option value="1">1 (Aktif)</option>
+                                    <option value="0">0 (Nonaktif)</option>
+                                </select>
+                            </div>
                         </div>
 
-                        <!-- KOLOM KANAN: Keamanan & Unggah Berkas Baru -->
+                        <!-- KOLOM KANAN: Keamanan, Unggah Berkas & Sistem Log Meta -->
                         <div class="col-md-6 d-flex flex-column gap-3">
                             <div>
                                 <label class="form-label text-white-50 small d-block fw-medium mb-2">Ganti Password (Opsional)</label>
                                 <input type="password" name="password" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2" placeholder="Kosongkan jika tidak ingin diubah">
                             </div>
+
                             <div>
                                 <label class="form-label text-white-50 small d-block fw-medium mb-2">Unggah Foto Baru (Opsional)</label>
-                                <!-- Ditambahkan d-flex dan align-items-center agar teks berada di tengah vertikal -->
                                 <input type="file" name="photo" id="edit_input_photo" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2 d-flex align-items-center" style="color-scheme: dark;" accept="image/*" onchange="previewEditImage(this)">
                                 <div class="form-text text-white-50" style="font-size: 0.72rem;">Biarkan kosong jika tidak ingin mengubah foto profil.</div>
+                            </div>
+
+                            <!-- INFORMASI READ-ONLY LOG TIME METADATA BERDASARKAN HEIDISQL -->
+                            <div class="mt-2 p-3 rounded-3" style="background: rgba(0, 0, 0, 0.15); border: 1px solid rgba(148, 163, 184, 0.1);">
+                                <h6 class="text-white fw-bold mb-3" style="font-size: 0.85rem;"><i class="bi bi-info-circle me-1 text-info"></i> Metadata Log Sistem</h6>
+                                <div class="row g-2" style="font-size: 0.78rem;">
+                                    <div class="col-6 text-white-50">Last Login:</div>
+                                    <div class="col-6 fw-mono text-end" id="log_last_login">-</div>
+                                    
+                                    <div class="col-6 text-white-50">Created At:</div>
+                                    <div class="col-6 fw-mono text-end" id="log_created_at">-</div>
+                                    
+                                    <div class="col-6 text-white-50">Updated At:</div>
+                                    <div class="col-6 fw-mono text-end" id="log_updated_at">-</div>
+                                    
+                                    <div class="col-6 text-white-50">Deleted At:</div>
+                                    <div class="col-6 fw-mono text-end" id="log_deleted_at">-</div>
+                                </div>
                             </div>
                         </div>
 
                         <!-- BARIS BAWAH: Area Pratinjau Foto Horizontal -->
-                        <div class="col-12 text-center mt-3">
+                        <div class="col-12 text-center mt-2">
                             <div class="d-inline-block p-2 rounded-3" style="background: rgba(0,0,0,0.15); min-width: 120px;">
                                 <label class="form-label text-white-50 small d-block fw-medium mb-2">Pratinjau Foto</label>
-                                <!-- Menggunakan 1x1 piksel transparan base64 sebagai fallback awal -->
                                 <img id="edit_preview_photo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="" class="rounded-circle border border-secondary shadow-sm" style="width: 80px; height: 80px; object-fit: cover;">
                             </div>
                         </div>
@@ -606,7 +592,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
     </div>
 </div>
 
-<!-- SCRIPT MANAJEMEN USER (PREVIEW, POPULATE & DRAG TO SCROLL) -->
+<!-- SCRIPT MANAJEMEN USER (PREVIEW, POPULATE & DRAG TO SCROLL - PERBAIKAN SCROLL MODAL) -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const userSlider = document.getElementById('dragScrollUserContainer');
@@ -625,35 +611,94 @@ document.addEventListener('DOMContentLoaded', function() {
         userSlider.scrollLeft = scrollLeft - ((x - startX) * 1.5);
     });
 });
+
 function previewImage(input) {
     const preview = document.getElementById('tambah_preview_photo');
-    if (input.files && input.files[0]) {
+    if (preview && input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = (e) => preview.src = e.target.result;
         reader.readAsDataURL(input.files[0]);
-    } else { preview.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; }
-}
-function previewEditImage(input) {
-    const preview = document.getElementById('edit_preview_photo');
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = (e) => preview.src = e.target.result;
-        reader.readAsDataURL(input.files[0]);
-    } else {
-        const oldPhoto = document.getElementById('edit_old_photo').value;
-        preview.src = oldPhoto ? "uploads/" + oldPhoto : "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+    } else if (preview) { 
+        preview.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; 
     }
 }
-function populateEditModal(user) {
-    document.getElementById('edit_id').value = user.id;
-    document.getElementById('edit_name').value = user.name;
-    document.getElementById('edit_email').value = user.email;
-    document.getElementById('edit_phone').value = user.phone;
-    document.getElementById('edit_old_photo').value = user.photo || '';
+
+function previewEditImage(input) {
     const preview = document.getElementById('edit_preview_photo');
-    preview.src = (user.photo && user.photo.trim() !== '') ? "uploads/" + user.photo : "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+    if (preview && input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => preview.src = e.target.result;
+        reader.readAsDataURL(input.files[0]);
+    } else if (preview) {
+        const oldPhoto = document.getElementById('edit_old_photo').value;
+        const baseUrl = "http://localhost:8080/RSI_FOOD&MART/";
+        if (oldPhoto) {
+            const cleanPhoto = oldPhoto.replace('uploads/', '');
+            preview.src = baseUrl + "uploads/" + cleanPhoto;
+        } else {
+            preview.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+        }
+    }
+}
+
+// GANTI populateEditModal MENJADI openEditUser
+function openEditUser(user) {
+    if (!user) return;
+
+    // Membuka modal edit secara terprogram agar sinkron
+    const modalEdit = new bootstrap.Modal(document.getElementById('modalEditUser'));
+    modalEdit.show();
+
+    // Mapping komponen input form utama
+    if (document.getElementById('edit_id')) document.getElementById('edit_id').value = user.id;
+    if (document.getElementById('edit_name')) document.getElementById('edit_name').value = user.name || '';
+    if (document.getElementById('edit_username')) document.getElementById('edit_username').value = user.username || '';
+    if (document.getElementById('edit_email')) document.getElementById('edit_email').value = user.email || '';
+    if (document.getElementById('edit_phone')) document.getElementById('edit_phone').value = user.phone || '';
+    if (document.getElementById('edit_role_id')) document.getElementById('edit_role_id').value = user.role_id || '';
+    if (document.getElementById('edit_status')) document.getElementById('edit_status').value = user.status;
+    if (document.getElementById('edit_old_photo')) document.getElementById('edit_old_photo').value = user.photo || '';
+
+    // Mapping teks Log info Metadata Read-only di sisi kanan modal
+    if (document.getElementById('log_last_login')) document.getElementById('log_last_login').innerText = user.last_login || 'NULL';
+    if (document.getElementById('log_created_at')) document.getElementById('log_created_at').innerText = user.created_at || 'NULL';
+    if (document.getElementById('log_updated_at')) document.getElementById('log_updated_at').innerText = user.updated_at || 'NULL';
+    if (document.getElementById('log_deleted_at')) document.getElementById('log_deleted_at').innerText = user.deleted_at || 'NULL';
+
+    // Rute render pratinjau gambar profil
+    const preview = document.getElementById('edit_preview_photo');
+    if (preview) {
+        let photoPath = user.photo ? user.photo.trim() : '';
+        const baseUrl = "http://localhost:8080/RSI_FOOD&MART/";
+
+        if (photoPath !== '') {
+            if (photoPath.startsWith('uploads/')) {
+                photoPath = photoPath.replace('uploads/', '');
+            }
+            preview.src = baseUrl + "uploads/" + photoPath;
+        } else {
+            preview.src = 'https://ui-avatars.com' + encodeURIComponent(user.name || 'US') + '&background=0d6efd&color=fff';
+        }
+
+        preview.onerror = function() {
+            this.onerror = null;
+            this.src = 'https://ui-avatars.com' + encodeURIComponent(user.name || 'US') + '&background=0d6efd&color=fff';
+        };
+    }
 }
 </script>
+
+<!-- CSS BENTENG TERAKHIR: Memaksa area modal meloloskan diri dari penguncian overflow-y gaya lama -->
+<style>
+    .modal-body {
+        overflow-y: auto !important;
+        max-height: calc(100vh - 210px) !important;
+    }
+    .modal-dialog-scrollable .modal-content {
+        max-height: 100% !important;
+        overflow: hidden !important;
+    }
+</style>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
