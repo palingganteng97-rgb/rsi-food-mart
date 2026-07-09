@@ -6,11 +6,17 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $currentFile = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
 $menu = [
-    'home.php'        => [ 'href' => 'home.php',        'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
-    'tenants.php'     => [ 'href' => 'tenants.php',     'label' => 'Tenants',      'icon' => 'bi-house-lock-fill' ], // Menggunakan icon house lock glyph
-    'user.php'        => [ 'href' => 'user.php',        'label' => 'User',         'icon' => 'bi-person' ],
-    'roles.php'       => [ 'href' => 'roles.php',       'label' => 'Roles',        'icon' => 'bi-shield-lock' ],
-    'permissions.php' => [ 'href' => 'permissions.php', 'label' => 'Permissions',  'icon' => 'bi-key' ],
+    'home.php'        => [ 'href' => 'home.php', 'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
+    'tenants_group'   => [
+        'label' => 'Tenants', 'icon' => 'bi-house-lock-fill', // Menggunakan ikon utama Tenant bertingkat
+        'sub'   => [
+            'tenants.php'         => [ 'href' => 'tenants.php',         'label' => 'Data Tenant',    'icon' => 'bi-house-lock-fill' ], // Ikon baru untuk Data Tenant
+            'tenant_holidays.php' => [ 'href' => 'tenant_holidays.php', 'label' => 'Tenant Holidays', 'icon' => 'bi-calendar-x' ],
+        ]
+    ],
+    'user.php'        => [ 'href' => 'user.php',        'label' => 'User',        'icon' => 'bi-person' ],
+    'roles.php'       => [ 'href' => 'roles.php',       'label' => 'Roles',       'icon' => 'bi-shield-lock' ],
+    'permissions.php' => [ 'href' => 'permissions.php', 'label' => 'Permissions', 'icon' => 'bi-key' ],
 ];
 
 function activeClass(string $file, string $currentFile): string {
@@ -70,50 +76,54 @@ function activeClass(string $file, string $currentFile): string {
   </div>
 </nav>
 
-<!-- Desktop Sidebar -->
+<!-- Desktop Sidebar (Mendukung Dropdown Opsi Tenants Bertingkat & Bebas Error) -->
 <aside class="desktop-sidebar sidebar-fixed d-none d-lg-block">
-  
-  <!-- Bagian Atas: Menampung Brand dan Menu List yang bisa di-scroll -->
   <div class="d-flex flex-column flex-grow-1 overflow-hidden">
     <div class="app-brand">
-      <div class="logo-badge" aria-hidden="true">
-        <i class="bi bi-hospital"></i>
-      </div>
+      <div class="logo-badge" aria-hidden="true"><i class="bi bi-hospital"></i></div>
       <div>
         <div class="fw-bold" style="letter-spacing:.2px;">RSI FOOD &amp; MART</div>
         <div class="text-white-50" style="font-size:.82rem;">Pemesanan Makanan Sehat</div>
       </div>
     </div>
-
-    <!-- Area Menu Utama dengan Scroll Bar Tersembunyi -->
     <div class="sidebar-scroll-container">
       <div class="navmenu mt-1">
-        <?php foreach ($menu as $file => $item): ?>
-          <a class="nav-link <?php echo activeClass($file, $currentFile); ?>" href="<?php echo htmlspecialchars($item['href']); ?>">
-            <i class="bi <?php echo htmlspecialchars($item['icon']); ?>"></i>
-            <span><?php echo htmlspecialchars($item['label']); ?></span>
-          </a>
+        <?php foreach ($menu as $key => $item): ?>
+          <?php if (isset($item['sub'])): $isSubActive = array_key_exists($currentFile, $item['sub']); ?>
+            <div class="w-100 mb-1">
+              <button class="nav-link w-100 border-0 text-start d-flex align-items-center gap-2 <?= $isSubActive ? 'active' : ''; ?>" data-bs-toggle="collapse" data-bs-target="#dropTenantsMenu" aria-expanded="<?= $isSubActive ? 'true' : 'false'; ?>" style="background:transparent; color:inherit;">
+                <i class="bi <?= $item['icon']; ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
+                <i class="bi bi-chevron-down small transition-arrow" style="transition: transform 0.2s; font-size: 0.75rem; opacity: 0.7;"></i>
+              </button>
+              <div class="collapse <?= $isSubActive ? 'show' : ''; ?> ms-3" id="dropTenantsMenu">
+                <?php foreach ($item['sub'] as $subFile => $subItem): ?>
+                  <a class="nav-link <?= ($currentFile === $subFile) ? 'active' : ''; ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding-left:15px;">
+                    <i class="bi <?= $subItem['icon']; ?> me-2"></i><?= htmlspecialchars($subItem['label']); ?>
+                  </a>
+                <?php endforeach; ?>
+              </div>
+            </div>
+          <?php else: ?>
+            <a class="nav-link <?= ($currentFile === $key) ? 'active' : ''; ?>" href="<?= htmlspecialchars($item['href']); ?>">
+              <i class="bi <?= htmlspecialchars($item['icon']); ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
+            </a>
+          <?php endif; ?>
         <?php endforeach; ?>
       </div>
     </div>
   </div>
-
-  <!-- Bagian Bawah: Mengunci tombol logout permanen di ujung bawah layar desktop -->
   <div class="sidebar-footer w-100">
       <a href="logout.php" class="btn-logout" onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?')">
-          <i class="bi bi-box-arrow-left"></i>
-          <span>Logout</span>
+          <i class="bi bi-box-arrow-left"></i><span>Logout</span>
       </a>
   </div>
 </aside>
 
-<!-- Mobile Sidebar Offcanvas -->
+<!-- Mobile Sidebar Offcanvas (Mendukung Dropdown Opsi Tenants & Bebas Error) -->
 <div class="offcanvas offcanvas-start text-white" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel" style="background:#0b1223; border-right:1px solid rgba(148,163,184,.25);">
   <div class="offcanvas-header">
     <div class="d-flex align-items-center gap-2">
-      <div class="logo-badge" aria-hidden="true">
-        <i class="bi bi-hospital fs-5"></i>
-      </div>
+      <div class="logo-badge" aria-hidden="true"><i class="bi bi-hospital fs-5"></i></div>
       <div>
         <div class="fw-bold">RSI FOOD &amp; MART</div>
         <div class="text-white-50" style="font-size:.82rem;">Menu Pasien</div>
@@ -122,23 +132,34 @@ function activeClass(string $file, string $currentFile): string {
     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
   </div>
   <div class="offcanvas-body d-flex flex-column justify-content-between p-0">
-    <!-- Area Ter-scroll Mobile -->
     <div class="sidebar-scroll-container py-3">
       <div class="navmenu">
-        <?php foreach ($menu as $file => $item): ?>
-          <a class="nav-link <?php echo activeClass($file, $currentFile); ?>" href="<?php echo htmlspecialchars($item['href']); ?>" data-mobile-nav="1">
-            <i class="bi <?php echo htmlspecialchars($item['icon']); ?>"></i>
-            <span><?php echo htmlspecialchars($item['label']); ?></span>
-          </a>
+        <?php foreach ($menu as $key => $item): ?>
+          <?php if (isset($item['sub'])): $isSubActive = array_key_exists($currentFile, $item['sub']); ?>
+            <div class="w-100 mb-1">
+              <button class="nav-link w-100 border-0 text-start d-flex align-items-center gap-2 <?= $isSubActive ? 'active' : ''; ?>" data-bs-toggle="collapse" data-bs-target="#dropMobileTenantsMenu" aria-expanded="<?= $isSubActive ? 'true' : 'false'; ?>" style="background:transparent; color:inherit;" data-mobile-nav="1">
+                <i class="bi <?= $item['icon']; ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
+                <i class="bi bi-chevron-down small transition-arrow" style="transition: transform 0.2s; font-size: 0.75rem; opacity: 0.7;"></i>
+              </button>
+              <div class="collapse <?= $isSubActive ? 'show' : ''; ?> ms-3" id="dropMobileTenantsMenu">
+                <?php foreach ($item['sub'] as $subFile => $subItem): ?>
+                  <a class="nav-link <?= ($currentFile === $subFile) ? 'active' : ''; ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding-left:15px;" data-mobile-nav="1">
+                    <i class="bi <?= $subItem['icon']; ?> me-2"></i><?= htmlspecialchars($subItem['label']); ?>
+                  </a>
+                <?php endforeach; ?>
+              </div>
+            </div>
+          <?php else: ?>
+            <a class="nav-link <?= ($currentFile === $key) ? 'active' : ''; ?>" href="<?= htmlspecialchars($item['href']); ?>" data-mobile-nav="1">
+              <i class="bi <?= htmlspecialchars($item['icon']); ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
+            </a>
+          <?php endif; ?>
         <?php endforeach; ?>
       </div>
     </div>
-    
-    <!-- Tombol Logout Mobile Offcanvas -->
     <div class="sidebar-footer w-100">
         <a href="logout.php" class="btn-logout" onclick="return confirm('Apakah Anda yakin ingin keluar?')">
-            <i class="bi bi-box-arrow-left"></i>
-            <span>Logout</span>
+            <i class="bi bi-box-arrow-left"></i><span>Logout</span>
         </a>
     </div>
   </div>
