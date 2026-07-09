@@ -138,7 +138,7 @@ try {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
-  <style>
+<style>
     :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
     body { background:var(--bg) !important; color:var(--text); }
     .content-bg { background: transparent; }
@@ -158,10 +158,10 @@ try {
     #dragScrollUserContainer table, #dragScrollContainer table, .drag-scroll-container table { border-collapse: collapse !important; border: none !important; }
     #dragScrollUserContainer table th, #dragScrollUserContainer table td, #dragScrollContainer table th, #dragScrollContainer table td, .drag-scroll-container table th, .drag-scroll-container table td { border-left: none !important; border-right: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; }
     .text-white-element { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
-    /* Kustomisasi Modal Tengah Melebar & Sembunyikan Scrollbar Dalam Modal */
+    /* Kustomisasi Modal Tengah Melebar & Izinkan Kalender Pop-up Muncul Keluar Melayang */
     .modal-dialog { max-width: 800px !important; }
     .modal-body::-webkit-scrollbar { display: none !important; }
-    .modal-body { -ms-overflow-style: none !important; scrollbar-width: none !important; }
+    .modal-body { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow: visible !important; }
     @media (min-width: 992px) { main.content-shift { margin-left: 280px; } .bottom-nav { display:none; } }
 </style>
 
@@ -257,9 +257,8 @@ try {
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="formHoliday" action="tenant_holidays.php" method="POST">
-                <input type="hidden" name="id" id="holiday_id">
-                <div id="holiday_action_flag"></div>
-                <div class="modal-body">
+                <input type="hidden" name="id" id="holiday_id"><div id="holiday_action_flag"></div>
+                <div class="modal-body" style="overflow: visible !important;">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Pilih Tenant <span class="text-danger">*</span></label>
@@ -272,7 +271,7 @@ try {
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Tanggal Libur <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" name="holiday_date" id="holiday_date" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                            <input type="date" class="form-control" name="holiday_date" id="holiday_date" onclick="this.showPicker()" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
                         </div>
                         <div class="col-12">
                             <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Keterangan / Alasan Libur</label>
