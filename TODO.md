@@ -10,3 +10,9 @@
   - [ ] Pastikan class `.active` hijau muncul sesuai halaman
 - [ ] Jika struktur DB/koneksi berbeda, sesuaikan kredensial & nama tabel/kolom di `profile.php`
 
+# TODO - Auth UI
+- [ ] Perbaiki tampilan `login.php` jadi Bootstrap dark card layout (tanpa ubah logika).
+- [ ] Perbaiki tampilan `register.php` jadi Bootstrap dark card layout (tanpa ubah logika).
+- [ ] Perbaiki tampilan `lupa-password.php` jadi Bootstrap dark card layout (tanpa ubah logika).
+- [ ] Uji di browser: login/register/lupa-password.
+

@@ -6,17 +6,13 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $currentFile = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
 $menu = [
-    'home.php' => [
-        'href' => 'home.php',
-        'label' => 'Etalase Menu',
-        'icon' => 'bi-shop'
-    ],
-    'profile.php' => [
-        'href' => 'profile.php',
-        'label' => 'Profil Diri',
-        'icon' => 'bi-person'
-    ],
-];
+    'home.php'        => [ 'href' => 'home.php',        'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
+    'user.php'        => [ 'href' => 'user.php',        'label' => 'User',         'icon' => 'bi-person' ],
+    'roles.php'       => [ 'href' => 'roles.php',       'label' => 'Roles',        'icon' => 'bi-shield-lock' ],
+    'permissions.php' => [ 'href' => 'permissions.php', 'label' => 'Permissions',  'icon' => 'bi-key' ],
+
+    
+    ];
 
 function activeClass(string $file, string $currentFile): string {
     return $file === $currentFile ? 'active' : '';

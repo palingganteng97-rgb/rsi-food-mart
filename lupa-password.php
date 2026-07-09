@@ -1,118 +1,92 @@
 <?php
 include "db.php";
 
-// session_start sudah dipanggil di db.php
-
-
-if (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) {
-    header('Location: home.php');
-    exit;
-}
-
-$message = '';
-$isError = false;
+$error = '';
+$success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
     $email = trim($_POST['email'] ?? '');
+    $newPassword = $_POST['new_password'] ?? '';
 
-    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $message = 'Masukkan email yang valid.';
-        $isError = true;
-    } else {
-            try {
-                // Simulasi: cek apakah email terdaftar, lalu tampilkan instruksi placeholder.
-                $stmt = $conn->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
-
-            $stmt->bind_param('s', $email);
+    if (!empty($email) && !empty($newPassword)) {
+        try {
+            $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
+            $stmt->bind_param("s", $email);
             $stmt->execute();
-
             $res = $stmt->get_result();
 
-            if ($res && $res->num_rows > 0) {
-                $message = 'Jika email Anda terdaftar, kami akan mengirim tautan pemulihan. (Simulasi)';
-                $isError = false;
+            if ($res->num_rows > 0) {
+                $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT);
+                $updateStmt = $conn->prepare("UPDATE users SET password = ? WHERE email = ?");
+                $updateStmt->bind_param("ss", $hashedPassword, $email);
+
+                if ($updateStmt->execute()) {
+                    $success = "Password berhasil diperbarui! Silakan login kembali.";
+                } else {
+                    $error = "Gagal memperbarui password.";
+                }
+                $updateStmt->close();
             } else {
-                // Jangan bocorkan apakah email terdaftar; tampilkan pesan generik.
-                $message = 'Jika email Anda terdaftar, kami akan mengirim tautan pemulihan. (Simulasi)';
-                $isError = false;
+                $error = "Email tidak ditemukan di sistem.";
             }
-
-
             $stmt->close();
-
         } catch (Throwable $e) {
-            $message = 'Terjadi kesalahan pada server. (Detail: ' . $e->getMessage() . ')';
-            $isError = true;
+            $error = "Terjadi kesalahan sistem.";
         }
+    } else {
+        $error = "Semua kolom wajib diisi!";
     }
 }
 
-?><!doctype html>
-<html lang="id">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Lupa Password - RSI Food &amp; Mart</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
-  <style>
-    :root{--bg:#0f172a;}
-    body{background:var(--bg); color:#e5e7eb;}
-    .card-glow{background:rgba(2,6,23,.55); border:1px solid rgba(148,163,184,.25);}
-    .pill{border:1px solid rgba(34,197,94,.35); background:rgba(34,197,94,.08); color:#86efac;}
-    .form-control{background:rgba(2,6,23,.25); border-color:rgba(148,163,184,.22); color:#e5e7eb;}
-    .form-control::placeholder{color:rgba(148,163,184,.85)}
-    .form-control:focus{box-shadow:none; border-color:rgba(34,197,94,.55)}
-  </style>
-</head>
-<body>
-  <main class="min-vh-100 d-flex align-items-center">
-    <div class="container">
-      <div class="row justify-content-center">
-        <div class="col-12 col-md-6">
-          <div class="card card-glow shadow-sm rounded-4 p-4">
-            <div class="d-flex align-items-center gap-3 mb-3">
-              <div class="p-2 rounded-3 pill">
-                <i class="bi bi-hospital fs-4"></i>
-              </div>
-              <div>
-                <div class="fw-bold">RSI FOOD &amp; MART</div>
-                <div class="text-white-50" style="font-size:.92rem">Pemulihan Akun</div>
-              </div>
-            </div>
+require __DIR__ . '/_auth_ui_shared.php';
+auth_ui_header('Lupa Password');
+require __DIR__ . '/_auth_ui_body_open.php';
+?>
 
-            <h5 class="mb-2">Lupa Password?</h5>
-            <p class="text-white-50 mb-4" style="line-height:1.45">Masukkan email Anda untuk menerima instruksi reset password. (Simulasi)</p>
+<h5 class="mb-2">Reset Password</h5>
+<p class="text-white-50 mb-4" style="line-height:1.45">Masukkan email terdaftar lalu buat password baru.</p>
 
-            <?php if ($message): ?>
-              <div class="alert <?php echo $isError ? 'alert-danger' : 'alert-success'; ?> border-0 rounded-4" role="alert" style="<?php echo $isError ? 'background:rgba(239,68,68,.12); color:#fecaca;' : 'background:rgba(34,197,94,.12); color:#86efac;'; ?>">
-                <?php echo htmlspecialchars($message); ?>
-              </div>
-            <?php endif; ?>
+<?php if (!empty($error)): ?>
+  <div class="alert alert-danger border-0 rounded-4" role="alert" style="background:rgba(239,68,68,.12); color:#fecaca;">
+    <?= htmlspecialchars($error) ?>
+  </div>
+<?php endif; ?>
 
-            <form method="post" class="d-grid gap-3">
-              <div>
-                <label class="form-label text-white-50" style="font-size:.9rem">Alamat Email</label>
-                <input type="email" name="email" class="form-control rounded-3" placeholder="contoh@domain.com" required />
-              </div>
+<?php if (!empty($success)): ?>
+  <div class="alert alert-success border-0 rounded-4" role="alert" style="background:rgba(34,197,94,.12); color:#86efac;">
+    <?= htmlspecialchars($success) ?>
+  </div>
+<?php endif; ?>
 
-              <button type="submit" class="btn btn-success rounded-3">
-                <i class="bi bi-send me-2"></i> Kirim Tautan Pemulihan
-              </button>
-
-              <div class="text-center pt-1">
-                <a href="index.php" class="text-decoration-none text-white-50">Kembali ke Login</a>
-              </div>
-            </form>
-
-          </div>
-        </div>
-      </div>
+<form method="POST" class="d-grid gap-3">
+  <div>
+    <label class="form-label text-white-50" style="font-size:.9rem">Email Terdaftar</label>
+    <div class="input-group">
+      <span class="input-group-text bg-transparent border-0 text-white-50"><i class="bi bi-envelope"></i></span>
+      <input type="email" name="email" class="form-control rounded-3" placeholder="Masukkan Email Terdaftar" required value="<?= isset($_POST['email']) ? htmlspecialchars((string)$_POST['email']) : '' ?>" />
     </div>
-  </main>
+  </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+  <div>
+    <label class="form-label text-white-50" style="font-size:.9rem">Password Baru</label>
+    <div class="input-group">
+      <span class="input-group-text bg-transparent border-0 text-white-50"><i class="bi bi-lock"></i></span>
+      <input type="password" name="new_password" class="form-control rounded-3" placeholder="Masukkan Password Baru" required />
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-success rounded-3">
+    <i class="bi bi-shield-lock me-2"></i> Reset Password
+  </button>
+
+  <div class="text-center">
+    <a class="text-decoration-none" style="color:#86efac" href="login.php">
+      <i class="bi bi-arrow-left me-1"></i>Kembali ke Login
+    </a>
+  </div>
+</form>
+
+<?php
+require __DIR__ . '/_auth_ui_body_close.php';
+auth_ui_footer();
 
