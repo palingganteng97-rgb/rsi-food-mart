@@ -93,21 +93,8 @@ $userName = $_SESSION['name'] ?? 'Pasien';
     </div>
   </main>
 
-  <!-- Bottom Navigation (Mobile) -->
-  <div class="bottom-nav d-flex d-lg-none">
-    <div class="container">
-      <div class="d-flex align-items-center justify-content-between gap-3 py-2">
-        <div>
-          <div class="text-white-50" style="font-size:.82rem;">Total Pesanan</div>
-          <div class="fw-bold" id="cartTotalText">0 item</div>
-        </div>
-        <button class="btn btn-success rounded-3 px-3" type="button" onclick="openCart()">
-          <i class="bi bi-basket2 me-2"></i> Lihat Keranjang
-        </button>
-      </div>
-    </div>
-  </div>
-
+  <?php include "bottom_nav.php"; ?>
+  
   <script>
     let currentDietFilter = '';
     let currentQuery = '';
