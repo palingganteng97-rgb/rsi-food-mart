@@ -1,7 +1,6 @@
 <?php
 include "db.php"; // Memanggil koneksi database ($conn) & session_start()
 
-// Jika sesi user_id sudah aktif, langsung alihkan ke index.php agar tidak berputar-putar
 if (isset($_SESSION['user_id'])) {
     header("Location: index.php");
     exit;
@@ -28,12 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['phone']    = $row['phone'];
                     $_SESSION['role_id']  = $row['role_id'];
                     $_SESSION['status']   = $row['status'];
-
-                    if (!empty($row['photo'])) {
-                        $_SESSION['photo'] = "uploads/" . $row['photo'];
-                    } else {
-                        $_SESSION['photo'] = "assets/img/default-avatar.png";
-                    }
+                    $_SESSION['photo']    = $row['photo'];
 
                     header("Location: index.php");
                     exit;
@@ -45,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $stmt->close();
         } catch (Throwable $e) {
-            $error = "Terjadi kesalahan sistem: " . $e->getMessage();
+            $error = "Terjadi kesalahan sistem.";
         }
     } else {
         $error = "Kolom login tidak boleh kosong!";
@@ -61,9 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 </head>
-<!-- PERBAIKAN: Menambahkan kontainer Bootstrap yang fleksibel agar responsif penuh di mobile -->
 <body class="d-flex align-items-center justify-content-center min-vh-100" style="background: #0f172a; padding: 1.5rem;">
-
     <div class="container d-flex justify-content-center align-items-center">
         <div class="card border-0 rounded-4 text-white shadow-lg p-4 w-100" style="background: #1e293b; max-width: 420px; border: 1px solid rgba(148,163,184,.15) !important;">
             <div class="text-center mb-3">
@@ -77,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             <?php endif; ?>
 
-            <form method="POST" class="d-grid gap-3">
+            <form method="POST" class="d-grid gap-3" action="login.php">
                 <div>
                     <label class="form-label text-white-50 small fw-medium mb-2">Username</label>
                     <div class="input-group">
@@ -85,7 +77,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <input type="text" name="username" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 py-2" placeholder="Masukkan username" required value="<?= isset($_POST['username']) ? htmlspecialchars((string)$_POST['username']) : '' ?>" />
                     </div>
                 </div>
-
                 <div>
                     <label class="form-label text-white-50 small fw-medium mb-2">Password</label>
                     <div class="input-group">
@@ -93,11 +84,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <input type="password" name="password" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 py-2" placeholder="Masukkan password" required />
                     </div>
                 </div>
-
                 <button type="submit" class="btn btn-success rounded-3 py-2 fw-medium mt-1">
                     <i class="bi bi-box-arrow-in-right me-2"></i> Login
                 </button>
-
                 <div class="d-flex align-items-center justify-content-between mt-2" style="font-size: 0.85rem;">
                     <a class="text-decoration-none text-white-50" href="lupa-password.php">Lupa Password?</a>
                     <a class="text-decoration-none text-white-50" href="register.php">Daftar Akun Baru</a>
@@ -105,7 +94,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
         </div>
     </div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
