@@ -3,7 +3,6 @@ include "db.php";
 
 // session_start sudah dipanggil di db.php
 
-
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: index.php");
     exit;
@@ -11,7 +10,20 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
 
 $userName = $_SESSION['name'] ?? 'Pasien';
 
+// AMBIL DATA UTAMA PRODUK UNTUK ETALASE HOME
+$listActiveProducts = [];
+$sql = "SELECT p.*, c.name AS category_name 
+        FROM products p 
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.status = 1 AND p.deleted_at IS NULL AND p.stock > 0
+        ORDER BY p.id DESC";
 
+$fetchQuery = mysqli_query($conn, $sql);
+if ($fetchQuery) {
+    while ($row = mysqli_fetch_assoc($fetchQuery)) {
+        $listActiveProducts[] = $row;
+    }
+}
 ?>
 
 <!Doctype html>
@@ -55,60 +67,112 @@ $userName = $_SESSION['name'] ?? 'Pasien';
 <body>
   <?php require __DIR__ . '/sidebar.php'; ?>
 
-  <main class="content-shift page-body">
+<main class="content-shift page-body">
     <div class="container py-3">
-      <div class="d-flex align-items-center justify-content-between mb-3">
-        <div>
-          <div class="fw-bold fs-5">Etalase Menu</div>
-          <div class="text-white-50" style="font-size:.9rem;">Halo, <?php echo htmlspecialchars($userName); ?></div>
+        <!-- HEADER ETALASE MENU -->
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <div>
+                <div class="fw-bold fs-5">Etalase Menu</div>
+                <div class="text-white-50" style="font-size:.9rem;">Halo, <?php echo htmlspecialchars($userName); ?></div>
+            </div>
+            <div class="d-none d-md-flex gap-2 align-items-center">
+                <span class="text-white-50">Diet hari ini:</span>
+                <span class="pill diet-pill">Sehat</span>
+            </div>
         </div>
-        <div class="d-none d-md-flex gap-2 align-items-center">
-          <span class="text-white-50">Diet hari ini:</span>
-          <span class="pill diet-pill">Sehat</span>
-        </div>
-      </div>
 
-      <div class="search-box p-3 mb-3">
-        <div class="row g-2 align-items-center">
-          <div class="col-12 col-md-7">
-            <div class="input-group">
-              <span class="input-group-text bg-transparent border-0 text-white-50">
-                <i class="bi bi-search"></i>
-              </span>
-              <input id="searchInput" type="text" class="form-control bg-transparent text-white border-0" placeholder="Cari nama menu..." autocomplete="off" />
-              <button class="btn btn-outline-secondary rounded-3" type="button" onclick="resetFilters()">
-                <i class="bi bi-x-circle me-1"></i> Reset
-              </button>
+        <!-- FITUR PENCARIAN & TOMBOL FILTER DIET -->
+        <div class="search-box p-3 mb-3">
+            <div class="row g-2 align-items-center">
+                <div class="col-12 col-md-7">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-0 text-white-50">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input id="searchInput" type="text" class="form-control bg-transparent text-white border-0" placeholder="Cari nama menu..." autocomplete="off" />
+                        <button class="btn btn-outline-secondary rounded-3" type="button" onclick="resetFilters()">
+                            <i class="bi bi-x-circle me-1"></i> Reset
+                        </button>
+                    </div>
+                </div>
+                <div class="col-12 col-md-5">
+                    <div class="d-flex flex-wrap gap-2 justify-content-md-end mt-2 mt-md-0">
+                        <button type="button" class="btn btn-sm diet-pill" data-filter="" data-active="true" onclick="setDietFilter('')">Semua</button>
+                        <button type="button" class="btn btn-sm diet-pill" data-filter="Lunak" data-active="false" onclick="setDietFilter('Lunak')">Lunak</button>
+                        <button type="button" class="btn btn-sm diet-pill" data-filter="Rendah Garam" data-active="false" onclick="setDietFilter('Rendah Garam')">Rendah Garam</button>
+                        <button type="button" class="btn btn-sm diet-pill" data-filter="Diabetes" data-active="false" onclick="setDietFilter('Diabetes')">Diabetes</button>
+                    </div>
+                </div>
             </div>
-          </div>
-          <div class="col-12 col-md-5">
-            <div class="d-flex flex-wrap gap-2 justify-content-md-end mt-2 mt-md-0">
-              <button type="button" class="btn btn-sm diet-pill" data-filter="" data-active="true" onclick="setDietFilter('')">
-                Semua
-              </button>
-              <button type="button" class="btn btn-sm diet-pill" data-filter="Lunak" data-active="false" onclick="setDietFilter('Lunak')">
-                Lunak
-              </button>
-              <button type="button" class="btn btn-sm diet-pill" data-filter="Rendah Garam" data-active="false" onclick="setDietFilter('Rendah Garam')">
-                Rendah Garam
-              </button>
-              <button type="button" class="btn btn-sm diet-pill" data-filter="Diabetes" data-active="false" onclick="setDietFilter('Diabetes')">
-                Diabetes
-              </button>
-            </div>
-          </div>
         </div>
-      </div>
+
+        <!-- GRID INTEGRASI DAFTAR PRODUK MAKANAN SEHAT (DATA DARI PRODUCTS.PHP) -->
+        <div id="catalogGrid" class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mt-2 mb-5">
+            <?php if (!empty($listActiveProducts)): foreach ($listActiveProducts as $prod): ?>
+                <div class="col">
+                    <div class="card-food h-100 d-flex flex-column text-white" 
+                         data-title="<?= htmlspecialchars($prod['name']) ?>" 
+                         data-diet="<?= htmlspecialchars($prod['category_name'] ?? '') ?>">
+                        
+                        <!-- Area Gambar Produk -->
+                        <div class="food-img">
+                            <?php if (!empty($prod['image']) && file_exists("uploads/products/" . $prod['image'])): ?>
+                                <img src="uploads/products/<?= htmlspecialchars($prod['image']) ?>" alt="<?= htmlspecialchars($prod['name']) ?>">
+                            <?php else: ?>
+                                <div class="text-center p-3 text-muted">
+                                    <i class="bi bi-egg-fried d-block mb-1" style="font-size: 2.5rem; color: rgba(148,163,184,.3);"></i>
+                                    <span style="font-size: 0.75rem;">No Image</span>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+
+                        <!-- Detail Info Produk -->
+                        <div class="p-3 d-flex flex-column flex-grow-1 justify-content-between">
+                            <div>
+                                <span class="text-muted d-block mb-1" style="font-size: 0.75rem; text-transform: uppercase;">
+                                    <?= htmlspecialchars($prod['category_name'] ?? 'General') ?>
+                                </span>
+                                <h6 class="fw-bold m-0 text-white" style="font-size: 0.95rem; line-height: 1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis;">
+                                    <?= htmlspecialchars($prod['name']) ?>
+                                </h6>
+                            </div>
+
+                            <!-- Harga & Tombol Aksi Tambah Pesanan -->
+                            <div class="d-flex justify-content-between align-items-center mt-3 pt-2" style="border-top: 1px solid rgba(148,163,184,.1);">
+                                <div class="fw-bold text-success" style="font-size: 1rem;">
+                                    Rp <?= number_format($prod['base_price'], 0, ',', '.') ?>
+                                </div>
+                                <button class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" onclick="tambahKeKeranjang(<?= $prod['id'] ?>, '<?= htmlspecialchars(addslashes($prod['name'])) ?>')">
+                                    <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; else: ?>
+                <!-- FIX TAMPILAN TEXT TERANG KETIKA DATA KOSONG -->
+                <div class="col-12 text-center py-5 w-100">
+                    <div class="p-4 rounded-4" style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(148, 163, 184, 0.15);">
+                        <i class="bi bi-inboxes d-block mb-3" style="font-size: 3rem; color: #94a3b8; opacity: 0.8;"></i>
+                        <h5 class="fw-semibold text-white mb-1" style="font-size: 1.1rem;">Menu Belum Tersedia</h5>
+                        <p class="m-0 text-white-50" style="font-size: 0.88rem;">
+                            Belum ada menu makanan sehat yang dirilis pada kategori etalase ini saat ini.
+                        </p>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
     </div>
-  </main>
+</main>
 
   <?php include "bottom_nav.php"; ?>
   
-  <script>
+<script>
     let currentDietFilter = '';
     let currentQuery = '';
     let cartCount = 0;
 
+    // Menyesuaikan ID penampung grid katalog produk dari home.php
     const grid = document.getElementById('catalogGrid');
 
     function setDietFilter(diet){
@@ -139,10 +203,15 @@ $userName = $_SESSION['name'] ?? 'Pasien';
 
     function applyFilters(){
       if(!grid) return;
-      const cards = grid.querySelectorAll('.food-card');
+      // Perbaikan penargetan kelas dari .food-card menjadi .col pembungkus luar kartu
+      const cards = grid.querySelectorAll('.col');
       cards.forEach(card=>{
-        const title = (card.dataset.title || '');
-        const dietList = (card.dataset.diet || '').toLowerCase();
+        // Ambil elemen pencarian di dalam card-food
+        const foodCard = card.querySelector('.card-food');
+        if(!foodCard) return;
+
+        const title = (foodCard.dataset.title || '').toLowerCase();
+        const dietList = (foodCard.dataset.diet || '').toLowerCase();
 
         const matchQuery = !currentQuery || title.includes(currentQuery);
         const matchDiet = !currentDietFilter || dietList.includes(currentDietFilter.toLowerCase());
@@ -164,10 +233,16 @@ $userName = $_SESSION['name'] ?? 'Pasien';
       applyFilters();
     }
 
-    function addToCart(id, title){
+    // Perbaikan: Mapping alias fungsi agar cocok dengan pemicu onclick="tambahKeKeranjang()" di home.php
+    function tambahKeKeranjang(id, title = 'Menu Sehat'){
       cartCount++;
-      document.getElementById('cartTotalText').textContent = cartCount + ' item';
-      // Placeholder toast
+      // Memperbarui elemen teks counter di footer bar bawah
+      const counterText = document.getElementById('cartTotalText');
+      if(counterText) {
+          counterText.textContent = cartCount + ' item';
+      }
+      
+      // Render animasi Toast pemberitahuan sukses
       const el = document.createElement('div');
       el.className = 'toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 m-3';
       el.role = 'alert';
@@ -189,12 +264,12 @@ $userName = $_SESSION['name'] ?? 'Pasien';
       alert('Placeholder: tombol Lihat Keranjang belum terhubung ke halaman cart.');
     }
 
-    // Initial
+    // Jalankan inisialisasi awal
     btnStyleRefresh();
     applyFilters();
-  </script>
+</script>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
 
