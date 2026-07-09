@@ -1,50 +1,13 @@
 <?php
 include "db.php"; // Memanggil koneksi database ($conn) & session_start()
 
+// Jika sesi user_id sudah aktif, langsung alihkan ke index.php agar tidak berputar-putar
 if (isset($_SESSION['user_id'])) {
     header("Location: index.php");
     exit;
 }
 
 $error = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
-
-    if (!empty($username) && !empty($password)) {
-        try {
-            $stmt = $conn->prepare("SELECT id, name, username, phone, photo, role_id, status, password FROM users WHERE username = ? LIMIT 1");
-            $stmt->bind_param("s", $username);
-            $stmt->execute();
-            $res = $stmt->get_result();
-
-            if ($row = $res->fetch_assoc()) {
-                if (password_verify($password, $row['password'])) {
-                    $_SESSION['user_id']  = $row['id'];
-                    $_SESSION['name']     = $row['name'];
-                    $_SESSION['username'] = $row['username'];
-                    $_SESSION['phone']    = $row['phone'];
-                    $_SESSION['role_id']  = $row['role_id'];
-                    $_SESSION['status']   = $row['status'];
-                    $_SESSION['photo']    = $row['photo'];
-
-                    header("Location: index.php");
-                    exit;
-                } else {
-                    $error = "Password yang Anda masukkan salah.";
-                }
-            } else {
-                $error = "Username tidak ditemukan.";
-            }
-            $stmt->close();
-        } catch (Throwable $e) {
-            $error = "Terjadi kesalahan sistem.";
-        }
-    } else {
-        $error = "Kolom login tidak boleh kosong!";
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -52,10 +15,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - RSI FOOD & MART</title>
+
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+
+  <style>
+    .loading-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(15, 23, 42, 0.9);
+        z-index: 9999; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+    }
+    .loading-overlay.show { opacity: 1; pointer-events: auto; }
+  </style>
 </head>
 <body class="d-flex align-items-center justify-content-center min-vh-100" style="background: #0f172a; padding: 1.5rem;">
+
+  <!-- KOMPONEN LAYAR MEMUAT -->
+  <div id="loginLoading" class="loading-overlay">
+      <div class="spinner-border text-success mb-3" style="width: 3.5rem; height: 3.5rem;" role="status"></div>
+      <div class="fw-bold text-white fs-5">Memverifikasi Akun Keamanan...</div>
+      <small class="text-white-50 mt-1">Harap tunggu beberapa saat.</small>
+  </div>
+
     <div class="container d-flex justify-content-center align-items-center">
         <div class="card border-0 rounded-4 text-white shadow-lg p-4 w-100" style="background: #1e293b; max-width: 420px; border: 1px solid rgba(148,163,184,.15) !important;">
             <div class="text-center mb-3">
@@ -69,14 +52,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             <?php endif; ?>
 
-            <form method="POST" class="d-grid gap-3" action="login.php">
+            <form method="POST" id="loginForm" class="d-grid gap-3" action="index.php">
                 <div>
-                    <label class="form-label text-white-50 small fw-medium mb-2">Username</label>
+                    <!-- Mengubah label dan placeholder agar mendukung Username / Email -->
+                    <label class="form-label text-white-50 small fw-medium mb-2">Username / Email</label>
                     <div class="input-group">
                         <span class="input-group-text bg-dark bg-opacity-25 border-secondary border-opacity-50 text-white-50"><i class="bi bi-person"></i></span>
-                        <input type="text" name="username" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 py-2" placeholder="Masukkan username" required value="<?= isset($_POST['username']) ? htmlspecialchars((string)$_POST['username']) : '' ?>" />
+                        <input type="text" name="username" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 py-2" placeholder="Masukkan username atau email" required value="<?= isset($_POST['username']) ? htmlspecialchars((string)$_POST['username']) : '' ?>" />
                     </div>
                 </div>
+
                 <div>
                     <label class="form-label text-white-50 small fw-medium mb-2">Password</label>
                     <div class="input-group">
@@ -84,9 +69,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <input type="password" name="password" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 py-2" placeholder="Masukkan password" required />
                     </div>
                 </div>
+
                 <button type="submit" class="btn btn-success rounded-3 py-2 fw-medium mt-1">
                     <i class="bi bi-box-arrow-in-right me-2"></i> Login
                 </button>
+
                 <div class="d-flex align-items-center justify-content-between mt-2" style="font-size: 0.85rem;">
                     <a class="text-decoration-none text-white-50" href="lupa-password.php">Lupa Password?</a>
                     <a class="text-decoration-none text-white-50" href="register.php">Daftar Akun Baru</a>
@@ -94,6 +81,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
         </div>
     </div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+        e.preventDefault(); 
+        const overlay = document.getElementById('loginLoading');
+        overlay.classList.add('show'); 
+        setTimeout(() => {
+            this.submit(); 
+        }, 3500);
+    });
+  </script>
 </body>
 </html>

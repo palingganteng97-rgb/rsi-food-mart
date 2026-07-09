@@ -12,28 +12,29 @@ $success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $username = trim($_POST['username'] ?? '');
+    $email = trim($_POST['email'] ?? ''); // Menangkap input email baru
     $phone = trim($_POST['phone'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    if (!empty($name) && !empty($username) && !empty($password)) {
+    if (!empty($name) && !empty($username) && !empty($email) && !empty($password)) {
         $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
         
-        // OTOMATISASI: Role Pasien = 1, Status Aktif = 1
         $roleId = 1; 
         $status = 1; 
 
         try {
-            $checkStmt = $conn->prepare("SELECT id FROM users WHERE username = ? LIMIT 1");
-            $checkStmt->bind_param("s", $username);
+            // Memeriksa duplikasi data berdasarkan username ATAU email
+            $checkStmt = $conn->prepare("SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1");
+            $checkStmt->bind_param("ss", $username, $email);
             $checkStmt->execute();
 
             $checkRes = $checkStmt->get_result();
             if ($checkRes && $checkRes->num_rows > 0) {
-                $error = "Username sudah digunakan!";
+                $error = "Username atau Email sudah digunakan!";
             } else {
-                // Kolom email telah dihapus dari kueri INSERT
-                $stmt = $conn->prepare("INSERT INTO users (role_id, name, username, phone, password, status) VALUES (?, ?, ?, ?, ?, ?)");
-                $stmt->bind_param("issssi", $roleId, $name, $username, $phone, $hashedPassword, $status);
+                // Kolom email dimasukkan kembali ke kueri INSERT
+                $stmt = $conn->prepare("INSERT INTO users (role_id, name, username, email, phone, password, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param("isssssi", $roleId, $name, $username, $email, $phone, $hashedPassword, $status);
 
                 if ($stmt->execute()) {
                     $success = "Registrasi berhasil! Silakan login.";
@@ -66,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="card border-0 rounded-4 text-white shadow-lg p-4" style="background: #1e293b; width: 100%; max-width: 440px; border: 1px solid rgba(148,163,184,.15) !important;">
         <div class="text-center mb-3">
-            <h4 class="fw-bold text-white mb-1"><i class="bi bi-person-plus-fill text-success me-2"></i> RSI FOOD & MART</h4>
+            <h4 class="fw-bold text-white mb-1"><i class="bi bi-person-plus-fill text-success me-2"></i> RSI FOOD &amp; MART</h4>
             <span class="text-white-50 small">Buat akun baru untuk mendaftar</span>
         </div>
 
@@ -96,6 +97,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="input-group">
                     <span class="input-group-text bg-dark bg-opacity-25 border-secondary border-opacity-50 text-white-50"><i class="bi bi-at"></i></span>
                     <input type="text" name="username" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 py-2" placeholder="Masukkan username" required value="<?= isset($_POST['username']) ? htmlspecialchars((string)$_POST['username']) : '' ?>" />
+                </div>
+            </div>
+
+            <!-- FORM INPUT BARU: Kolom Alamat Email -->
+            <div>
+                <label class="form-label text-white-50 small fw-medium mb-2">Email</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-dark bg-opacity-25 border-secondary border-opacity-50 text-white-50"><i class="bi bi-envelope"></i></span>
+                    <input type="email" name="email" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 py-2" placeholder="contoh@email.com" required value="<?= isset($_POST['email']) ? htmlspecialchars((string)$_POST['email']) : '' ?>" />
                 </div>
             </div>
 
