@@ -4,9 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// ===================================================
-// UTALITAS: ROUTER DETEKSI PERANGKAT & NAVIGASI DINAMIS BERPENGAMAN SESSIONS
-// ===================================================
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -14,16 +12,21 @@ if (session_status() === PHP_SESSION_NONE) {
 $currentFile = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
 
 $menu = [
-    'home.php' => [ 
-        'href'  => 'home.php', 
-        'label' => 'Etalase Menu', 
-        'icon'  => 'bi-shop' 
-    ],
+    'home.php'      => [ 'href' => 'home.php', 'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
     
+    // GRUP PRODUK (URUTAN: CATEGORIES, BRANDS, UNITS, PRODUCTS)
+    'produk_group'  => [
+        'label' => 'Produk', 'icon' => 'bi-bag-dash-fill', 'class' => '',
+        'sub'   => [
+            'categories.php' => [ 'href' => 'categories.php', 'label' => 'Kategori Produk', 'icon' => 'bi-tags-fill' ],
+            'brands.php'     => [ 'href' => 'brands.php',     'label' => 'Brand / Merk',    'icon' => 'bi-patch-check-fill' ],
+            'units.php'      => [ 'href' => 'units.php',      'label' => 'Satuan / Units',  'icon' => 'bi-calculator-fill' ],
+            'products.php'   => [ 'href' => 'products.php',   'label' => 'Data Produk',     'icon' => 'bi-box-seam-fill' ],
+        ]
+    ],
+
     'tenants_group' => [
-        'label' => 'Tenants', 
-        'icon'  => 'bi-house-lock-fill', 
-        'class' => 'd-mobile-none',
+        'label' => 'Tenants', 'icon' => 'bi-house-lock-fill', 'class' => 'd-mobile-none',
         'sub'   => [
             'tenants.php'                => [ 'href' => 'tenants.php',                'label' => 'Data Tenant',            'icon' => 'bi-house-lock-fill' ],
             'tenant_operating_hours.php' => [ 'href' => 'tenant_operating_hours.php', 'label' => 'Tenant Operating Hours', 'icon' => 'bi-clock-history' ],
@@ -32,35 +35,12 @@ $menu = [
         ]
     ],
     
-    // 1. MENU USER PC: Ditambahkan class d-none d-lg-block agar SEMBUNYI TOTAL di layar HP
-    'user.php' => [ 
-        'href'  => 'user.php',        
-        'label' => 'User',        
-        'icon'  => 'bi-person',
-        'class' => 'd-none d-lg-block'
-    ], 
-
-    // 2. MENU PROFIL MOBILE BARU: Ditambahkan class d-block d-lg-none agar HANYA MUNCUL DI HP menggantikan posisi menu User
-    'profile.php' => [ 
-        'href'  => 'profile.php',        
-        'label' => 'User',        
-        'icon'  => 'bi-person',
-        'class' => 'd-block d-lg-none'
-    ], 
+    // PEMISAHAN HAK AKSES STRUKTUR USER PC DAN SELULER
+    'user.php'     => [ 'href' => 'user.php',    'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-none d-lg-block' ], 
+    'profile.php'  => [ 'href' => 'profile.php', 'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-block d-lg-none' ], 
     
-    'roles.php' => [ 
-        'href'  => 'roles.php',       
-        'label' => 'Roles',       
-        'icon'  => 'bi-shield-lock', 
-        'class' => 'd-mobile-none' 
-    ], 
-    
-    'permissions.php' => [ 
-        'href'  => 'permissions.php', 
-        'label' => 'Permissions', 
-        'icon'  => 'bi-key',         
-        'class' => 'd-mobile-none' 
-    ], 
+    'roles.php'       => [ 'href' => 'roles.php',       'label' => 'Roles',       'icon' => 'bi-shield-lock', 'class' => 'd-mobile-none' ], 
+    'permissions.php' => [ 'href' => 'permissions.php', 'label' => 'Permissions', 'icon' => 'bi-key',         'class' => 'd-mobile-none' ], 
 ];
 
 function activeClass(string $file, string $currentFile): string {
