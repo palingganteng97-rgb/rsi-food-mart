@@ -268,24 +268,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
-    <style>
-        :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
-        body { background:var(--bg) !important; color:var(--text); }
-        .content-bg { background: transparent; }
-        .search-box { background: rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.25); border-radius: 18px; }
-        .diet-pill { border:1px solid rgba(34,197,94,.35); background: rgba(34,197,94,.08); color:#86efac; }
-        .diet-pill[data-active="true"] { background: rgba(34,197,94,.92); color:#06210f; border-color: rgba(34,197,94,.65); }
-        .card-food { background: rgba(2,6,23,.40); border:1px solid rgba(148,163,184,.22); border-radius: 18px; overflow:hidden; transition: transform .15s ease, border-color .15s ease; }
-        .card-food:hover { transform: translateY(-2px); border-color: rgba(34,197,94,.35); }
-        .food-img { height: 150px; background: linear-gradient(180deg, rgba(34,197,94,.10), rgba(2,6,23,.0)); display:flex; align-items:center; justify-content:center; color: rgba(148,163,184,.8); position: relative; }
-        .food-img img { width:100%; height:100%; object-fit: cover; }
-        .price-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.35rem .7rem; background: rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.25); border-radius: 999px; color: var(--text); }
-        .bottom-nav { position: fixed; left:0; right:0; bottom:0; z-index: 1035; background: rgba(15,23,42,.88); backdrop-filter: blur(10px); border-top: 1px solid rgba(148,163,184,.25); display:block; }
-        @media (min-width: 992px) {
-        main.content-shift { margin-left: 280px; }
-        .bottom-nav { display:none; }
-        }
-    </style>
+<style>
+    :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
+    body { background:var(--bg) !important; color:var(--text); overflow-y: hidden !important; } /* Menyembunyikan scrollbar halaman utama */
+    .content-bg { background: transparent; }
+    .search-box { background: rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.25); border-radius: 18px; }
+    .diet-pill { border:1px solid rgba(34,197,94,.35); background: rgba(34,197,94,.08); color:#86efac; }
+    .diet-pill[data-active="true"] { background: rgba(34,197,94,.92); color:#06210f; border-color: rgba(34,197,94,.65); }
+    .card-food { background: rgba(2,6,23,.40); border:1px solid rgba(148,163,184,.22); border-radius: 18px; overflow:hidden; transition: transform .15s ease, border-color .15s ease; }
+    .card-food:hover { transform: translateY(-2px); border-color: rgba(34,197,94,.35); }
+    .food-img { height: 150px; background: linear-gradient(180deg, rgba(34,197,94,.10), rgba(2,6,23,.0)); display:flex; align-items:center; justify-content:center; color: rgba(148,163,184,.8); position: relative; }
+    .food-img img { width:100%; height:100%; object-fit: cover; }
+    .price-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.35rem .7rem; background: rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.25); border-radius: 999px; color: var(--text); }
+    .bottom-nav { position: fixed; left:0; right:0; bottom:0; z-index: 1035; background: rgba(15,23,42,.88); backdrop-filter: blur(10px); border-top: 1px solid rgba(148,163,184,.25); display:block; }
+    /* Penyelarasan Tabel & Sembunyikan Scrollbar Horizontal */
+    #dragScrollUserContainer::-webkit-scrollbar, #dragScrollContainer::-webkit-scrollbar, .drag-scroll-container::-webkit-scrollbar { display: none !important; }
+    #dragScrollUserContainer, #dragScrollContainer, .drag-scroll-container { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow-x: auto !important; cursor: grab !important; border: none !important; box-shadow: none !important; -webkit-box-shadow: none !important; }
+    #dragScrollUserContainer:active, #dragScrollContainer:active, .drag-scroll-container:active { cursor: grabbing !important; }
+    #dragScrollUserContainer table, #dragScrollContainer table, .drag-scroll-container table { border-collapse: collapse !important; border: none !important; }
+    #dragScrollUserContainer table th, #dragScrollUserContainer table td, #dragScrollContainer table th, #dragScrollContainer table td, .drag-scroll-container table th, .drag-scroll-container table td { border-left: none !important; border-right: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; }
+    .text-white-element { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+    /* Kustomisasi Modal Tengah Melebar & Sembunyikan Semua Scrollbar Dalam Modal */
+    .modal-dialog { max-width: 800px !important; }
+    .modal, .modal-body, .modal-open { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow-y: hidden !important; }
+    .modal::-webkit-scrollbar, .modal-body::-webkit-scrollbar { display: none !important; }
+    @media (min-width: 992px) { main.content-shift { margin-left: 280px; } .bottom-nav { display:none; } }
+</style>
 
 </head>
 <body>
@@ -307,31 +315,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
       </div>
     </div>
 
-    <!-- STRUKTUR TABEL LIST DATA (14 KOLOM LENGKAP) -->
-    <div class="table-responsive border rounded-3" style="border-color: rgba(148, 163, 184, 0.15) !important; background: transparent !important;">
-      <table class="table table-hover align-middle mb-0 text-white" style="background: transparent !important; color: #e5e7eb !important; min-width: 1500px;">
+    <!-- STRUKTUR TABEL LIST DATA USER (TANPA SCROLLBAR, DAPAT DIGESER MOUSE & BEBAS GARIS PUTIH) -->
+    <div id="dragScrollUserContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
+      <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1500px; user-select: none; border-collapse: collapse !important;">
         <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
           <tr>
-            <th class="py-3 px-2 text-center text-white" style="background: transparent !important;">#1 ID</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important;">#2 Role ID</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important;">#3 Tenant ID</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important;">#9 Photo</th>
-            <th class="py-3 text-white" style="background: transparent !important;">#4 Name</th>
-            <th class="py-3 text-white" style="background: transparent !important;">#5 Username</th>
-            <th class="py-3 text-white" style="background: transparent !important;">#6 Email</th>
-            <th class="py-3 text-white" style="background: transparent !important;">#7 Phone</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important;">#10 Status</th>
-            <th class="py-3 text-white" style="background: transparent !important;">#11 Last Login</th>
-            <th class="py-3 text-white" style="background: transparent !important;">#12 Created At</th>
-            <th class="py-3 text-white" style="background: transparent !important;">#13 Updated At</th>
-            <th class="py-3 text-white" style="background: transparent !important;">#14 Deleted At</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important;">Aksi</th>
+            <th class="py-3 px-2 text-center text-white" style="background: transparent !important; border: none !important;">#1 ID</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">#2 Role ID</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">#3 Tenant ID</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">#9 Photo</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#4 Name</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#5 Username</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#6 Email</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#7 Phone</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">#10 Status</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#11 Last Login</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#12 Created At</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#13 Updated At</th>
+            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">#14 Deleted At</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Aksi</th>
           </tr>
         </thead>
         <tbody style="background: transparent !important;">
           <?php
           try {
-              // Menarik seluruh data kolom tanpa terkecuali
               $queryAllFields = "SELECT id, role_id, tenant_id, name, username, email, phone, photo, status, last_login, created_at, updated_at, deleted_at FROM users ORDER BY id ASC";
               $resultAllFields = $conn->query($queryAllFields);
               
@@ -339,73 +346,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                   while ($userRow = $resultAllFields->fetch_assoc()) {
                       $isUserActive = (int)$userRow['status'] === 1;
                       
-                      // Manajemen Gambar Profil
                       if (!empty($userRow['photo']) && file_exists($userRow['photo'])) {
-                          $imgDisplay = '<img src="'.htmlspecialchars($userRow['photo']).'" class="rounded-circle shadow-sm" style="width: 35px; height: 35px; object-fit: cover; border: 1px solid rgba(148, 163, 184, 0.2);">';
+                          $imgDisplay = '<img src="'.htmlspecialchars($userRow['photo']).'" class="rounded-circle shadow-sm" style="width: 35px; height: 35px; object-fit: cover; border: 1px solid rgba(148, 163, 184, 0.2);" draggable="false">';
                       } else {
                           $initials = strtoupper(substr($userRow['name'] ?? 'US', 0, 2));
                           $imgDisplay = '<div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm" style="width: 35px; height: 35px; background: rgba(148, 163, 184, 0.25); border: 1px solid rgba(148, 163, 184, 0.2); font-size: 0.75rem;">'.$initials.'</div>';
                       }
                       ?>
                       <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
-                        <!-- #1 id -->
-                        <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important;"><?= $userRow['id'] ?></td>
-                        <!-- #2 role_id -->
-                        <td class="text-center text-white-50" style="background: transparent !important;"><?= $userRow['role_id'] ?? 'NULL' ?></td>
-                        <!-- #3 tenant_id -->
-                        <td class="text-center text-white-50" style="background: transparent !important;"><?= $userRow['tenant_id'] ?? 'NULL' ?></td>
-                        <!-- #9 photo -->
-                        <td class="text-center" style="background: transparent !important;"><?= $imgDisplay ?></td>
-                        <!-- #4 name -->
-                        <td class="fw-semibold text-white" style="background: transparent !important;"><?= htmlspecialchars($userRow['name'] ?? '-') ?></td>
-                        <!-- #5 username -->
-                        <td style="color: #94a3b8 !important; background: transparent !important;">@<?= htmlspecialchars($userRow['username'] ?? '-') ?></td>
-                        <!-- #6 email -->
-                        <td class="text-white-50" style="background: transparent !important;"><?= htmlspecialchars($userRow['email'] ?? '-') ?></td>
-                        <!-- #7 phone -->
-                        <td class="text-white-50" style="background: transparent !important;"><?= htmlspecialchars($userRow['phone'] ? $userRow['phone'] : '-') ?></td>
-                        <!-- #10 status -->
-                        <td class="text-center" style="background: transparent !important;">
+                        <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $userRow['id'] ?></td>
+                        <td class="text-center text-white-50" style="background: transparent !important; border: none !important;"><?= $userRow['role_id'] ?? 'NULL' ?></td>
+                        <td class="text-center text-white-50" style="background: transparent !important; border: none !important;"><?= $userRow['tenant_id'] ?? 'NULL' ?></td>
+                        <td class="text-center" style="background: transparent !important; border: none !important;"><?= $imgDisplay ?></td>
+                        <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($userRow['name'] ?? '-') ?></td>
+                        <td style="color: #94a3b8 !important; background: transparent !important; border: none !important;">@<?= htmlspecialchars($userRow['username'] ?? '-') ?></td>
+                        <td class="text-white-50" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($userRow['email'] ?? '-') ?></td>
+                        <td class="text-white-50" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($userRow['phone'] ? $userRow['phone'] : '-') ?></td>
+                        <td class="text-center" style="background: transparent !important; border: none !important;">
                           <?php if ($isUserActive): ?>
                             <span class="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">1 (Aktif)</span>
                           <?php else: ?>
                             <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">0 (Nonaktif)</span>
                           <?php endif; ?>
                         </td>
-                        <!-- #11 last_login -->
-                        <td class="text-white-50 small" style="background: transparent !important;"><?= $userRow['last_login'] ?? 'NULL' ?></td>
-                        <!-- #12 created_at -->
-                        <td class="text-white-50 small" style="background: transparent !important;"><?= $userRow['created_at'] ?? 'NULL' ?></td>
-                        <!-- #13 updated_at -->
-                        <td class="text-white-50 small" style="background: transparent !important;"><?= $userRow['updated_at'] ?? 'NULL' ?></td>
-                        <!-- #14 deleted_at -->
-                        <td class="text-white-50 small" style="background: transparent !important;"><?= $userRow['deleted_at'] ?? 'NULL' ?></td>
+                        <td class="text-white-50 small" style="background: transparent !important; border: none !important;"><?= $userRow['last_login'] ?? 'NULL' ?></td>
+                        <td class="text-white-50 small" style="background: transparent !important; border: none !important;"><?= $userRow['created_at'] ?? 'NULL' ?></td>
+                        <td class="text-white-50 small" style="background: transparent !important; border: none !important;"><?= $userRow['updated_at'] ?? 'NULL' ?></td>
+                        <td class="text-white-50 small" style="background: transparent !important; border: none !important;"><?= $userRow['deleted_at'] ?? 'NULL' ?></td>
                         
-                        <!-- AKSI TOMBOL CRUD -->
-                        <td class="text-center" style="background: transparent !important;">
+                        <td class="text-center" style="background: transparent !important; border: none !important;">
                           <div class="d-flex justify-content-center gap-1">
-                            <button class="btn btn-sm btn-outline-success border-0 rounded-2" title="Edit User" data-bs-toggle="modal" data-bs-target="#modalEditUser" onclick="populateEditModal(<?= htmlspecialchars(json_encode($userRow)) ?>)">
-                              <i class="bi bi-pencil"></i>
+                            <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit User" data-bs-toggle="modal" data-bs-target="#modalEditUser" onclick="populateEditModal(<?= htmlspecialchars(json_encode($userRow)) ?>)">
+                              <i class="bi bi-pencil-square"></i>
                             </button>
-                            <button class="btn btn-sm btn-outline-danger border-0 rounded-2" title="Hapus User">
-                              <i class="bi bi-trash"></i>
-                            </button>
+                            <a href="user.php?action=delete&id=<?= $userRow['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete User" onclick="return confirm('Apakah Anda yakin ingin menghapus user ini?')">
+                              <i class="bi bi-trash-fill"></i>
+                            </a>
                           </div>
                         </td>
                       </tr>
                       <?php
                   }
               } else {
-                  echo '<tr><td colspan="14" class="text-center py-5 border-0" style="color: #94a3b8 !important; background: transparent !important;">Belum ada data user terdaftar di sistem.</td></tr>';
+                  ?>
+                  <tr>
+                    <td colspan="14" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">Tidak ada data user saat ini.</td>
+                  </tr>
+                  <?php
               }
           } catch (Throwable $e) {
-              echo '<tr><td colspan="14" class="text-center py-4 text-danger border-0" style="background: transparent !important;">Gagal memuat data: '.$e->getMessage().'</td></tr>';
+              echo "<tr><td colspan='14' class='text-danger text-center py-3' style='background: transparent !important; border: none !important;'>Gagal memuat data: " . htmlspecialchars($e->getMessage()) . "</td></tr>";
           }
           ?>
         </tbody>
       </table>
     </div>
-
   </div>
 </main>
 
@@ -609,63 +604,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
     </div>
 </div>
 
-<!-- SCRIPT MANAJEMEN USER (PREVIEW & POPULATE) -->
+<!-- SCRIPT MANAJEMEN USER (PREVIEW, POPULATE & DRAG TO SCROLL) -->
 <script>
-
-/**
- * 1. Live Preview Foto untuk Modal Tambah User
- */
+document.addEventListener('DOMContentLoaded', function() {
+    const userSlider = document.getElementById('dragScrollUserContainer');
+    if (!userSlider) return;
+    let isDown = false, startX, scrollLeft;
+    userSlider.addEventListener('mousedown', (e) => {
+        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+        isDown = true; userSlider.style.cursor = 'grabbing';
+        startX = e.pageX - userSlider.offsetLeft; scrollLeft = userSlider.scrollLeft;
+    });
+    userSlider.addEventListener('mouseleave', () => { isDown = false; userSlider.style.cursor = 'grab'; });
+    userSlider.addEventListener('mouseup', () => { isDown = false; userSlider.style.cursor = 'grab'; });
+    userSlider.addEventListener('mousemove', (e) => {
+        if (!isDown) return; e.preventDefault();
+        const x = e.pageX - userSlider.offsetLeft;
+        userSlider.scrollLeft = scrollLeft - ((x - startX) * 1.5);
+    });
+});
 function previewImage(input) {
     const preview = document.getElementById('tambah_preview_photo');
-    // PERBAIKAN: Menambahkan [0] untuk menangkap file pertama yang dipilih
     if (input.files && input.files[0]) {
         const reader = new FileReader();
-        reader.onload = function(e) {
-            preview.src = e.target.result;
-        }
-        reader.readAsDataURL(input.files[0]); // PERBAIKAN: Menambahkan [0]
-    } else {
-        preview.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-    }
+        reader.onload = (e) => preview.src = e.target.result;
+        reader.readAsDataURL(input.files[0]);
+    } else { preview.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; }
 }
-
-/**
- * 2. Live Preview Foto untuk Modal Edit User
- */
 function previewEditImage(input) {
     const preview = document.getElementById('edit_preview_photo');
-    // PERBAIKAN: Menambahkan [0] untuk menangkap file pertama yang dipilih
     if (input.files && input.files[0]) {
         const reader = new FileReader();
-        reader.onload = function(e) {
-            preview.src = e.target.result;
-        }
-        reader.readAsDataURL(input.files[0]); // PERBAIKAN: Menambahkan [0]
+        reader.onload = (e) => preview.src = e.target.result;
+        reader.readAsDataURL(input.files[0]);
     } else {
         const oldPhoto = document.getElementById('edit_old_photo').value;
         preview.src = oldPhoto ? "uploads/" + oldPhoto : "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
     }
 }
-
-/**
- * 3. Mengisi Data Pengguna ke Form Modal Edit
- */
 function populateEditModal(user) {
     document.getElementById('edit_id').value = user.id;
     document.getElementById('edit_name').value = user.name;
     document.getElementById('edit_email').value = user.email;
     document.getElementById('edit_phone').value = user.phone;
-    
     document.getElementById('edit_old_photo').value = user.photo || '';
-    
     const preview = document.getElementById('edit_preview_photo');
-    if (user.photo && user.photo.trim() !== '') {
-        preview.src = "uploads/" + user.photo;
-    } else {
-        preview.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-    }
+    preview.src = (user.photo && user.photo.trim() !== '') ? "uploads/" + user.photo : "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 }
-
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

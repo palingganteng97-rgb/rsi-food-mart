@@ -1,14 +1,16 @@
-<?php
-include "db.php"; // Memanggil koneksi database ($conn) & session_start()
-
-// Jika sesi user_id sudah aktif, langsung alihkan ke index.php agar tidak berputar-putar
-if (isset($_SESSION['user_id'])) {
-    header("Location: index.php");
-    exit;
-}
-
-$error = '';
+<?php 
+  // Ambil pesan error dari session flash jika ada kegagalan otentikasi di index.php
+  $flashError = $_SESSION['flash_error'] ?? '';
+  if (!empty($flashError)): 
 ?>
+    <div class="alert alert-danger border-0 rounded-3 small py-2 mb-3" role="alert" style="background: rgba(239,68,68,.12); color: #fecaca;">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= htmlspecialchars($flashError) ?>
+    </div>
+<?php 
+    unset($_SESSION['flash_error']);
+  endif; 
+?>
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
