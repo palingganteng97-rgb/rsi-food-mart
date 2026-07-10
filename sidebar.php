@@ -138,22 +138,28 @@ function activeClass(string $file, string $currentFile): string {
         <?php foreach ($menu as $key => $item): ?>
           <?php if (isset($item['sub'])): $isSubActive = array_key_exists($currentFile, $item['sub']); ?>
             <div class="w-100 mb-1">
-              <button class="nav-link w-100 border-0 text-start d-flex align-items-center gap-2 <?= $isSubActive ? 'active' : ''; ?>" data-bs-toggle="collapse" data-bs-target="#dropMenu-<?= $key ?>" aria-expanded="<?= $isSubActive ? 'true' : 'false'; ?>" style="background:transparent; color:inherit;">
-                <i class="bi <?= $item['icon']; ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
+              <!-- Judul Grup Menu Bertingkat -->
+              <button class="nav-link w-100 border-0 text-start d-flex align-items-center gap-3 <?= $isSubActive ? 'active' : ''; ?>" data-bs-toggle="collapse" data-bs-target="#dropMenu-<?= $key ?>" aria-expanded="<?= $isSubActive ? 'true' : 'false'; ?>" style="background:transparent; color:inherit; padding: 0.6rem 1rem;">
+                <i class="bi <?= $item['icon']; ?> d-inline-block text-center" style="width: 20px;"></i>
+                <span class="flex-grow-1"><?= htmlspecialchars($item['label']); ?></span>
                 <i class="bi bi-chevron-down small transition-arrow" style="transition: transform 0.2s; font-size: 0.75rem; opacity: 0.7;"></i>
               </button>
               <div class="collapse <?= $isSubActive ? 'show' : ''; ?> ms-3" id="dropMenu-<?= $key ?>">
                 <?php foreach ($item['sub'] as $subFile => $subItem): ?>
-                  <a class="nav-link <?= ($currentFile === $subFile) ? 'active' : ''; ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding-left:15px;">
-                    <i class="bi <?= $subItem['icon']; ?> me-2"></i><?= htmlspecialchars($subItem['label']); ?>
+                  <!-- Sub Menu Di Dalam Grup -->
+                  <a class="nav-link d-flex align-items-center gap-3 <?= ($currentFile === $subFile) ? 'active' : ''; ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding: 0.5rem 1rem 0.5rem 15px;">
+                    <i class="bi <?= $subItem['icon']; ?> d-inline-block text-center" style="width: 20px;"></i>
+                    <span><?= htmlspecialchars($subItem['label']); ?></span>
                   </a>
                 <?php endforeach; ?>
               </div>
             </div>
           <?php else: ?>
-            <!-- PERBAIKAN: Menambahkan kelas utilitas layar dari array menu -->
-            <a class="nav-link <?= ($currentFile === $key) ? 'active' : ''; ?> <?= $item['class'] ?? ''; ?>" href="<?= htmlspecialchars($item['href']); ?>">
-              <i class="bi <?= htmlspecialchars($item['icon']); ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
+            <!-- Menu Utama Biasa (Etalase, User, Roles, dll) -->
+            <!-- SOLUSI UTAMA: Menambahkan kembali class 'nav-link' yang terhapus agar d-flex & gap-3 berfungsi sempurna -->
+            <a class="nav-link d-flex align-items-center gap-3 <?= ($currentFile === ($item['href'] ?? '')) ? 'active' : ''; ?> <?= $item['class'] ?? ''; ?>" href="<?= htmlspecialchars($item['href'] ?? '#'); ?>" style="padding: 0.6rem 1rem;">
+              <i class="bi <?= htmlspecialchars($item['icon']); ?> d-inline-block text-center" style="width: 20px;"></i>
+              <span><?= htmlspecialchars($item['label']); ?></span>
             </a>
           <?php endif; ?>
         <?php endforeach; ?>
@@ -161,8 +167,9 @@ function activeClass(string $file, string $currentFile): string {
     </div>
   </div>
   <div class="sidebar-footer w-100">
-      <a href="logout.php" class="btn-logout" onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?')">
-          <i class="bi bi-box-arrow-left"></i><span>Logout</span>
+      <a href="logout.php" class="btn-logout d-flex align-items-center gap-3" onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?')" style="padding: 0.6rem 1rem;">
+          <i class="bi bi-box-arrow-left d-inline-block text-center" style="width: 20px;"></i>
+          <span>Logout</span>
       </a>
   </div>
 </aside>
