@@ -2,25 +2,19 @@
 // tenant.php
 include "db.php"; // Memanggil koneksi database ($conn) & session_start()
 
-// Proteksi Halaman: Jika sesi user_id kosong, tendang kembali ke login.php
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
-// Menghubungkan logika modular penghapusan data (jika ada file delete_handler tersendiri)
 if (file_exists("delete_handler.php")) {
     include "delete_handler.php";
 }
 
-// =========================================================================
-// 0. CRUD: LOGIKA SOFT DELETE DATA TENANT (MENGISI DELETED_AT)
-// =========================================================================
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
     $idToDelete = (int)$_GET['id'];
     if ($idToDelete > 0) {
         try {
-            // Update kolom deleted_at dengan penanda waktu saat ini (Soft Delete)
             $deleteStmt = $conn->prepare("UPDATE tenants SET deleted_at = NOW() WHERE id = ?");
             $deleteStmt->bind_param("i", $idToDelete);
             if ($deleteStmt->execute()) {
@@ -38,9 +32,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
     }
 }
 
-// =========================================================================
-// 1. CRUD: LOGIKA INSERT DATA TENANT BARU (DARI MODAL TAMBAH)
-// =========================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_add_tenant'])) {
     $tenantName  = trim($_POST['name'] ?? '');
     $tenantType  = trim($_POST['type'] ?? '');
@@ -99,9 +90,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_add_tenant']))
     }
 }
 
-// =========================================================================
-// 2. CRUD: LOGIKA UPDATE DATA TENANT (DARI MODAL EDIT)
-// =========================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_tenant'])) {
     $targetId    = (int)($_POST['id'] ?? 0);
     $upName      = trim($_POST['name'] ?? '');
@@ -160,9 +148,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_tenant'
     }
 }
 
-// =========================================================================
-// 3. READ DATA: AMBIL DATA YANG BELUM DI-SOFT-DELETE (`deleted_at IS NULL`)
-// =========================================================================
 $listTenants = [];
 try {
     // MENYARING DATA: Hanya menarik record yang data deleted_at-nya masih kosong/NULL
@@ -343,29 +328,35 @@ $menu = [
                 <h5 class="modal-title fw-bold text-white" id="modalTenantLabel">Form Tenant</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="formTenant" action="tenants.php?action=save" method="POST">
+            <!-- PERBAIKAN 1: Mengubah action ke tenant.php (tanpa s) -->
+            <form id="formTenant" action="tenant.php" method="POST" enctype="multipart/form-data">
                 <div class="modal-body" style="overflow-y: auto; max-height: calc(100vh - 130px); padding-bottom: 80px;">
+                    
+                    <!-- PERBAIKAN 2: Input penanda dinamis untuk Add/Update menggunakan JavaScript -->
                     <input type="hidden" name="id" id="tenant_id">
+                    <input type="hidden" name="action_add_tenant" id="action_add_trigger" value="1">
+                    <input type="hidden" name="action_update_tenant" id="action_update_trigger" value="1" disabled>
+                    <input type="hidden" name="old_photo" id="tenant_old_photo">
+
                     <div class="mb-3">
                         <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Nama Tenant</label>
                         <input type="text" class="form-control" name="name" id="tenant_name" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Tipe Tenant</label>
-                        <select class="form-select" name="type" id="tenant_type" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" onchange="toggleCustomType(this.value)" required>
+                        <select class="form-select" name="type" id="tenant_type" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
                             <option value="kantin">Kantin</option>
                             <option value="cafe">Cafe</option>
                             <option value="koperasi">Koperasi</option>
                             <option value="laundry">Laundry</option>
                             <option value="florist">Florist</option>
                             <option value="giftshop">Giftshop</option>
-                            <option value="lainnya">Lainnya (Ketik Manual)</option>
+                            <option value="lainnya">Lainnya</option>
                         </select>
                     </div>
-                    <!-- Input Tambahan Jika Memilih Lainnya -->
-                    <div class="mb-3" id="custom_type_container" style="display: none;">
-                        <label class="form-label" style="color: #22c55e !important; font-weight: 500;">Masukkan Tipe Baru</label>
-                        <input type="text" class="form-control" id="tenant_type_custom" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(34, 197, 94, 0.4) !important; color: #e5e7eb !important;">
+                    <div class="mb-3">
+                        <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Upload Logo</label>
+                        <input type="file" class="form-control" name="logo" id="tenant_logo" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
                     </div>
                     <div class="mb-3">
                         <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Deskripsi</label>
@@ -393,68 +384,62 @@ $menu = [
     </div>
 </div>
 
-
   <?php include "bottom_nav.php"; ?>
   
 <!-- JavaScript Integrasi Modal, Isian Form, dan Drag to Scroll -->
 <script>
-// =========================================================================
-// FUNGSI UTAMA: MOUSE DRAG TO SCROLL (GESER TABEL DENGAN KURSOR)
-// =========================================================================
 document.addEventListener('DOMContentLoaded', function() {
     const slider = document.querySelector('.table-responsive');
     if (!slider) return;
-
-    let isDown = false;
-    let startX;
-    let scrollLeft;
-
+    let isDown = false, startX, scrollLeft;
     slider.addEventListener('mousedown', (e) => {
-        // Mencegah trigger drag jika yang diklik adalah tombol aksi atau input text
         if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
-        
-        isDown = true;
-        startX = e.pageX - slider.offsetLeft;
-        scrollLeft = slider.scrollLeft;
+        isDown = true; startX = e.pageX - slider.offsetLeft; scrollLeft = slider.scrollLeft;
     });
-
-    slider.addEventListener('mouseleave', () => {
-        isDown = false;
-    });
-
-    slider.addEventListener('mouseup', () => {
-        isDown = false;
-    });
-
+    slider.addEventListener('mouseleave', () => { isDown = false; });
+    slider.addEventListener('mouseup', () => { isDown = false; });
     slider.addEventListener('mousemove', (e) => {
-        if (!isDown) return;
-        e.preventDefault(); // Mencegah pemblokiran teks saat digeser
-        const x = e.pageX - slider.offsetLeft;
-        const walk = (x - startX) * 1.5; // Mengatur sensitivitas kecepatan pergeseran kursor
+        if (!isDown) return; e.preventDefault();
+        const x = e.pageX - slider.offsetLeft; const walk = (x - startX) * 1.5;
         slider.scrollLeft = scrollLeft - walk;
     });
 });
 
-// =========================================================================
-// FUNGSI PENDUKUNG: MODAL & ISIAN FORM CRUD
-// =========================================================================
+function openTambahModal() {
+    resetForm();
+    document.getElementById('modalTenantLabel').innerText = 'Tambah Tenant';
+}
+
 function resetForm() {
     document.getElementById('formTenant').reset();
     document.getElementById('tenant_id').value = '';
     document.getElementById('modalTenantLabel').innerText = 'Tambah Tenant';
+    document.getElementById('action_add_trigger').removeAttribute('disabled');
+    document.getElementById('action_update_trigger').setAttribute('disabled', 'disabled');
+    toggleCustomType('kantin'); 
 }
 
 function editTenant(data) {
     resetForm();
     document.getElementById('modalTenantLabel').innerText = 'Ubah Data Tenant';
+    document.getElementById('action_add_trigger').setAttribute('disabled', 'disabled');
+    document.getElementById('action_update_trigger').removeAttribute('disabled');
     document.getElementById('tenant_id').value = data.id;
     document.getElementById('tenant_name').value = data.name;
-    document.getElementById('tenant_type').value = data.type;
     document.getElementById('tenant_description').value = data.description;
     document.getElementById('tenant_phone').value = data.phone;
     document.getElementById('tenant_email').value = data.email;
     document.getElementById('tenant_prep').value = data.preparation_time;
-    
+    if (document.getElementById('tenant_old_photo')) { document.getElementById('tenant_old_photo').value = data.logo || ''; }
+
+    const selectType = document.getElementById('tenant_type');
+    const standardOptions = ['kantin', 'cafe', 'koperasi', 'laundry', 'florist', 'giftshop'];
+    if (data.type && standardOptions.includes(data.type.toLowerCase())) {
+        selectType.value = data.type.toLowerCase(); toggleCustomType(data.type.toLowerCase());
+    } else {
+        selectType.value = 'lainnya'; toggleCustomType('lainnya');
+        if (document.getElementById('tenant_type_custom')) { document.getElementById('tenant_type_custom').value = data.type || ''; }
+    }
     var myModal = new bootstrap.Modal(document.getElementById('modalTenantRight'));
     myModal.show();
 }
@@ -463,39 +448,13 @@ function toggleCustomType(value) {
     const container = document.getElementById('custom_type_container');
     const inputCustom = document.getElementById('tenant_type_custom');
     const selectType = document.getElementById('tenant_type');
-
+    if (!container || !inputCustom || !selectType) return;
     if (value === 'lainnya') {
-        container.style.display = 'block';
-        inputCustom.setAttribute('name', 'type');
-        inputCustom.setAttribute('required', 'required');
-        selectType.removeAttribute('name');
+        container.style.display = 'block'; inputCustom.setAttribute('name', 'type');
+        inputCustom.setAttribute('required', 'required'); selectType.removeAttribute('name');
     } else {
-        container.style.display = 'none';
-        inputCustom.removeAttribute('name');
-        inputCustom.removeAttribute('required');
-        selectType.setAttribute('name', 'type');
-    }
-}
-
-// Interseptor saat fungsi EDIT/pemicu JS mengisi data ke form modal Anda
-function setModalData(data) {
-    document.getElementById('tenant_id').value = data.id;
-    document.getElementById('tenant_name').value = data.name;
-    document.getElementById('tenant_description').value = data.description;
-    document.getElementById('tenant_phone').value = data.phone;
-    document.getElementById('tenant_email').value = data.email;
-    document.getElementById('tenant_prep').value = data.preparation_time;
-
-    const selectType = document.getElementById('tenant_type');
-    const standardOptions = ['kantin', 'cafe', 'koperasi', 'laundry', 'florist', 'giftshop'];
-
-    if (standardOptions.includes(data.type.toLowerCase())) {
-        selectType.value = data.type.toLowerCase();
-        toggleCustomType(data.type.toLowerCase());
-    } else {
-        selectType.value = 'lainnya';
-        toggleCustomType('lainnya');
-        document.getElementById('tenant_type_custom').value = data.type;
+        container.style.display = 'none'; inputCustom.removeAttribute('name');
+        inputCustom.removeAttribute('required'); selectType.setAttribute('name', 'type');
     }
 }
 </script>
