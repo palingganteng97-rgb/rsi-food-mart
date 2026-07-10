@@ -116,7 +116,13 @@
                                 <!-- Opsi varian disuntikkan dari JavaScript -->
                             </select>
                         </div>
-
+                        <!-- 1.5. PILIHAN TOPPING / ADDON PRODUK (DIUBAH MENJADI SELECT DROPDOWN) -->
+                        <div class="mb-4">
+                            <label for="detail_product_addons_select" class="small text-white-50 d-block mb-2" style="opacity: 0.7; font-weight: 500;">Pilih Topping / Tambahan:</label>
+                            <select id="detail_product_addons_select" class="form-select bg-dark text-white border-secondary py-2 px-3" style="border-radius: 10px; font-size: 0.92rem; box-shadow: none;">
+                                <!-- Pilihan topping disuntikkan secara dinamis dari JavaScript -->
+                            </select>
+                        </div>
                         <!-- 2. AREA INPUT TEXT UNTUK CATATAN CUSTOM -->
                         <div class="mb-4">
                             <label for="detail_product_notes_input" class="small text-white-50 d-block mb-2" style="opacity: 0.7; font-weight: 500;">Catatan Tambahan Pembeli (Opsional):</label>
