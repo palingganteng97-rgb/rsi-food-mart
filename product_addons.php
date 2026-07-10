@@ -1,7 +1,5 @@
 <?php
-// =========================================================================
-// LOGIKA BACKEND - PRODUCT VARIANTS (VERSI MYSQLI)
-// =========================================================================
+// product_addons.php
 include 'db.php'; 
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -14,32 +12,35 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $action = isset($_GET['action']) ? $_GET['action'] : 'read';
+$status = isset($_GET['status']) ? $_GET['status'] : "";
+$msg    = isset($_GET['msg']) ? $_GET['msg'] : "";
 
-// 1. Ambil Semua Data Varian (Read)
+// 1. Ambil Semua Data Topping / Addon (Read)
 if ($action == 'read') {
-    $query = "SELECT pv.*, p.name AS product_name 
-              FROM product_variants pv 
-              JOIN products p ON pv.product_id = p.id 
-              ORDER BY pv.id DESC";
+    $query = "SELECT pa.*, p.name AS product_name 
+              FROM product_addons pa 
+              JOIN products p ON pa.product_id = p.id 
+              ORDER BY pa.id DESC";
     $result = mysqli_query($conn, $query);
     if (!$result) {
         die("Gagal mengambil data: " . mysqli_error($conn));
     }
-    $variants = mysqli_fetch_all($result, MYSQLI_ASSOC);
+    $addons = mysqli_fetch_all($result, MYSQLI_ASSOC);
 }
 
 // 2. Tambah Data (Create)
 if ($action == 'create' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     $product_id = intval($_POST['product_id']);
-    $name       = mysqli_real_escape_string($conn, trim($_POST['name']));
+    $addon_name = mysqli_real_escape_string($conn, trim($_POST['addon_name']));
+    $required   = isset($_POST['required']) ? intval($_POST['required']) : 0;
 
-    if (!empty($product_id) && !empty($name)) {
-        $query = "INSERT INTO product_variants (product_id, name) VALUES ($product_id, '$name')";
+    if (!empty($product_id) && !empty($addon_name)) {
+        $query = "INSERT INTO product_addons (product_id, addon_name, required) VALUES ($product_id, '$addon_name', $required)";
         if (mysqli_query($conn, $query)) {
-            header("Location: product_variants.php?status=success_add");
+            header("Location: product_addons.php?status=success_add");
             exit;
         } else {
-            header("Location: product_variants.php?status=error&msg=" . urlencode(mysqli_error($conn)));
+            header("Location: product_addons.php?status=error&msg=" . urlencode(mysqli_error($conn)));
             exit;
         }
     }
@@ -49,15 +50,16 @@ if ($action == 'create' && $_SERVER['REQUEST_METHOD'] == 'POST') {
 if ($action == 'update' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     $id         = intval($_POST['id']);
     $product_id = intval($_POST['product_id']);
-    $name       = mysqli_real_escape_string($conn, trim($_POST['name']));
+    $addon_name = mysqli_real_escape_string($conn, trim($_POST['addon_name']));
+    $required   = isset($_POST['required']) ? intval($_POST['required']) : 0;
 
-    if (!empty($id) && !empty($product_id) && !empty($name)) {
-        $query = "UPDATE product_variants SET product_id = $product_id, name = '$name' WHERE id = $id";
+    if (!empty($id) && !empty($product_id) && !empty($addon_name)) {
+        $query = "UPDATE product_addons SET product_id = $product_id, addon_name = '$addon_name', required = $required WHERE id = $id";
         if (mysqli_query($conn, $query)) {
-            header("Location: product_variants.php?status=success_edit");
+            header("Location: product_addons.php?status=success_edit");
             exit;
         } else {
-            header("Location: product_variants.php?status=error&msg=" . urlencode(mysqli_error($conn)));
+            header("Location: product_addons.php?status=error&msg=" . urlencode(mysqli_error($conn)));
             exit;
         }
     }
@@ -66,12 +68,12 @@ if ($action == 'update' && $_SERVER['REQUEST_METHOD'] == 'POST') {
 // 4. Hapus Data (Delete)
 if ($action == 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
-    $query = "DELETE FROM product_variants WHERE id = $id";
+    $query = "DELETE FROM product_addons WHERE id = $id";
     if (mysqli_query($conn, $query)) {
-        header("Location: product_variants.php?status=success_delete");
+        header("Location: product_addons.php?status=success_delete");
         exit;
     } else {
-        header("Location: product_variants.php?status=error&msg=" . urlencode(mysqli_error($conn)));
+        header("Location: product_addons.php?status=error&msg=" . urlencode(mysqli_error($conn)));
         exit;
     }
 }
@@ -123,18 +125,19 @@ $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : 
 <body>
   <?php require __DIR__ . '/sidebar.php'; ?>
 
+<!--- MAIN KONTEN --->
 <main class="content-shift p-4">
     <!-- Container tabel dengan tema gelap transparan -->
     <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
         
-        <!-- HEADER TABEL & TOMBOL TAMBAH VARIAN -->
+        <!-- HEADER TABEL & TOMBOL TAMBAH TOPPING -->
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
             <div>
-                <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Varian Produk</h2>
+                <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Topping / Addon Produk</h2>
             </div>
             <div>
-                <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalVariant" onclick="openTambahVariant()">
-                    <i class="bi bi-plus-circle"></i> Tambah Varian
+                <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalAddon" onclick="openTambahAddon()">
+                    <i class="bi bi-plus-circle"></i> Tambah Topping
                 </button>
             </div>
         </div>
@@ -144,9 +147,9 @@ $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : 
             <div class="alert <?= strpos($status, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
                 <strong>
                     <?php 
-                    if ($status == 'success_add') echo "Varian produk berhasil ditambahkan!";
-                    elseif ($status == 'success_edit') echo "Data varian berhasil diperbarui!";
-                    elseif ($status == 'success_delete') echo "Varian produk berhasil dihapus!";
+                    if ($status == 'success_add') echo "Topping produk berhasil ditambahkan!";
+                    elseif ($status == 'success_edit') echo "Data topping berhasil diperbarui!";
+                    elseif ($status == 'success_delete') echo "Topping produk berhasil dihapus!";
                     else echo "Operasi gagal: " . htmlspecialchars($msg);
                     ?>
                 </strong>
@@ -154,19 +157,20 @@ $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : 
             </div>
         <?php endif; ?>
 
-        <!-- STRUKTUR TABEL LIST DATA VARIAN (PAS SATU LAYAR FULL - NO SCROLL) -->
-        <div id="variantTableContainer" class="table-responsive rounded-3" style="border: none !important; background: transparent !important; box-shadow: none !important; -webkit-box-shadow: none !important; overflow-x: hidden !important;">
+        <!-- STRUKTUR TABEL LIST DATA ADDONS (PAS SATU LAYAR FULL - NO SCROLL) -->
+        <div id="addonTableContainer" class="table-responsive rounded-3" style="border: none !important; background: transparent !important; box-shadow: none !important; -webkit-box-shadow: none !important; overflow-x: hidden !important;">
             <table class="table table-hover align-middle mb-0 text-white" style="background: transparent !important; color: #e5e7eb !important; width: 100% !important; table-layout: auto !important; border-collapse: collapse !important;">
                 <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
                     <tr>
                         <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 80px;">ID</th>
                         <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Nama Produk</th>
-                        <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Nama Varian</th>
+                        <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Nama Topping</th>
+                        <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Sifat Pembelian</th>
                         <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 130px;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody style="background: transparent !important;">
-                    <?php if (!empty($variants)): foreach ($variants as $row): ?>
+                    <?php if (!empty($addons)): foreach ($addons as $row): ?>
                         <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
                             <!-- Kolom ID -->
                             <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $row['id'] ?></td>
@@ -176,27 +180,36 @@ $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : 
                                 <div class="text-truncate" title="<?= htmlspecialchars($row['product_name']) ?>"><?= htmlspecialchars($row['product_name'] ?: 'Produk Telah Dihapus') ?></div>
                             </td>
 
-                            <!-- Kolom Nama Varian (PERBAIKAN: Menggunakan bg-dark text-white & border tipis agar teks putih terlihat sangat jelas) -->
+                            <!-- Kolom Nama Topping -->
                             <td class="text-white" style="background: transparent !important; border: none !important;">
                                 <span class="badge bg-dark text-white border border-secondary border-opacity-50 px-3 py-1.5" style="font-size: 0.85rem; letter-spacing: 0.5px;">
-                                    <?= htmlspecialchars($row['name']) ?>
+                                    <?= htmlspecialchars($row['addon_name']) ?>
                                 </span>
+                            </td>
+
+                            <!-- Kolom Sifat Pembelian (Required / Optional) -->
+                            <td class="text-center" style="background: transparent !important; border: none !important;">
+                                <?php if ((int)$row['required'] === 1): ?>
+                                    <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;"><i class="bi bi-exclamation-circle-fill me-1"></i>Wajib Beli</span>
+                                <?php else: ?>
+                                    <span class="badge bg-secondary-subtle text-muted border border-secondary border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">Opsional</span>
+                                <?php endif; ?>
                             </td>
                             
                             <!-- Kolom Aksi Menu CRUD -->
                             <td class="text-center" style="background: transparent !important; border: none !important;">
                                 <div class="d-flex justify-content-center gap-1">
-                                    <!-- Tombol Edit Baru: Mengirimkan data sebagai argumen teks biasa, anti-error JSON -->
+                                    <!-- Tombol Edit: Mengirimkan parameter terpisah (id, product_id, addon_name, required) -->
                                     <button type="button" class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit Data" 
-                                            onclick="openEditVariant(<?= $row['id'] ?>, <?= $row['product_id'] ?>, '<?= addslashes(htmlspecialchars($row['name'], ENT_QUOTES, 'UTF-8')) ?>')">
+                                            onclick="openEditAddon(<?= $row['id'] ?>, <?= $row['product_id'] ?>, '<?= addslashes(htmlspecialchars($row['addon_name'], ENT_QUOTES, 'UTF-8')) ?>', <?= $row['required'] ?>)">
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
 
                                     <!-- Tombol Hapus Terhubung ke Modal Konfirmasi -->
-                                    <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Hapus Varian"
+                                    <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Hapus Topping"
                                             data-bs-toggle="modal" 
-                                            data-bs-target="#modalConfirmDeleteVariant" 
-                                            onclick="document.getElementById('delete_variant_display_name').innerText = '<?php echo addslashes($row['name']); ?>'; document.getElementById('btnConfirmDeleteVariantAction').setAttribute('href', 'product_variants.php?action=delete&id=<?= $row['id'] ?>')">
+                                            data-bs-target="#modalConfirmDeleteAddon" 
+                                            onclick="document.getElementById('delete_addon_display_name').innerText = '<?php echo addslashes($row['addon_name']); ?>'; document.getElementById('btnConfirmDeleteAddonAction').setAttribute('href', 'product_addons.php?action=delete&id=<?= $row['id'] ?>')">
                                         <i class="bi bi-trash-fill"></i>
                                     </button>
                                 </div>
@@ -205,7 +218,7 @@ $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : 
                     <?php endforeach; else: ?>
                         <!-- State Tampilan jika data kosong -->
                         <tr>
-                            <td colspan="4" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">Belum ada data varian produk.</td>
+                            <td colspan="5" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">Belum ada data topping / addon produk.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
@@ -215,24 +228,24 @@ $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : 
 </main>
 
 <!-- =========================================================================
-     MODAL INPUT DATA (TAMBAH / EDIT VARIAN)
+     MODAL INPUT DATA (TAMBAH / EDIT TOPPING)
      ========================================================================= -->
-<div class="modal fade" id="modalVariant" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="modalAddon" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <form action="product_variants.php" method="POST" id="formVariant" class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb; border-radius: 16px;">
+        <form action="product_addons.php" method="POST" id="formAddon" class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb; border-radius: 16px;">
             <div class="modal-header border-0 pb-0" style="padding: 1.5rem 1.5rem 0 1.5rem;">
-                <h5 class="fw-bold text-white m-0" id="modalVariantLabel">Tambah Varian</h5>
+                <h5 class="fw-bold text-white m-0" id="modalAddonLabel">Tambah Topping</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             
             <div class="modal-body p-4">
                 <!-- Input Hidden ID untuk Operasi Update -->
-                <input type="hidden" name="id" id="variant_id">
+                <input type="hidden" name="id" id="addon_id">
                 
                 <!-- Pilih Produk Relasi -->
                 <div class="mb-3">
-                    <label for="variant_product_id" class="form-label small text-white-50 fw-medium">Pilih Produk</label>
-                    <select name="product_id" id="variant_product_id" class="form-select bg-dark text-white border-secondary rounded-3" style="background-color: rgba(2, 6, 23, 0.4) !important;" required>
+                    <label for="addon_product_id" class="form-label small text-white-50 fw-medium">Pilih Produk</label>
+                    <select name="product_id" id="addon_product_id" class="form-select bg-dark text-white border-secondary rounded-3" style="background-color: rgba(2, 6, 23, 0.4) !important;" required>
                         <option value="">-- Pilih Produk --</option>
                         <?php foreach ($products as $p): ?>
                             <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['name']) ?></option>
@@ -240,17 +253,25 @@ $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : 
                     </select>
                 </div>
                 
-                <!-- Input Nama Varian -->
+                <!-- Input Nama Topping -->
+                <div class="mb-3">
+                    <label for="addon_name" class="form-label small text-white-50 fw-medium">Nama Topping</label>
+                    <input type="text" name="addon_name" id="addon_name" class="form-control text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); box-shadow: none;" placeholder="Contoh: Ekstra Telur, Tambah Keju, Sambal Korek" required>
+                </div>
+
+                <!-- Input Sifat Pembelian (Required) -->
                 <div class="mb-2">
-                    <label for="variant_name" class="form-label small text-white-50 fw-medium">Nama Varian</label>
-                    <input type="text" name="name" id="variant_name" class="form-control text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); box-shadow: none;" placeholder="Contoh: Pedas, Jumbo, Ekstra Keju" required>
+                    <label for="addon_required" class="form-label small text-white-50 fw-medium">Sifat Pembelian</label>
+                    <select name="required" id="addon_required" class="form-select bg-dark text-white border-secondary rounded-3" style="background-color: rgba(2, 6, 23, 0.4) !important;" required>
+                        <option value="0">Opsional (Pembeli boleh memilih atau tidak)</option>
+                        <option value="1">Wajib Beli (Pembeli harus membeli topping ini)</option>
+                    </select>
                 </div>
             </div>
             
             <div class="modal-footer border-0 pt-0 d-flex gap-2 justify-content-end" style="padding: 0 1.5rem 1.5rem 1.5rem;">
                 <button type="button" class="btn btn-sm btn-secondary rounded-3 px-3 py-2" data-bs-dismiss="modal" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8;">Batal</button>
-                <!-- PERBAIKAN UTAMA: Memastikan id="btnSubmitVariant" ada agar name dan value bisa dimanipulasi dinamis oleh JS -->
-                <button type="submit" name="action" value="create" id="btnSubmitVariant" class="btn btn-sm btn-success rounded-3 px-3 py-2 fw-medium">Simpan Data</button>
+                <button type="submit" name="action" value="create" id="btnSubmitAddon" class="btn btn-sm btn-success rounded-3 px-3 py-2 fw-medium">Simpan Data</button>
             </div>
         </form>
     </div>
@@ -259,11 +280,11 @@ $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : 
 <!-- =========================================================================
      MODAL KONFIRMASI HAPUS DATA
      ========================================================================= -->
-<div class="modal fade" id="modalConfirmDeleteVariant" tabindex="-1" aria-labelledby="modalConfirmDeleteVariantLabel" aria-hidden="true">
+<div class="modal fade" id="modalConfirmDeleteAddon" tabindex="-1" aria-labelledby="modalConfirmDeleteAddonLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content text-bg-dark border-secondary" style="background-color: #111827 !important; border-color: #374151 !important; border-radius: 16px;">
       <div class="modal-header border-bottom border-secondary">
-        <h5 class="modal-title text-white fw-bold d-flex align-items-center" id="modalConfirmDeleteVariantLabel">
+        <h5 class="modal-title text-white fw-bold d-flex align-items-center" id="modalConfirmDeleteAddonLabel">
           <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i> Konfirmasi Hapus
         </h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -272,53 +293,56 @@ $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : 
         <div class="mb-3">
           <i class="bi bi-trash3-fill text-danger" style="font-size: 3.5rem;"></i>
         </div>
-        <p class="text-white-50 fs-6 mb-1">Apakah Anda yakin ingin menghapus varian dari produk ini?</p>
-        <h6 id="delete_variant_display_name" class="text-warning fw-bold mt-2"></h6>
+        <p class="text-white-50 fs-6 mb-1">Apakah Anda yakin ingin menghapus topping dari produk ini?</p>
+        <h6 id="delete_addon_display_name" class="text-warning fw-bold mt-2"></h6>
       </div>
       <div class="modal-footer border-top border-secondary justify-content-center">
         <button type="button" class="btn btn-sm btn-secondary px-4 rounded-3 py-2" data-bs-dismiss="modal" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8;">Batal</button>
-        <a id="btnConfirmDeleteVariantAction" href="#" class="btn btn-sm btn-danger px-4 rounded-3 py-2 fw-bold d-inline-flex align-items-center justify-content-center">Oke, Hapus</a>
+        <a id="btnConfirmDeleteAddonAction" href="#" class="btn btn-sm btn-danger px-4 rounded-3 py-2 fw-bold d-inline-flex align-items-center justify-content-center">Oke, Hapus</a>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-    function openTambahVariant() {
-        const form = document.getElementById('formVariant');
-        const submitBtn = document.getElementById('btnSubmitVariant');
+    // Fungsi Reset Form saat Tombol "Tambah Topping" diklik
+    function openTambahAddon() {
+        const form = document.getElementById('formAddon');
+        const submitBtn = document.getElementById('btnSubmitAddon');
         
-        if(form) form.action = "product_variants.php?action=create";
+        if(form) form.action = "product_addons.php?action=create";
         if(submitBtn) {
             submitBtn.name = "action";
             submitBtn.value = "create";
         }
         
-        document.getElementById('variant_id').value = "";
-        document.getElementById('variant_product_id').value = "";
-        document.getElementById('variant_name').value = "";
-        document.getElementById('modalVariantLabel').innerText = "Tambah Varian";
+        document.getElementById('addon_id').value = "";
+        document.getElementById('addon_product_id').value = "";
+        document.getElementById('addon_name').value = "";
+        document.getElementById('addon_required').value = "0"; // Default: Opsional
+        document.getElementById('modalAddonLabel').innerText = "Tambah Topping";
     }
 
-    // PERBAIKAN MUTLAK: Menginisialisasi modal secara langsung saat tombol diklik
-    function openEditVariant(id, productId, name) {
-        const form = document.getElementById('formVariant');
-        const submitBtn = document.getElementById('btnSubmitVariant');
+    // Fungsi Pengisian Form & Tampil Jendela saat Tombol "Edit" diklik (Anti-Crash)
+    function openEditAddon(id, productId, addonName, required) {
+        const form = document.getElementById('formAddon');
+        const submitBtn = document.getElementById('btnSubmitAddon');
         
-        if(form) form.action = "product_variants.php?action=update";
+        if(form) form.action = "product_addons.php?action=update";
         if(submitBtn) {
             submitBtn.name = "action";
             submitBtn.value = "update";
         }
         
-        // Isi data ke form input
-        document.getElementById('variant_id').value = id;
-        document.getElementById('variant_product_id').value = productId;
-        document.getElementById('variant_name').value = name;
-        document.getElementById('modalVariantLabel').innerText = "Ubah Detail Varian";
+        // Memasukkan data record database ke dalam komponen input form modal
+        document.getElementById('addon_id').value = id;
+        document.getElementById('addon_product_id').value = productId;
+        document.getElementById('addon_name').value = addonName;
+        document.getElementById('addon_required').value = required;
+        document.getElementById('modalAddonLabel').innerText = "Ubah Detail Topping";
         
-        // Panggil langsung instansiasi modal Bootstrap di sini (Anti-Crash)
-        const modalElement = document.getElementById('modalVariant');
+        // Panggil langsung instansiasi objek resmi jendela modal Bootstrap
+        const modalElement = document.getElementById('modalAddon');
         const instance = bootstrap.Modal.getOrCreateInstance(modalElement);
         instance.show();
     }

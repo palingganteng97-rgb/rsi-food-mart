@@ -19,6 +19,7 @@ $menu = [
             'products.php'       => [ 'href' => 'products.php',       'label' => 'Data Produk',     'icon' => 'bi-box-seam-fill' ],
             'product_images.php' => [ 'href' => 'product_images.php', 'label' => 'Gambar Produk',   'icon' => 'bi-images' ],
             'product_variants.php' => [ 'href' => 'product_variants.php', 'label' => 'Varian Produk',   'icon' => 'bi-grid-3x3-gap-fill' ],
+            'product_addons.php'   => [ 'href' => 'product_addons.php',   'label' => 'Topping Produk',  'icon' => 'bi-egg-fried' ],
         ]
     ],
 
