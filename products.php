@@ -12,13 +12,16 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $status = isset($_GET['status']) ? $_GET['status'] : "";
-$msg = "";
+$msg = isset($_GET['msg']) ? $_GET['msg'] : "";
 $uploadDir = "uploads/products/";
 
 if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0775, true);
 }
 
+// ==========================================
+// 1. PROSES CREATE (TAMBAH DATA PRODUK)
+// ==========================================
 if (isset($_POST['action_add_product'])) {
     $tenant_id   = intval($_POST['tenant_id']);
     $category_id = intval($_POST['category_id']);
@@ -34,42 +37,40 @@ if (isset($_POST['action_add_product'])) {
     $imageName   = ""; 
 
     if (!empty($sku)) {
-        $checkSku = mysqli_query($conn, "SELECT id FROM products WHERE sku = '$sku' LIMIT 1");
+        $checkSku = mysqli_query($conn, "SELECT id FROM products WHERE sku = '$sku' AND deleted_at IS NULL LIMIT 1");
         if (mysqli_num_rows($checkSku) > 0) {
-            $status = "error"; $msg = "SKU sudah digunakan oleh produk lain!";
+            header("Location: products.php?status=error&msg=" . urlencode("SKU sudah digunakan!"));
+            exit();
         }
     }
 
-    if ($status !== "error" && isset($_FILES['image']) && !empty($_FILES['image']['name'])) {
-        $fileName = $_FILES['image']['name'];
-        $fileTmp  = $_FILES['image']['tmp_name'];
-        $fileExt  = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-        
+    if (isset($_FILES['image']) && !empty($_FILES['image']['name'])) {
+        $fileExt  = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
         $imageName = "prod_" . time() . "_" . uniqid() . "." . $fileExt;
-        $targetFile = $uploadDir . $imageName;
-
-        $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
-        if (in_array($fileExt, $allowedExtensions)) {
-            if (!move_uploaded_file($fileTmp, $targetFile)) {
-                $status = "error"; $msg = "Gagal mengunggah gambar produk.";
-            }
+        
+        if (in_array($fileExt, ['jpg', 'jpeg', 'png', 'webp'])) {
+            move_uploaded_file($_FILES['image']['tmp_name'], $uploadDir . $imageName);
         } else {
-            $status = "error"; $msg = "Format gambar tidak didukung (Gunakan: JPG, PNG, WEBP).";
+            header("Location: products.php?status=error&msg=" . urlencode("Format gambar wajib JPG, PNG, atau WEBP."));
+            exit();
         }
     }
 
-    if ($status !== "error") {
-        $query = "INSERT INTO products (tenant_id, category_id, brand_id, unit_id, sku, barcode, name, description, base_price, stock, image, status) 
-                  VALUES ($tenant_id, $category_id, $brand_id, $unit_id, '$sku', '$barcode', '$name', '$description', $base_price, $stock, '$imageName', $p_status)";
-        
-        if (mysqli_query($conn, $query)) {
-            $status = "success_insert";
-        } else {
-            $status = "error"; $msg = "Gagal menyimpan produk: " . mysqli_error($conn);
-        }
+    $query = "INSERT INTO products (tenant_id, category_id, brand_id, unit_id, sku, barcode, name, description, base_price, stock, image, status, created_at) 
+              VALUES ($tenant_id, $category_id, $brand_id, $unit_id, '$sku', '$barcode', '$name', '$description', $base_price, $stock, '$imageName', $p_status, NOW())";
+    
+    if (mysqli_query($conn, $query)) {
+        header("Location: products.php?status=success_insert");
+        exit();
+    } else {
+        header("Location: products.php?status=error&msg=" . urlencode(mysqli_error($conn)));
+        exit();
     }
 }
 
+// ==========================================
+// 2. PROSES UPDATE (UBAH DATA PRODUK)
+// ==========================================
 if (isset($_POST['action_update_product'])) {
     $id          = intval($_POST['id']);
     $tenant_id   = intval($_POST['tenant_id']);
@@ -83,6 +84,7 @@ if (isset($_POST['action_update_product'])) {
     $base_price  = floatval($_POST['base_price']);
     $stock       = intval($_POST['stock']);
     $p_status    = isset($_POST['status']) ? intval($_POST['status']) : 1;
+
     $checkQuery = mysqli_query($conn, "SELECT image FROM products WHERE id = $id");
     $currentData = mysqli_fetch_assoc($checkQuery);
     $oldImage = $currentData['image'];
@@ -96,53 +98,56 @@ if (isset($_POST['action_update_product'])) {
     }
 
     if (isset($_FILES['image']) && !empty($_FILES['image']['name'])) {
-        $fileName = $_FILES['image']['name'];
-        $fileTmp  = $_FILES['image']['tmp_name'];
-        $fileExt  = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-        $imageName = "prod_" . time() . "_" . uniqid() . "." . $fileExt;
-        $targetFile = $uploadDir . $imageName;
-        $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
-        if (in_array($fileExt, $allowedExtensions)) {
-            if (move_uploaded_file($fileTmp, $targetFile)) {
-                if (!empty($oldImage) && file_exists($uploadDir . $oldImage) && !isset($_POST['delete_current_image'])) {
+        $fileExt  = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
+        $newImageName = "prod_" . time() . "_" . uniqid() . "." . $fileExt;
+        
+        if (in_array($fileExt, ['jpg', 'jpeg', 'png', 'webp'])) {
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $uploadDir . $newImageName)) {
+                if (!empty($oldImage) && file_exists($uploadDir . $oldImage)) {
                     unlink($uploadDir . $oldImage);
                 }
-            } else {
-                $status = "error"; $msg = "Gagal mengunggah gambar baru.";
+                $imageName = $newImageName;
             }
-        } else {
-            $status = "error"; $msg = "Format file gambar baru tidak didukung.";
         }
     }
 
-    if ($status !== "error") {
-        $query = "UPDATE products SET 
-                    tenant_id = $tenant_id, 
-                    category_id = $category_id, 
-                    brand_id = $brand_id, 
-                    unit_id = $unit_id, 
-                    sku = '$sku', 
-                    barcode = '$barcode', 
-                    name = '$name', 
-                    description = '$description', 
-                    base_price = $base_price, 
-                    stock = $stock, 
-                    image = '$imageName', 
-                    status = $p_status 
-                  WHERE id = $id";
-        
-        if (mysqli_query($conn, $query)) {
-            $status = "success_update";
-        } else {
-            $status = "error"; $msg = "Gagal memperbarui produk: " . mysqli_error($conn);
-        }
+    $query = "UPDATE products SET 
+                tenant_id = $tenant_id, category_id = $category_id, brand_id = $brand_id, unit_id = $unit_id, 
+                sku = '$sku', barcode = '$barcode', name = '$name', description = '$description', 
+                base_price = $base_price, stock = $stock, image = '$imageName', status = $p_status, updated_at = NOW() 
+              WHERE id = $id";
+    
+    if (mysqli_query($conn, $query)) {
+        header("Location: products.php?status=success_update");
+        exit();
+    } else {
+        header("Location: products.php?status=error&msg=" . urlencode(mysqli_error($conn)));
+        exit();
     }
 }
 
-$listTenants    = [];
-$listCategories = [];
-$listBrands     = [];
-$listUnits      = [];
+// ==========================================
+// 3. PROSES SOFT DELETE (HAPUS DATA PRODUK)
+// ==========================================
+if (isset($_GET['action_delete'])) {
+    $id = intval($_GET['action_delete']);
+
+    // Menggunakan Soft Delete (updated_at & deleted_at diisi bersamaan sesuai kolom HeidiSQL)
+    $query = "UPDATE products SET updated_at = NOW(), deleted_at = NOW() WHERE id = $id";
+    
+    if (mysqli_query($conn, $query)) {
+        header("Location: products.php?status=success_delete");
+        exit();
+    } else {
+        header("Location: products.php?status=error&msg=" . urlencode(mysqli_error($conn)));
+        exit();
+    }
+}
+
+// ==========================================
+// 4. FETCH DATA DROPDOWN & LIST PRODUK
+// ==========================================
+$listTenants = []; $listCategories = []; $listBrands = []; $listUnits = [];
 $qTenant = mysqli_query($conn, "SELECT id, name FROM tenants ORDER BY name ASC");
 while ($r = mysqli_fetch_assoc($qTenant)) { $listTenants[] = $r; }
 $qCat = mysqli_query($conn, "SELECT id, name FROM categories ORDER BY name ASC");
@@ -228,90 +233,136 @@ if ($fetchQuery) {
     <!-- Container tabel dengan tema gelap transparan -->
     <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
         
-        <!-- HEADER TABEL & TOMBOL TAMBAH HAK AKSES -->
+        <!-- HEADER TABEL & TOMBOL TAMBAH PRODUK -->
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
             <div>
-                <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Hak Akses / Permissions</h2>
+                <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Products</h2>
             </div>
             <div>
-                <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalPermission" onclick="openTambahPermission()">
-                    <i class="bi bi-plus-circle"></i> Tambah Hak Akses
+                <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalProduct" onclick="openTambahProduct()">
+                    <i class="bi bi-plus-circle"></i> Tambah Produk
                 </button>
             </div>
         </div>
 
         <!-- NOTIFIKASI STATUS OPERASI CRUD -->
-        <?php if (isset($_GET['status'])): ?>
-            <div class="alert <?= strpos($_GET['status'], 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
+        <?php if (!empty($status)): ?>
+            <div class="alert <?= strpos($status, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
                 <strong>
                     <?php 
-                    if ($_GET['status'] == 'success_create') echo "Data hak akses berhasil ditambahkan!";
-                    elseif ($_GET['status'] == 'success_update') echo "Data hak akses berhasil diperbarui!";
-                    elseif ($_GET['status'] == 'success_delete') echo "Data hak akses berhasil dihapus!";
-                    else echo "Operasi gagal dijalankan!";
+                    if ($status == 'success_insert') echo "Data produk berhasil ditambahkan!";
+                    elseif ($status == 'success_update') echo "Data produk berhasil diperbarui!";
+                    elseif ($status == 'success_delete') echo "Data produk berhasil dihapus!";
+                    else echo "Operasi gagal: " . htmlspecialchars($msg);
                     ?>
                 </strong>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         <?php endif; ?>
 
-<!-- STRUKTUR TABEL LIST DATA PERMISSIONS (DRAG SCROLL MOUSE WIDE MODE) -->
-<div id="dragScrollPermissionContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
-    <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1200px !important; table-layout: fixed !important; user-select: none; border-collapse: collapse !important;">
+<!-- STRUKTUR TABEL LIST DATA PRODUK (BISA DIGESER + TANPA BATANG SCROLL PUTIH) -->
+<div id="dragScrollProductContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important; overflow-x: auto !important; scrollbar-width: none; -ms-overflow-style: none;">
+    
+    <!-- Gaya CSS khusus internal untuk menyembunyikan batang scrollbar putih browser -->
+    <style>
+        #dragScrollProductContainer::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+        }
+    </style>
+
+    <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1400px !important; table-layout: fixed !important; user-select: none; border-collapse: collapse !important;">
         <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
             <tr>
-                <!-- WAJIB MENGUNCI LEBAR DI SETIAP SELEKTOR TH AGAR TABEL MELEBAR KELUAR LAYAR -->
-                <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px !important;">ID</th>
-                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 450px !important;">Nama Modul (Module Name)</th>
-                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 450px !important;">Nama Hak Akses (Permission Name)</th>
-                <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 180px !important;">Aksi</th>
+                <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 80px !important;">ID</th>
+                <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px !important;">Gambar</th>
+                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 280px !important;">Nama Produk</th>
+                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 220px !important;">Tenant / Kategori</th>
+                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 180px !important;">SKU / Brand</th>
+                <th class="py-3 text-end text-white" style="background: transparent !important; border: none !important; width: 150px !important;">Harga Jual</th>
+                <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px !important;">Stok</th>
+                <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 120px !important;">Status</th>
+                <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 140px !important;">Aksi</th>
             </tr>
         </thead>
         <tbody style="background: transparent !important;">
-            <?php if ($permissionsData && mysqli_num_rows($permissionsData) > 0): ?>
-                <?php while ($row = mysqli_fetch_assoc($permissionsData)): ?>
+            <?php if (!empty($listProducts)): foreach ($listProducts as $row): ?>
                 <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
                     <!-- Kolom ID -->
                     <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $row['id'] ?></td>
                     
-                    <!-- Kolom Module Name -->
+                    <!-- Kolom Gambar -->
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <?php if (!empty($row['image'])): ?>
+                            <img src="uploads/products/<?= htmlspecialchars($row['image']) ?>" alt="Gambar" class="rounded-2" style="max-height: 45px; max-width: 45px; object-fit: cover;">
+                        <?php else: ?>
+                            <span class="text-muted" style="font-size: 0.75rem;">No Image</span>
+                        <?php endif; ?>
+                    </td>
+                    
+                    <!-- Kolom Nama & Deskripsi Pendek -->
                     <td class="fw-semibold text-white" style="background: transparent !important; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        <div class="text-white-50"><i class="bi bi-box-seam me-2"></i><?= htmlspecialchars($row['module_name']) ?></div>
+                        <div class="text-truncate" title="<?= htmlspecialchars($row['name']) ?>"><?= htmlspecialchars($row['name']) ?></div>
+                        <div class="text-muted text-truncate fw-normal" style="font-size: 0.75rem;"><?= htmlspecialchars($row['description'] ?: '-') ?></div>
                     </td>
                     
-                    <!-- Kolom Permission Name -->
+                    <!-- Kolom Tenant & Kategori -->
                     <td style="background: transparent !important; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        <span class="badge bg-primary-subtle text-primary border border-primary border-opacity-10 rounded-2" style="font-size: 0.8rem; background: rgba(13, 110, 253, 0.12); padding: 6px 12px;">
-                            <i class="bi bi-key me-1"></i><?= htmlspecialchars($row['permission_name']) ?>
-                        </span>
+                        <div class="text-white-50 text-truncate" style="font-size: 0.8rem;"><i class="bi bi-shop me-1"></i><?= htmlspecialchars($row['tenant_name']) ?></div>
+                        <span class="badge bg-primary-subtle text-primary border border-primary border-opacity-10 rounded-2 mt-1" style="font-size: 0.72rem; background: rgba(13, 110, 253, 0.12);"><?= htmlspecialchars($row['category_name']) ?></span>
                     </td>
                     
-                    <!-- Kolom Aksi Menu CRUD -->
+                    <!-- Kolom SKU & Brand -->
+                    <td style="background: transparent !important; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        <div class="font-monospace text-warning" style="font-size: 0.8rem;"><?= htmlspecialchars($row['sku'] ?: '-') ?></div>
+                        <div class="text-white-50 text-truncate mt-0.5" style="font-size: 0.75rem;"><i class="bi bi-tag me-1"></i><?= htmlspecialchars($row['brand_name'] ?: 'Tanpa Merek') ?></div>
+                    </td>
+
+                    <!-- Kolom Harga Jual -->
+                    <td class="text-end fw-bold text-white" style="background: transparent !important; border: none !important;">
+                        Rp <?= number_format($row['base_price'], 0, ',', '.') ?>
+                    </td>
+                    
+                    <!-- Kolom Stok & Satuan -->
+                    <td class="text-center" style="background: transparent !important; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        <span class="fw-semibold <?= $row['stock'] <= 5 ? 'text-danger' : 'text-white' ?>"><?= $row['stock'] ?></span>
+                        <div class="text-muted" style="font-size: 0.72rem;"><?= htmlspecialchars($row['unit_name'] ?: 'Pcs') ?></div>
+                    </td>
+                    
+                    <!-- Kolom Status Produk -->
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <?php if ((int)$row['status'] === 1): ?>
+                            <span class="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">Aktif</span>
+                        <?php else: ?>
+                            <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">Nonaktif</span>
+                        <?php endif; ?>
+                    </td>
+                    
+                    <!-- PERBAIKAN UTAMA: Memastikan tag penutup <td> menutup kolom aksi secara mandiri tanpa bocor -->
                     <td class="text-center" style="background: transparent !important; border: none !important;">
                         <div class="d-flex justify-content-center gap-1">
                             <!-- Tombol Edit -->
-                            <button type="button" class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" 
-                                    onclick='openEditPermission(<?= json_encode($row) ?>)'>
+                            <button type="button" class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit Produk" 
+                                    onclick='openEditProduct(<?= json_encode($row) ?>)'>
                                 <i class="bi bi-pencil-square"></i>
                             </button>
                             
                             <!-- Tombol Hapus -->
-                            <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete"
+                            <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Hapus Produk"
                                     data-bs-toggle="modal" 
-                                    data-bs-target="#modalDeletePermission" 
-                                    onclick="document.getElementById('delete_permission_title_display').innerText = '<?php echo addslashes($row['permission_name']); ?>'; document.getElementById('btn_confirm_delete_permission').setAttribute('href', 'permissions.php?delete=<?= $row['id'] ?>')">
+                                    data-bs-target="#modalConfirmDelete" 
+                                    onclick="document.getElementById('delete_target_name').innerText = '<?php echo addslashes($row['name']); ?>'; document.getElementById('btnConfirmDeleteAction').setAttribute('href', 'products.php?action_delete=<?= $row['id'] ?>')">
                                 <i class="bi bi-trash-fill"></i>
                             </button>
                         </div>
                     </td>
                 </tr>
-                <?php endwhile; ?>
-            <?php else: ?>
-                <!-- State Tampilan jika data kosong -->
+            <?php endforeach; else: ?>
                 <tr>
-                    <td colspan="4" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">
+                    <td colspan="9" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">
                         <i class="bi bi-folder-x d-block mb-2" style="font-size: 2rem; color: rgba(148, 163, 184, 0.4);"></i>
-                        Tidak ada data hak akses saat ini.
+                        Tidak ada data produk saat ini.
                     </td>
                 </tr>
             <?php endif; ?>
@@ -322,133 +373,128 @@ if ($fetchQuery) {
     </div>
 </main>
 
-<!-- MODAL FORM INPUT MELEBAR DI TENGAH (WIDE MODE & FIX SCROLL INTERNAL) -->
-<div class="modal fade" id="modalProduct" tabindex="-1" aria-labelledby="modalProductLabel" aria-hidden="true" style="overflow-y: hidden !important;">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" style="max-height: calc(100vh - 2rem);">
-        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.2); color: #e5e7eb; border-radius: 16px; max-height: inherit; display: flex; flex-direction: column;">
-            <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15); flex-shrink: 0;">
-                <h5 class="modal-title fw-bold text-white" id="modalProductLabel">Form Produk</h5>
+<!-- MODAL FORM CRUD (TAMBAH / UBAH DATA PRODUK) -->
+<div class="modal fade" id="modalProduct" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <form action="products.php" method="POST" id="formProduct" enctype="multipart/form-data" class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb; border-radius: 16px;">
+            
+            <div class="modal-header border-0 pb-0" style="padding: 1.5rem 1.5rem 0 1.5rem;">
+                <h5 class="fw-bold text-white m-0" id="modalProductLabel">Tambah Produk Baru</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="formProduct" action="products.php" method="POST" enctype="multipart/form-data" style="display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0;">
+            
+            <div class="modal-body p-4">
+                <!-- Input Hidden ID untuk Operasi Update -->
                 <input type="hidden" name="id" id="product_id">
                 <div id="product_action_flag"></div>
                 
-                <!-- PENTING: overflow-y: auto memaksa scrollbar aktif hanya di area form ini -->
-                <div class="modal-body" style="overflow-y: auto !important; flex-grow: 1; padding-right: 8px;">
-                    <div class="row g-3">
+                <div class="row g-3">
+                    <!-- Pilih Tenant -->
+                    <div class="col-md-6">
+                        <label class="form-label small text-white-50 fw-medium">Tenant / Toko</label>
+                        <select name="tenant_id" id="product_tenant_id" class="form-select bg-dark text-white border-secondary rounded-3" style="background-color: rgba(2, 6, 23, 0.4) !important;" required>
+                            <option value="">-- Pilih Tenant --</option>
+                            <?php foreach ($listTenants as $t): ?>
+                                <option value="<?= $t['id'] ?>"><?= htmlspecialchars($t['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <!-- Pilih Kategori -->
+                    <div class="col-md-6">
+                        <label class="form-label small text-white-50 fw-medium">Kategori Produk</label>
+                        <select name="category_id" id="product_category_id" class="form-select bg-dark text-white border-secondary rounded-3" style="background-color: rgba(2, 6, 23, 0.4) !important;" required>
+                            <option value="">-- Pilih Kategori --</option>
+                            <?php foreach ($listCategories as $c): ?>
+                                <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
 
-                        <!-- Pilihan Tenant -->
-                        <div class="col-md-6">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Pilih Tenant <span class="text-danger">*</span></label>
-                            <select class="form-select" name="tenant_id" id="product_tenant_id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                                <option value="" disabled selected>-- Pilih Tenant --</option>
-                                <?php foreach ($listTenants as $t): ?>
-                                    <option value="<?= $t['id'] ?>"><?= htmlspecialchars($t['name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <!-- Pilihan Kategori -->
-                        <div class="col-md-6">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Pilih Kategori <span class="text-danger">*</span></label>
-                            <select class="form-select" name="category_id" id="product_category_id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                                <option value="" disabled selected>-- Pilih Kategori --</option>
-                                <?php foreach ($listCategories as $c): ?>
-                                    <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <!-- Pilihan Brand -->
-                        <div class="col-md-6">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Pilih Brand</label>
-                            <select class="form-select" name="brand_id" id="product_brand_id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-                                <option value="">-- Tanpa Brand --</option>
-                                <?php foreach ($listBrands as $b): ?>
-                                    <option value="<?= $b['id'] ?>"><?= htmlspecialchars($b['name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <!-- Pilihan Satuan / Unit -->
-                        <div class="col-md-6">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Pilih Satuan</label>
-                            <select class="form-select" name="unit_id" id="product_unit_id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-                                <option value="">-- Tanpa Satuan --</option>
-                                <?php foreach ($listUnits as $u): ?>
-                                    <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <!-- SKU -->
-                        <div class="col-md-6">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">SKU</label>
-                            <input type="text" class="form-control" name="sku" id="product_sku" placeholder="Contoh: SKU-1002" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-                        </div>
-                        <!-- Barcode -->
-                        <div class="col-md-6">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Barcode</label>
-                            <input type="text" class="form-control" name="barcode" id="product_barcode" placeholder="Contoh: 8991234567" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-                        </div>
-                        <!-- Nama Produk -->
-                        <div class="col-md-12">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Nama Produk <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="name" id="product_name" placeholder="Contoh: Ayam Goreng Kremes" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                        </div>
-                        <!-- Harga Dasar -->
-                        <div class="col-md-4">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Harga Dasar <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" class="form-control" name="base_price" id="product_base_price" placeholder="0" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                        </div>
-                        <!-- Stok -->
-                        <div class="col-md-4">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Stok <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" name="stock" id="product_stock" value="0" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                        </div>
-                        <!-- Status Aktif -->
-                        <div class="col-md-4">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Status <span class="text-danger">*</span></label>
-                            <select class="form-select" name="status" id="product_status" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                                <option value="1">Aktif</option>
-                                <option value="0">Non-Aktif</option>
-                            </select>
-                        </div>
-                        <!-- Gambar Produk -->
-                        <div class="col-md-12">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Gambar Produk</label>
-                            <input type="file" class="form-control" name="image" id="product_image" accept="image/*" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-                            
-                            <!-- Opsi Hapus Gambar Saat Edit -->
-                            <div id="container_hapus_image" class="mt-2" style="display: none;">
-                                <div class="form-check text-start">
-                                    <input class="form-check-input" type="checkbox" name="delete_current_image" id="delete_current_image" value="1" style="background-color: rgba(2, 6, 23, 0.4); border-color: rgba(148, 163, 184, 0.3);">
-                                    <label class="form-check-label text-danger fw-medium" for="delete_current_image" style="font-size: 0.85rem; cursor: pointer;">
-                                        <i class="bi bi-trash3-fill me-1"></i> Hapus gambar saat ini
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="form-text text-muted" style="font-size: 0.75rem;">Format gambar didukung: JPG, JPEG, PNG, WEBP.</div>
-                        </div>
-                        <!-- Deskripsi -->
-                        <div class="col-md-12">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Deskripsi Produk</label>
-                            <textarea class="form-control" name="description" id="product_description" rows="3" placeholder="Keterangan lengkap isi porsi, rasa, atau detail produk..." style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;"></textarea>
+                    <!-- Pilih Brand -->
+                    <div class="col-md-6">
+                        <label class="form-label small text-white-50 fw-medium">Brand / Merek (Opsional)</label>
+                        <select name="brand_id" id="product_brand_id" class="form-select bg-dark text-white border-secondary rounded-3" style="background-color: rgba(2, 6, 23, 0.4) !important;">
+                            <option value="">Tanpa Merek</option>
+                            <?php foreach ($listBrands as $b): ?>
+                                <option value="<?= $b['id'] ?>"><?= htmlspecialchars($b['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <!-- Pilih Satuan -->
+                    <div class="col-md-6">
+                        <label class="form-label small text-white-50 fw-medium">Satuan / Unit</label>
+                        <select name="unit_id" id="product_unit_id" class="form-select bg-dark text-white border-secondary rounded-3" style="background-color: rgba(2, 6, 23, 0.4) !important;" required>
+                            <option value="">-- Pilih Satuan --</option>
+                            <?php foreach ($listUnits as $u): ?>
+                                <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <!-- SKU & Barcode -->
+                    <div class="col-md-6">
+                        <label class="form-label small text-white-50 fw-medium">SKU</label>
+                        <input type="text" name="sku" id="product_sku" class="form-control text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); box-shadow: none;" placeholder="Contoh: SKU-FOOD-001">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small text-white-50 fw-medium">Barcode</label>
+                        <input type="text" name="barcode" id="product_barcode" class="form-control text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); box-shadow: none;" placeholder="Contoh: 899123...">
+                    </div>
+                    
+                    <!-- Nama & Deskripsi -->
+                    <div class="col-12">
+                        <label class="form-label small text-white-50 fw-medium">Nama Produk</label>
+                        <input type="text" name="name" id="product_name" class="form-control text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); box-shadow: none;" required placeholder="Contoh: Nasi Goreng Spesial">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small text-white-50 fw-medium">Deskripsi Pendek</label>
+                        <textarea name="description" id="product_description" rows="2" class="form-control text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); box-shadow: none;" placeholder="Keterangan isi porsi produk..."></textarea>
+                    </div>
+
+                    <!-- Harga Jual, Stok & Status -->
+                    <div class="col-md-4">
+                        <label class="form-label small text-white-50 fw-medium">Harga Jual (Rp)</label>
+                        <input type="number" step="any" name="base_price" id="product_base_price" class="form-control text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); box-shadow: none;" required placeholder="0">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small text-white-50 fw-medium">Stok Awal</label>
+                        <input type="number" name="stock" id="product_stock" class="form-control text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); box-shadow: none;" required value="0">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small text-white-50 fw-medium">Status</label>
+                        <select name="status" id="product_status" class="form-select bg-dark text-white border-secondary rounded-3" style="background-color: rgba(2, 6, 23, 0.4) !important;">
+                            <option value="1">Aktif (Tersedia)</option>
+                            <option value="0">Nonaktif (Habis)</option>
+                        </select>
+                    </div>
+
+                    <!-- Input Gambar & Opsi Hapus Gambar Saat Ini -->
+                    <div class="col-12">
+                        <label class="form-label small text-white-50 fw-medium">Foto Produk (JPG, PNG, WEBP)</label>
+                        <input type="file" name="image" id="product_image_file" class="form-control text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); box-shadow: none;">
+                        <div id="container_hapus_image" class="mt-2 form-check" style="display: none;">
+                            <input type="checkbox" name="delete_current_image" value="1" id="delete_current_image" class="form-check-input">
+                            <label class="form-check-label text-warning small" for="delete_current_image">Centang untuk menghapus foto produk saat ini</label>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Bagian Tombol Aksi di Bawah Form -->
-                <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.15); background: rgba(15, 23, 42, 0.95); border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-success" id="btnSubmitProduct">Simpan Data</button>
-                </div>
-            </form>
-        </div>
+            </div>
+            
+            <div class="modal-footer border-0 pt-0 d-flex gap-2 justify-content-end" style="padding: 0 1.5rem 1.5rem 1.5rem;">
+                <button type="button" class="btn btn-sm btn-secondary rounded-3 px-3 py-2" data-bs-dismiss="modal" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8;">Batal</button>
+                <button type="submit" name="action_submit" id="btnSubmitProduct" class="btn btn-sm btn-success rounded-3 px-3 py-2 fw-medium">Simpan Data</button>
+            </div>
+            
+        </form>
     </div>
 </div>
 
 <!-- Modal Konfirmasi Hapus Produk -->
 <div class="modal fade" id="modalConfirmDelete" tabindex="-1" aria-labelledby="modalConfirmDeleteLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content text-bg-dark border-secondary" style="background-color: #111827 !important; border-color: #374151 !important;">
+    <div class="modal-content text-bg-dark border-secondary" style="background-color: #111827 !important; border-color: #374151 !important; border-radius: 16px;">
       
       <!-- Bagian Atas / Header Modal -->
       <div class="modal-header border-bottom border-secondary">
@@ -464,15 +510,17 @@ if ($fetchQuery) {
           <!-- Ikon Tempat Sampah Besar berwarna Merah -->
           <i class="bi bi-trash3-fill text-danger" style="font-size: 3.5rem;"></i>
         </div>
-        <p class="text-light fs-6 mb-1">Apakah Anda yakin ingin menghapus produk ini?</p>
+        <p class="text-white-50 fs-6 mb-1">Apakah Anda yakin ingin menghapus produk ini?</p>
         <!-- Tempat nama produk akan muncul secara dinamis -->
         <h6 id="delete_target_name" class="text-warning fw-bold mt-2"></h6>
       </div>
       
       <!-- Bagian Bawah / Tombol Aksi -->
       <div class="modal-footer border-top border-secondary justify-content-center">
-        <button type="button" class="btn btn-secondary px-4 rounded-2" data-bs-dismiss="modal">Batal</button>
-        <button type="button" id="btnConfirmDeleteAction" class="btn btn-danger px-4 rounded-2 fw-bold">Oke, Hapus</button>
+        <button type="button" class="btn btn-sm btn-secondary px-4 rounded-3 py-2" data-bs-dismiss="modal" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8;">Batal</button>
+        
+        <!-- PERBAIKAN: Mengganti button menjadi tag <a> agar fungsi setAttribute('href') dari tabel bekerja sempurna -->
+        <a id="btnConfirmDeleteAction" href="#" class="btn btn-sm btn-danger px-4 rounded-3 py-2 fw-bold d-inline-flex align-items-center justify-content-center">Oke, Hapus</a>
       </div>
 
     </div>
@@ -480,100 +528,117 @@ if ($fetchQuery) {
 </div>
 
 <script>
-// Variabel global untuk menampung URL hapus data permission
-let deletePermissionUrlTarget = '';
+// Variabel global penampung instans modal
+let bootstrapProductModalInstance = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     // ==========================================
-    // LOGIKA SELEKTOR GAYA DRAG SCROLL
+    // 1. LOGIKA DRAG TO SCROLL MOUSE (PRODUK)
     // ==========================================
-    const permSlider = document.getElementById('dragScrollPermissionContainer');
-    if (permSlider) {
+    const prodSlider = document.getElementById('dragScrollProductContainer');
+    if (prodSlider) {
         let isDown = false;
-        let startX;
-        let scrollLeft;
-
-        permSlider.addEventListener('mousedown', (e) => {
-            isDown = true;
-            permSlider.style.cursor = 'grabbing';
-            startX = e.pageX - permSlider.offsetLeft;
-            scrollLeft = permSlider.scrollLeft;
+        let startX, scrollLeft;
+        
+        prodSlider.addEventListener('mousedown', (e) => {
+            // Cegah interupsi drag jika pengguna mengklik tombol atau input dalam tabel
+            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('select')) return;
+            
+            isDown = true; 
+            prodSlider.style.cursor = 'grabbing';
+            startX = e.pageX - prodSlider.offsetLeft; 
+            scrollLeft = prodSlider.scrollLeft;
         });
-
-        permSlider.addEventListener('mouseleave', () => {
-            isDown = false;
-            permSlider.style.cursor = 'grab';
+        
+        prodSlider.addEventListener('mouseleave', () => { 
+            isDown = false; 
+            prodSlider.style.cursor = 'grab'; 
         });
-
-        permSlider.addEventListener('mouseup', () => {
-            isDown = false;
-            permSlider.style.cursor = 'grab';
+        
+        prodSlider.addEventListener('mouseup', () => { 
+            isDown = false; 
+            prodSlider.style.cursor = 'grab'; 
         });
-
-        permSlider.addEventListener('mousemove', (e) => {
-            if (!isDown) return;
+        
+        prodSlider.addEventListener('mousemove', (e) => {
+            if (!isDown) return; 
             e.preventDefault();
-            const x = e.pageX - permSlider.offsetLeft;
-            const walk = (x - startX) * 2; // Pengali 2 mempercepat respons pergeseran mouse
-            permSlider.scrollLeft = scrollLeft - walk;
-        });
-    }
-
-    // ==========================================
-    // LOGIKA EKSEKUSI TOMBOL HAPUS DI MODAL
-    // ==========================================
-    const btnConfirmDelete = document.getElementById('btn_confirm_delete_permission');
-    if (btnConfirmDelete) {
-        btnConfirmDelete.addEventListener('click', function(e) {
-            if (deletePermissionUrlTarget) {
-                e.preventDefault();
-                window.location.href = deletePermissionUrlTarget;
-            }
+            const x = e.pageX - prodSlider.offsetLeft;
+            // Angka 2 merupakan akselerasi sensitivitas pergeseran mouse
+            prodSlider.scrollLeft = scrollLeft - ((x - startX) * 2);
         });
     }
 });
 
 // ==========================================
-// LOGIKA FORM MODAL TAMBAH & EDIT PERMISSION
+// 2. LOGIKA FORM MODAL TAMBAH PRODUK
 // ==========================================
-function openTambahPermission() {
-    const formPerm = document.getElementById('formPermission');
-    if (formPerm) formPerm.reset();
+function openTambahProduct() {
+    const formProd = document.getElementById('formProduct');
+    if (formProd) formProd.reset();
     
-    if (document.getElementById('modalPermissionLabel')) {
-        document.getElementById('modalPermissionLabel').innerText = 'Tambah Hak Akses';
-    }
-    if (document.getElementById('perm_id')) document.getElementById('perm_id').value = '';
-    if (document.getElementById('perm_module_name')) document.getElementById('perm_module_name').value = '';
-    if (document.getElementById('perm_permission_name')) document.getElementById('perm_permission_name').value = '';
+    document.getElementById('modalProductLabel').innerText = 'Tambah Produk Baru';
+    document.getElementById('product_id').value = '';
     
-    const btnSubmit = document.getElementById('btnSubmitPermission');
+    // Reset dropdown pilihan ke default kosong
+    document.getElementById('product_tenant_id').value = '';
+    document.getElementById('product_category_id').value = '';
+    document.getElementById('product_brand_id').value = '';
+    document.getElementById('product_unit_id').value = '';
+    
+    // Setel ulang tombol submit
+    const btnSubmit = document.getElementById('btnSubmitProduct');
     if (btnSubmit) {
-        btnSubmit.setAttribute('name', 'create');
+        btnSubmit.setAttribute('name', 'action_add_product');
         btnSubmit.className = "btn btn-sm btn-success rounded-3 px-3 py-2 fw-medium";
         btnSubmit.innerText = "Simpan Data";
     }
+    
+    if (document.getElementById('container_hapus_image')) {
+        document.getElementById('container_hapus_image').style.display = 'none';
+        document.getElementById('delete_current_image').checked = false;
+    }
 }
 
-function openEditPermission(data) {
+// ==========================================
+// 3. LOGIKA FORM MODAL EDIT PRODUK (POPULATE)
+// ==========================================
+function openEditProduct(data) {
     if (data) {
-        if (document.getElementById('modalPermissionLabel')) {
-            document.getElementById('modalPermissionLabel').innerText = 'Ubah Hak Akses';
-        }
-        if (document.getElementById('perm_id')) document.getElementById('perm_id').value = data.id;
-        if (document.getElementById('perm_module_name')) document.getElementById('perm_module_name').value = data.module_name;
-        if (document.getElementById('perm_permission_name')) document.getElementById('perm_permission_name').value = data.permission_name;
+        document.getElementById('modalProductLabel').innerText = 'Ubah Data Produk';
+        document.getElementById('product_id').value = data.id;
+        document.getElementById('product_tenant_id').value = data.tenant_id;
+        document.getElementById('product_category_id').value = data.category_id;
+        document.getElementById('product_brand_id').value = data.brand_id ? data.brand_id : '';
+        document.getElementById('product_unit_id').value = data.unit_id ? data.unit_id : '';
+        document.getElementById('product_sku').value = data.sku ?? '';
+        document.getElementById('product_barcode').value = data.barcode ?? '';
+        document.getElementById('product_name').value = data.name ?? '';
+        document.getElementById('product_description').value = data.description ?? '';
+        document.getElementById('product_base_price').value = data.base_price ?? 0;
+        document.getElementById('product_stock').value = data.stock ?? 0;
+        document.getElementById('product_status').value = data.status ?? 1;
         
-        const btnSubmit = document.getElementById('btnSubmitPermission');
+        // Ubah tombol submit menjadi mode update
+        const btnSubmit = document.getElementById('btnSubmitProduct');
         if (btnSubmit) {
-            btnSubmit.setAttribute('name', 'update');
+            btnSubmit.setAttribute('name', 'action_update_product');
             btnSubmit.className = "btn btn-sm btn-warning text-dark rounded-3 px-3 py-2 fw-semibold";
             btnSubmit.innerText = "Simpan Perubahan";
         }
         
-        const modalEl = document.getElementById('modalPermission');
-        if (modalEl) {
-            const instance = bootstrap.Modal.getOrCreateInstance(modalEl);
+        // Tampilkan checkbox hapus gambar jika produk memiliki gambar aktif
+        if (data.image && data.image !== "" && document.getElementById('container_hapus_image')) {
+            document.getElementById('container_hapus_image').style.display = 'block';
+            document.getElementById('delete_current_image').checked = false;
+        } else if (document.getElementById('container_hapus_image')) {
+            document.getElementById('container_hapus_image').style.display = 'none';
+        }
+        
+        // Munculkan bootstrap modal produk secara aman
+        const modalProdEl = document.getElementById('modalProduct');
+        if (modalProdEl) {
+            const instance = bootstrap.Modal.getOrCreateInstance(modalProdEl);
             instance.show();
         }
     }
