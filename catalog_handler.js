@@ -15,9 +15,6 @@ function openDetailProduct(data) {
     const formattedPrice = 'Rp ' + new Intl.NumberFormat('id-ID').format(data.base_price);
     document.getElementById('detail_product_price').innerText = formattedPrice;
 
-    // =========================================================================
-    // LOGIKA DINAMIS: MEMUAT VARIAN PRODUK DARI DATABASE KE DROPDOWN
-    // =========================================================================
     const variantSelect = document.getElementById('detail_product_variant_select');
     if (variantSelect) {
         variantSelect.innerHTML = '<option value="">Memuat varian...</option>';
@@ -40,9 +37,6 @@ function openDetailProduct(data) {
             .catch(err => { variantSelect.innerHTML = '<option value="">Gagal memuat</option>'; });
     }
 
-        // =========================================================================
-    // LOGIKA DINAMIS: MEMUAT RIWAYAT ULASAN & TESTIMONI DARI DATABASE
-    // =========================================================================
     const reviewsContainer = document.getElementById('detail_product_reviews_container');
     if (reviewsContainer) {
         reviewsContainer.innerHTML = '<div class="text-white-50 small"><div class="spinner-border spinner-border-sm text-warning me-2"></div>Memuat ulasan pasien...</div>';
@@ -83,9 +77,6 @@ function openDetailProduct(data) {
             });
     }
 
-    // =========================================================================
-    // LOGIKA DINAMIS: MEMUAT TOPPING / ADDON PRODUK (SELECT DROPDOWN)
-    // =========================================================================
     const addonsSelect = document.getElementById('detail_product_addons_select');
     if (addonsSelect) {
         addonsSelect.innerHTML = '<option value="" class="bg-dark text-white">Memuat topping...</option>';
@@ -122,15 +113,10 @@ function openDetailProduct(data) {
             });
     }
 
-    // =========================================================================
-    // LOGIKA DINAMIS: RESET AREA INPUTAN TEXT CATATAN KUSTOM SETIAP BUKA MODAL
-    // =========================================================================
+
     const notesInput = document.getElementById('detail_product_notes_input');
     if (notesInput) { notesInput.value = ""; }
 
-    // =========================================================================
-    // LOGIKA SLIDER GAMBAR GALERI
-    // =========================================================================
     const carouselInner = document.getElementById('detail_product_carousel_inner');
     const prevBtn = document.getElementById('carousel_btn_prev');
     const nextBtn = document.getElementById('carousel_btn_next');
@@ -168,9 +154,6 @@ function openDetailProduct(data) {
             });
     }
     
-    // =========================================================================
-    // LOGIKA TOMBOL KERANJANG BELI (GABUNGAN VARIAN, TOPPING & CATATAN)
-    // =========================================================================
     const cartBtn = document.getElementById('btn_detail_add_cart');
     cartBtn.onclick = function() {
         // 1. Ambil varian terpilh
@@ -227,7 +210,6 @@ function btnStyleRefresh(){
   });
 }
 
-// Event listener kotak pencarian input katalog
 const searchInp = document.getElementById('searchInput');
 if (searchInp) {
     searchInp.addEventListener('input', (e)=>{
@@ -266,37 +248,50 @@ function resetFilters(){
   applyFilters();
 }
 
-function tambahKeKeranjang(id, title, price, image) {
-  const itemAda = keranjangBelanja.find(item => item.id === id);
-  if (itemAda) {
-      itemAda.qty += 1;
-  } else {
-      keranjangBelanja.push({
-          id: id,
-          title: title,
-          price: parseFloat(price) || 0,
-          image: image ? image : 'default.png',
-          qty: 1
-      });
-  }
-  updateRingkasanNavbar();
-  
-  const el = document.createElement('div');
-  el.className = 'toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 m-3';
-  el.role = 'alert';
-  el.style.zIndex = 2000;
-  el.innerHTML = `<div class="d-flex"><div class="toast-body">Ditambahkan: <strong>${title}</strong></div></div>`;
-  document.body.appendChild(el);
-  const toast = new bootstrap.Toast(el, { delay: 1400 });
-  toast.show();
-  setTimeout(() => el.remove(), 1600);
+function tambahKeKeranjang(id, name, price, image, notes) {
+    const userNotes = notes ? notes : '';
+    
+    const formData = new FormData();
+    formData.append('id', id);
+    formData.append('name', name);
+    formData.append('price', price);
+    formData.append('image', image);
+    formData.append('notes', userNotes);
+
+    fetch('api_cart.php?action=add', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateCartBadgeDisplay(data.total_items);
+        }
+    })
+    .catch(err => console.error(err));
 }
 
-function updateRingkasanNavbar() {
-    const counterText = document.getElementById('cartTotalText');
-    if (counterText) {
-        const totalItem = keranjangBelanja.reduce((sum, item) => sum + item.qty, 0);
-        counterText.textContent = totalItem + ' item';
+function updateCartBadgeDisplay(totalItems) {
+    const badgeEl = document.getElementById('totalCartItemsCount'); 
+    if (badgeEl) {
+        badgeEl.innerText = totalItems + " item";
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    fetch('api_cart.php?action=get_total')
+        .then(response => response.json())
+        .then(data => {
+            updateCartBadgeDisplay(data.total_items);
+        })
+        .catch(err => console.error(err));
+});
+
+function updateCartBadgeDisplay(totalItems) {
+    const badgeEl = document.getElementById('totalCartItemsCount'); 
+    if (badgeEl) {
+        // Mencetak angka item secara dinamis ke boks Total Pesanan
+        badgeEl.innerText = totalItems + " item";
     }
 }
 
@@ -313,41 +308,55 @@ function openCart() {
     }
     myModal.show();
 
-    if (keranjangBelanja.length > 0) {
-        bodyContainer.innerHTML = ''; 
-        let grandTotal = 0;
+    bodyContainer.innerHTML = '<div class="text-center py-4 text-white-50 small"><div class="spinner-border spinner-border-sm text-success me-2"></div>Memuat data keranjang...</div>';
 
-        keranjangBelanja.forEach(item => {
-            const subtotalItem = item.price * item.qty;
-            grandTotal += subtotalItem;
+    fetch('api_cart.php?action=get_cart_items')
+        .then(response => response.json())
+        .then(cartItems => {
+            if (Array.isArray(cartItems) && cartItems.length > 0) {
+                bodyContainer.innerHTML = ''; 
+                let grandTotal = 0;
 
-            const formattedPrice = 'Rp ' + new Intl.NumberFormat('id-ID').format(item.price);
-            const formattedSubtotal = 'Rp ' + new Intl.NumberFormat('id-ID').format(subtotalItem);
+                cartItems.forEach(item => {
+                    const subtotalItem = item.price * item.qty;
+                    grandTotal += subtotalItem;
 
-            bodyContainer.innerHTML += `
-            <div class="d-flex align-items-center mb-3 border-bottom pb-2" style="border-color: rgba(148, 163, 184, 0.12) !important;">
-                <img src="uploads/products/${item.image}" style="width:50px; height:50px; object-fit:cover;" class="rounded me-3" onerror="this.src='uploads/products/default.png'">
-                <div class="flex-grow-1">
-                    <h6 class="mb-0 text-white small fw-semibold">${item.title}</h6>
-                    <small class="text-muted">${formattedPrice} x ${item.qty}</small>
-                </div>
-                <div class="text-end">
-                    <span class="text-success small fw-bold">${formattedSubtotal}</span>
-                </div>
-            </div>`;
+                    const formattedPrice = 'Rp ' + new Intl.NumberFormat('id-ID').format(item.price);
+                    const formattedSubtotal = 'Rp ' + new Intl.NumberFormat('id-ID').format(subtotalItem);
+
+                    bodyContainer.innerHTML += `
+                    <div class="d-flex align-items-center mb-3 border-bottom pb-2" style="border-color: rgba(148, 163, 184, 0.12) !important;">
+                        <img src="uploads/products/${item.image}" style="width:50px; height:50px; object-fit:cover;" class="rounded me-3" onerror="this.src='uploads/products/default.png'">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0 text-white small fw-semibold">${item.name}</h6>
+                            <small class="text-muted">${formattedPrice} x ${item.qty}</small>
+                            ${item.notes ? `<div class="text-warning small mt-0.5" style="font-size: 0.75rem;"><i class="bi bi-chat-left-text me-1"></i>${item.notes}</div>` : ''}
+                        </div>
+                        <div class="text-end">
+                            <span class="text-success small fw-bold">${formattedSubtotal}</span>
+                        </div>
+                    </div>`;
+                });
+                
+                totalContainer.innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(grandTotal);
+                btnCheckout.removeAttribute('disabled');
+            } else {
+                bodyContainer.innerHTML = '<div class="text-center py-4 text-muted small">Keranjang belanja Anda masih kosong.</div>';
+                totalContainer.innerText = 'Rp 0';
+                btnCheckout.setAttribute('disabled', 'disabled');
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            bodyContainer.innerHTML = '<div class="text-center py-4 text-danger small">Gagal memuat data keranjang.</div>';
         });
-        
-        totalContainer.innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(grandTotal);
-        btnCheckout.removeAttribute('disabled');
-    } else {
-        bodyContainer.innerHTML = '<div class="text-center py-4 text-muted small">Keranjang belanja Anda masih kosong.</div>';
-        totalContainer.innerText = 'Rp 0';
-        btnCheckout.setAttribute('disabled', 'disabled');
-    }
 }
 
 document.addEventListener("DOMContentLoaded", function() {
-    updateRingkasanNavbar();
-    btnStyleRefresh();
-    applyFilters();
+    fetch('api_cart.php?action=get_total')
+        .then(response => response.json())
+        .then(data => {
+            updateCartBadgeDisplay(data.total_items);
+        })
+        .catch(err => console.error(err));
 });

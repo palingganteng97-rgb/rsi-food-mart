@@ -1,4 +1,5 @@
 <?php
+//home.php
 include "db.php";
 
 // session_start sudah dipanggil di db.php
@@ -79,7 +80,6 @@ if ($fetchQuery) {
 <body>
   <?php require __DIR__ . '/sidebar.php'; ?>
 
-<!-- MAIN KONTEN -->
 <main class="content-shift page-body">
     <div class="container py-3">
         <!-- HEADER ETALASE MENU -->
@@ -119,7 +119,7 @@ if ($fetchQuery) {
             </div>
         </div>
 
-        <!-- GRID INTEGRASI DAFTAR PRODUK MAKANAN SEHAT (DATA DARI PRODUCTS.PHP) -->
+        <!-- GRID INTEGRASI DAFTAR PRODUK MAKANAN SEHAT -->
         <div id="catalogGrid" class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mt-2 mb-5">
             <?php if (!empty($listActiveProducts)): foreach ($listActiveProducts as $prod): ?>
                 <div class="col">
@@ -159,11 +159,11 @@ if ($fetchQuery) {
                                     Rp <?= number_format($prod['base_price'], 0, ',', '.') ?>
                                 </div>
                                 
-                                <!-- PERBAIKAN UTAMA: Melengkapi 4 parameter (id, name, base_price, image) agar fungsi tambah ke keranjang tidak memicu crash javascript -->
-                                <button class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" 
-                                        onclick="event.stopPropagation(); tambahKeKeranjang(<?= (int)$prod['id'] ?>, <?= htmlspecialchars(json_encode($prod['name']), ENT_QUOTES, 'UTF-8') ?>, <?= floatval($prod['base_price']) ?>, '<?= addslashes($prod['image'] ?? '') ?>')">
-                                    <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
-                                </button>
+<button type="button" class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" 
+        onclick="event.stopPropagation(); tambahKeKeranjang(<?= (int)$prod['id'] ?>, '<?= addslashes(htmlspecialchars($prod['name'], ENT_QUOTES, 'UTF-8')) ?>', <?= floatval($prod['base_price']) ?>, '<?= addslashes($prod['image'] ?? '') ?>', '')">
+    <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
+</button>
+
                             </div>
                         </div>
                     </div>

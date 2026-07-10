@@ -31,14 +31,13 @@
         <div class="d-flex align-items-center justify-content-between gap-3 py-3">
             <div>
                 <div class="text-white-50" style="font-size: .82rem;">Total Pesanan</div>
-                <!-- PERBAIKAN: Menghapus angka 0 statis dan mencetaknya secara dinamis dari database menggunakan PHP -->
-                <div class="fw-bold text-white fs-5" id="cartTotalText">
-                    <?= isset($initialCartCount) ? $initialCartCount : 0 ?> item
+                <!-- PERBAIKAN: Mengubah ID dari cartTotalText menjadi totalCartItemsCount agar sinkron dengan JavaScript -->
+                <div class="fw-bold text-white fs-5" id="totalCartItemsCount">
+                    0 item
                 </div>
             </div>
-            <!-- PERBAIKAN: Menyesuaikan fungsi klik tombol agar memanggil fungsi AJAX openCart() yang membuka modal ringkasan, alih-alih berpindah halaman penuh -->
-            <button class="btn btn-success rounded-3 px-4 py-2 fw-medium" type="button" onclick="openCart()">
-                <i class="bi bi-basket2 me-2"></i> Lihat Keranjang
+            <button class="btn btn-success rounded-3 px-4 py-2 fw-medium" type="button" onclick="window.location.href='keranjang.php'"> 
+              <i class="bi bi-basket2 me-2"></i> Lihat Keranjang 
             </button>
         </div>
     </div>
