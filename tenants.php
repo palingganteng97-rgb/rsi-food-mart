@@ -196,31 +196,31 @@ $menu = [
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
 <style>
-    :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
-    body { background:var(--bg) !important; color:var(--text); }
+    :root { --bg: #0f172a; --text: #e5e7eb; --muted: #94a3b8; --green: #22c55e; }
+    body { background: var(--bg) !important; color: var(--text); }
     .content-bg { background: transparent; }
-    .search-box { background: rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.25); border-radius: 18px; }
-    .diet-pill { border:1px solid rgba(34,197,94,.35); background: rgba(34,197,94,.08); color:#86efac; }
-    .diet-pill[data-active="true"] { background: rgba(34,197,94,.92); color:#06210f; border-color: rgba(34,197,94,.65); }
-    .card-food { background: rgba(2,6,23,.40); border:1px solid rgba(148,163,184,.22); border-radius: 18px; overflow:hidden; transition: transform .15s ease, border-color .15s ease; }
-    .card-food:hover { transform: translateY(-2px); border-color: rgba(34,197,94,.35); }
-    .food-img { height: 150px; background: linear-gradient(180deg, rgba(34,197,94,.10), rgba(2,6,23,.0)); display:flex; align-items:center; justify-content:center; color: rgba(148,163,184,.8); position: relative; }
-    .food-img img { width:100%; height:100%; object-fit: cover; }
-    .price-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.35rem .7rem; background: rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.25); border-radius: 999px; color: var(--text); }
-    .bottom-nav { position: fixed; left:0; right:0; bottom:0; z-index: 1035; background: rgba(15,23,42,.88); backdrop-filter: blur(10px); border-top: 1px solid rgba(148,163,184,.25); display:block; }
+    .search-box { background: rgba(2, 6, 23, 0.35); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 18px; }
+    .diet-pill { border: 1px solid rgba(34, 197, 94, 0.35); background: rgba(34, 197, 94, 0.08); color: #86efac; }
+    .diet-pill[data-active="true"] { background: rgba(34, 197, 94, 0.92); color: #06210f; border-color: rgba(34, 197, 94, 0.65); }
+    .card-food { background: rgba(2, 6, 23, 0.40); border: 1px solid rgba(148, 163, 184, 0.22); border-radius: 18px; overflow: hidden; transition: transform 0.15s ease, border-color 0.15s ease; }
+    .card-food:hover { transform: translateY(-2px); border-color: rgba(34, 197, 94, 0.35); }
+    .food-img { height: 150px; background: linear-gradient(180deg, rgba(34, 197, 94, 0.10), rgba(2, 6, 23, 0.0)); display: flex; align-items: center; justify-content: center; color: rgba(148, 163, 184, 0.8); position: relative; }
+    .food-img img { width: 100%; height: 100%; object-fit: cover; }
+    .price-badge { display: inline-flex; align-items: center; gap: .35rem; padding: .35rem .7rem; background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 999px; color: var(--text); }
+    .bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1035; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(10px); border-top: 1px solid rgba(148, 163, 184, 0.25); display: block; }
     #dragScrollUserContainer::-webkit-scrollbar, #dragScrollContainer::-webkit-scrollbar, .drag-scroll-container::-webkit-scrollbar { display: none !important; }
     #dragScrollUserContainer, #dragScrollContainer, .drag-scroll-container { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow-x: auto !important; cursor: grab !important; border: none !important; box-shadow: none !important; -webkit-box-shadow: none !important; }
     #dragScrollUserContainer:active, #dragScrollContainer:active, .drag-scroll-container:active { cursor: grabbing !important; }
     #dragScrollUserContainer table, #dragScrollContainer table, .drag-scroll-container table { border-collapse: collapse !important; border: none !important; }
     #dragScrollUserContainer table th, #dragScrollUserContainer table td, #dragScrollContainer table th, #dragScrollContainer table td, .drag-scroll-container table th, .drag-scroll-container table td { border-left: none !important; border-right: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; }
     .text-white-element { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
-    .modal-dialog { max-width: 800px !important; }
-    .modal-body::-webkit-scrollbar { display: none !important; }
-    .modal-body { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow: visible !important; }
     .bi-clock-history, .text-white-icon { color: #ffffff !important; opacity: 1 !important; filter: drop-shadow(0 0 1px rgba(255,255,255,0.2)); }
-    input[type="time"]::-webkit-calendar-picker-indicator,
-    input[type="date"]::-webkit-calendar-picker-indicator {filter: invert(1) brightness(100%) contrast(100%) !important;cursor: pointer;}
-    @media (min-width: 992px) { main.content-shift { margin-left: 280px; } .bottom-nav { display:none; } }
+    input[type="time"]::-webkit-calendar-picker-indicator, input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1) brightness(100%) contrast(100%) !important; cursor: pointer; }
+    .modal-dialog { max-width: 800px !important; max-height: 90vh; display: flex; align-items: center; }
+    .modal-content { max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+    .modal-body { overflow-y: auto !important; max-height: calc(90vh - 130px); -ms-overflow-style: none !important; scrollbar-width: none !important; }
+    .modal-body::-webkit-scrollbar { display: none !important; }
+    @media (min-width: 992px) { main.content-shift { margin-left: 280px; } .bottom-nav { display: none; } }
 </style>
 
 </head>
@@ -352,14 +352,20 @@ $menu = [
                     </div>
                     <div class="mb-3">
                         <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Tipe Tenant</label>
-                        <select class="form-select" name="type" id="tenant_type" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                        <select class="form-select" name="type" id="tenant_type" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" onchange="toggleCustomType(this.value)" required>
                             <option value="kantin">Kantin</option>
                             <option value="cafe">Cafe</option>
                             <option value="koperasi">Koperasi</option>
                             <option value="laundry">Laundry</option>
                             <option value="florist">Florist</option>
                             <option value="giftshop">Giftshop</option>
+                            <option value="lainnya">Lainnya (Ketik Manual)</option>
                         </select>
+                    </div>
+                    <!-- Input Tambahan Jika Memilih Lainnya -->
+                    <div class="mb-3" id="custom_type_container" style="display: none;">
+                        <label class="form-label" style="color: #22c55e !important; font-weight: 500;">Masukkan Tipe Baru</label>
+                        <input type="text" class="form-control" id="tenant_type_custom" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(34, 197, 94, 0.4) !important; color: #e5e7eb !important;">
                     </div>
                     <div class="mb-3">
                         <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Deskripsi</label>
@@ -386,6 +392,7 @@ $menu = [
         </div>
     </div>
 </div>
+
 
   <?php include "bottom_nav.php"; ?>
   
@@ -450,6 +457,46 @@ function editTenant(data) {
     
     var myModal = new bootstrap.Modal(document.getElementById('modalTenantRight'));
     myModal.show();
+}
+
+function toggleCustomType(value) {
+    const container = document.getElementById('custom_type_container');
+    const inputCustom = document.getElementById('tenant_type_custom');
+    const selectType = document.getElementById('tenant_type');
+
+    if (value === 'lainnya') {
+        container.style.display = 'block';
+        inputCustom.setAttribute('name', 'type');
+        inputCustom.setAttribute('required', 'required');
+        selectType.removeAttribute('name');
+    } else {
+        container.style.display = 'none';
+        inputCustom.removeAttribute('name');
+        inputCustom.removeAttribute('required');
+        selectType.setAttribute('name', 'type');
+    }
+}
+
+// Interseptor saat fungsi EDIT/pemicu JS mengisi data ke form modal Anda
+function setModalData(data) {
+    document.getElementById('tenant_id').value = data.id;
+    document.getElementById('tenant_name').value = data.name;
+    document.getElementById('tenant_description').value = data.description;
+    document.getElementById('tenant_phone').value = data.phone;
+    document.getElementById('tenant_email').value = data.email;
+    document.getElementById('tenant_prep').value = data.preparation_time;
+
+    const selectType = document.getElementById('tenant_type');
+    const standardOptions = ['kantin', 'cafe', 'koperasi', 'laundry', 'florist', 'giftshop'];
+
+    if (standardOptions.includes(data.type.toLowerCase())) {
+        selectType.value = data.type.toLowerCase();
+        toggleCustomType(data.type.toLowerCase());
+    } else {
+        selectType.value = 'lainnya';
+        toggleCustomType('lainnya');
+        document.getElementById('tenant_type_custom').value = data.type;
+    }
 }
 </script>
 
