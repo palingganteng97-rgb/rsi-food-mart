@@ -112,60 +112,60 @@ $permissionsData = getPermissions($conn);
   <!-- Container tabel dengan tema gelap transparan yang selaras sempurna -->
   <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
     
-    <!-- HEADER TABEL & TOMBOL TAMBAH PRODUCT ADDON -->
+    <!-- HEADER TABEL & TOMBOL TAMBAH PERMISSION -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
       <div>
-        <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;"> Product Addons </h2>
+        <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;"> Hak Akses / Permissions </h2>
       </div>
       <div>
-        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalAddon" onclick="openTambahAddon()">
-          <i class="bi bi-plus-circle"></i> Tambah Addon
+        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalPermission" onclick="openTambahPermission()">
+          <i class="bi bi-plus-circle"></i> Tambah Hak Akses
         </button>
       </div>
     </div>
 
-    <!-- STRUKTUR TABEL LIST DATA PRODUCT ADDONS (DRAG SCROLL & TRANSPARAN) -->
-    <div id="dragScrollAddonContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
+    <!-- STRUKTUR TABEL LIST DATA PERMISSIONS (DRAG SCROLL & TRANSPARAN) -->
+    <div id="dragScrollPermissionContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
       <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1000px; user-select: none; border-collapse: collapse !important;">
         <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
             <tr>
-            <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;">ID</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Product ID</th>
-            <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Addon Name</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 180px;">Required</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Aksi</th>
+              <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;">ID</th>
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 250px;">Module Name</th>
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Permission Name</th>
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Aksi</th>
             </tr>
         </thead>
         <tbody style="background: transparent !important;">
           <?php
           try {
-              // Menarik data berdasarkan susunan kolom asli di database HeidiSQL Anda
-              $queryAddons = "SELECT id, product_id, addon_name, required FROM product_addons ORDER BY id ASC";
-              $resultAddons = $conn->query($queryAddons);
-              
-              if ($resultAddons && $resultAddons->num_rows > 0) {
-                  while ($addonRow = $resultAddons->fetch_assoc()) {
-                      $isRequired = (int)$addonRow['required'] === 1;
+              if ($permissionsData && mysqli_num_rows($permissionsData) > 0) {
+                  while ($row = mysqli_fetch_assoc($permissionsData)) {
                       ?>
                       <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
-                        <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $addonRow['id'] ?></td>
-                        <td class="text-center text-white-50" style="background: transparent !important; border: none !important;"><?= $addonRow['product_id'] ?></td>
-                        <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($addonRow['addon_name'] ?? '-') ?></td>
-                        <td class="text-center" style="background: transparent !important; border: none !important;">
-                          <?php if ($isRequired): ?>
-                            <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">Wajib (1)</span>
-                          <?php else: ?>
-                            <span class="badge bg-secondary-subtle text-muted border border-secondary border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">Opsional (0)</span>
-                          <?php endif; ?>
+                        <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $row['id'] ?></td>
+                        <td class="text-white-50 fw-medium" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($row['module_name'] ?? '-') ?></td>
+                        <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;">
+                          <span class="badge bg-secondary-subtle text-white-50 border border-secondary border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.8rem; background: rgba(30, 41, 59, 0.5) !important;">
+                            <?= htmlspecialchars($row['permission_name'] ?? '-') ?>
+                          </span>
                         </td>
                         <td class="text-center" style="background: transparent !important; border: none !important;">
                           <div class="d-flex justify-content-center gap-1">
-                            <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditAddon(<?= json_encode($addonRow) ?>)'>
+                            <!-- Tombol Edit -->
+                            <button type="button" class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#modalPermission" 
+                                    onclick='openEditPermission(<?= json_encode($row) ?>)'>
                               <i class="bi bi-pencil-square"></i>
                             </button>
-                            <a href="product_addons.php?action=delete&id=<?= $addonRow['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick="return confirm('Yakin ingin menghapus addon ini?')">
+                            
+                            <!-- Tombol Hapus Modern Anti-Macet -->
+                            <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete"
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#modalDeletePermission" 
+                                    onclick="document.getElementById('delete_permission_display').innerText = '<?php echo addslashes($row['permission_name']); ?>'; document.getElementById('btn_confirm_delete_permission').setAttribute('href', 'permissions.php?delete=<?= $row['id'] ?>')">
                               <i class="bi bi-trash-fill"></i>
-                            </a>
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -174,15 +174,15 @@ $permissionsData = getPermissions($conn);
               } else {
                   ?>
                   <tr>
-                    <td colspan="5" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">
+                    <td colspan="4" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">
                       <i class="bi bi-folder-x d-block mb-2" style="font-size: 2rem; color: rgba(148, 163, 184, 0.4);"></i>
-                      Tidak ada data product addon saat ini.
+                      Tidak ada data hak akses (permissions) saat ini.
                     </td>
                   </tr>
                   <?php
               }
           } catch (Throwable $e) {
-              echo "<tr><td colspan='5' class='text-danger text-center py-3' style='background: transparent !important; border: none !important;'>Gagal memuat data</td></tr>";
+              echo "<tr><td colspan='4' class='text-danger text-center py-3' style='background: transparent !important; border: none !important;'>Gagal memuat data</td></tr>";
           }
           ?>
         </tbody>
@@ -191,126 +191,108 @@ $permissionsData = getPermissions($conn);
   </div>
 </main>
 
-    <!-- MODAL CREATE -->
-    <div class="modal fade" id="modalCreate" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <form action="permissions.php" method="POST" class="modal-content" style="background: #1e293b; color: #e5e7eb; border: 1px solid rgba(148, 163, 184, 0.25);">
-                <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.25);">
-                    <h5 class="modal-title">Tambah Permission Baru</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label" style="color: #94a3b8;">Nama Modul</label>
-                        <input type="text" name="module_name" class="form-control" style="background: rgba(2, 6, 23, 0.35); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb;" placeholder="Contoh: orders, users, atau products" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label" style="color: #94a3b8;">Nama Permission</label>
-                        <input type="text" name="permission_name" class="form-control" style="background: rgba(2, 6, 23, 0.35); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb;" placeholder="Contoh: create_order, edit_user" required>
-                    </div>
-                </div>
-                <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.25);">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" name="create" class="btn btn-success">Simpan Data</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-<!-- MODAL UPDATE -->
-    <div class="modal fade" id="modalUpdate" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <form action="permissions.php" method="POST" class="modal-content" style="background: #1e293b; color: #e5e7eb; border: 1px solid rgba(148, 163, 184, 0.25);">
-                <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.25);">
-                    <h5 class="modal-title">Ubah Data Permission</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <!-- Input Hidden untuk menampung ID record yang akan diupdate -->
-                    <input type="hidden" name="id" id="edit-id">
-                    
-                    <div class="mb-3">
-                        <label class="form-label" style="color: #94a3b8;">Nama Modul</label>
-                        <input type="text" name="module_name" id="edit-module" class="form-control" style="background: rgba(2, 6, 23, 0.35); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb;" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label" style="color: #94a3b8;">Nama Permission</label>
-                        <input type="text" name="permission_name" id="edit-permission" class="form-control" style="background: rgba(2, 6, 23, 0.35); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb;" required>
-                    </div>
-                </div>
-                <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.25);">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" name="update" class="btn btn-warning text-dark">Perbarui</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-<!-- MODAL DELETE -->
-<div class="modal fade" id="modalDelete" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content" style="background: #1e293b; color: #e5e7eb; border: 1px solid rgba(239, 68, 68, 0.35);">
-            <div class="modal-body text-center p-4">
-                <!-- Icon Peringatan -->
-                <div class="text-danger mb-3">
-                    <i class="bi bi-exclamation-triangle" style="font-size: 3rem;"></i>
-                </div>
-                <h5 class="modal-title mb-2">Hapus Permission?</h5>
-                <p class="text-muted small">Anda yakin ingin menghapus data permission <code id="delete-permission-text" class="text-danger"></code>? Tindakan ini tidak dapat dibatalkan.</p>
+<!-- MODAL FORM CRUD (TAMBAH / UBAH PRODUCT ADDON) -->
+<div class="modal fade" id="modalAddon" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <!-- Form diarahkan kembali ke file product_addons.php -->
+        <form action="product_addons.php" method="POST" class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb; border-radius: 16px;">
+            <div class="modal-header border-0 pb-0" style="padding: 1.5rem 1.5rem 0 1.5rem;">
+                <h5 class="fw-bold text-white m-0" id="modalAddonLabel">Tambah Addon</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-footer justify-content-center border-0 pt-0">
-                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
-                <a href="#" id="delete-confirm-btn" class="btn btn-sm btn-danger">Ya, Hapus</a>
+            
+            <div class="modal-body p-4">
+                <!-- Input Hidden untuk menampung ID saat operasi Update/Edit -->
+                <input type="hidden" name="id" id="addon_id">
+                
+                <!-- Input ID Produk -->
+                <div class="mb-3">
+                    <label for="addon_product_id" class="form-label small text-white-50 fw-medium">Product ID</label>
+                    <input type="number" name="product_id" id="addon_product_id" class="form-control rounded-3 text-white" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.2); shadow: none;" placeholder="Contoh: 12" required>
+                </div>
+                
+                <!-- Input Nama Addon -->
+                <div class="mb-3">
+                    <label for="addon_name_input" class="form-label small text-white-50 fw-medium">Addon Name</label>
+                    <input type="text" name="addon_name" id="addon_name_input" class="form-control rounded-3 text-white" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.2); shadow: none;" placeholder="Contoh: Ekstra Sambal" required>
+                </div>
+                
+                <!-- Pilihan Status Sifat Pilihan (Required) -->
+                <div class="mb-2">
+                    <label for="addon_required" class="form-label small text-white-50 fw-medium">Sifat Pilihan (Required)</label>
+                    <select name="required" id="addon_required" class="form-select rounded-3 text-white" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.2); shadow: none;" required>
+                        <option value="0" class="bg-dark text-white">Opsional (0)</option>
+                        <option value="1" class="bg-dark text-white">Wajib (1)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="modal-footer border-0 pt-0 d-flex gap-2 justify-content-end" style="padding: 0 1.5rem 1.5rem 1.5rem;">
+                <button type="button" class="btn btn-sm btn-secondary rounded-3 px-3 py-2" data-bs-dismiss="modal" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8;">Batal</button>
+                <button type="submit" name="action_add" id="btnSubmitAddon" class="btn btn-sm btn-success rounded-3 px-3 py-2 fw-medium">Simpan Data</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL KONFIRMASI HAPUS PRODUCT ADDON KUSTOM (Tempatkan Sebelum Tag Penutup </body>) -->
+<div class="modal fade" id="modalDeleteProductAddon" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px); border: 1px solid rgba(239, 68, 68, 0.25); color: #e5e7eb; border-radius: 16px;">
+            <div class="modal-body text-center p-4">
+                <div class="text-danger mb-3">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem; filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.3));"></i>
+                </div>
+                <h5 class="fw-bold text-white mb-2">Hapus Product Addon?</h5>
+                <p class="text-white-50 small mb-4">Tindakan ini akan menghapus data addon <span id="delete_addon_title_display" class="text-white fw-semibold"></span> secara permanen. Data yang dihapus tidak dapat dikembalikan.</p>
+                <div class="d-flex gap-2 justify-content-center">
+                    <button type="button" class="btn btn-sm btn-secondary rounded-3 px-3 py-2" data-bs-dismiss="modal" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8;">Batal</button>
+                    <a id="btn_confirm_delete_addon" href="#" class="btn btn-sm btn-danger rounded-3 px-3 py-2 fw-medium">Ya, Hapus</a>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-    <script>
-        // Logika Javascript untuk memindahkan data dari baris tabel ke dalam field Input di Modal Update
-        document.addEventListener('DOMContentLoaded', function() {
-            const editButtons = document.querySelectorAll('.btn-edit');
-            editButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    document.getElementById('edit-id').value = this.getAttribute('data-id');
-                    document.getElementById('edit-module').value = this.getAttribute('data-module');
-                    document.getElementById('edit-permission').value = this.getAttribute('data-permission');
-                });
-            });
-        });
+<!-- LOGIKA JAVASCRIPT POPULATE DATA & MANIPULASI MODAL -->
+<script>
+// Fungsi pemicu saat menekan tombol "Tambah Addon"
+function openTambahAddon() {
+    document.getElementById('modalAddonLabel').innerText = 'Tambah Addon Baru';
+    document.getElementById('addon_id').value = '';
+    document.getElementById('addon_product_id').value = '';
+    document.getElementById('addon_name_input').value = '';
+    document.getElementById('addon_required').value = '0'; // Default opsional
+    
+    // Ubah nama atribut submit menjadi create
+    const btnSubmit = document.getElementById('btnSubmitAddon');
+    btnSubmit.setAttribute('name', 'create_addon');
+    btnSubmit.className = "btn btn-sm btn-success rounded-3 px-3 py-2 fw-medium";
+    btnSubmit.innerText = "Simpan Data";
+}
 
-        // Logika untuk memindahkan parameter data ke Modal Hapus
-        const deleteButtons = document.querySelectorAll('.btn-delete');
-        deleteButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                const id = this.getAttribute('data-id');
-                const name = this.getAttribute('data-permission');
-                
-                // Set tulisan nama permission di dalam teks modal
-                document.getElementById('delete-permission-text').textContent = name;
-                // Set href tombol konfirmasi hapus dengan ID target
-                document.getElementById('delete-confirm-btn').setAttribute('href', 'permissions.php?delete=' + id);
-            });
-        });
-
-        document.addEventListener('DOMContentLoaded', function() {
-            const addonSlider = document.getElementById('dragScrollAddonContainer');
-            if (!addonSlider) return;
-            let isDown = false, startX, scrollLeft;
-            addonSlider.addEventListener('mousedown', (e) => {
-                if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
-                isDown = true; addonSlider.style.cursor = 'grabbing';
-                startX = e.pageX - addonSlider.offsetLeft; scrollLeft = addonSlider.scrollLeft;
-            });
-            addonSlider.addEventListener('mouseleave', () => { isDown = false; addonSlider.style.cursor = 'grab'; });
-            addonSlider.addEventListener('mouseup', () => { isDown = false; addonSlider.style.cursor = 'grab'; });
-            addonSlider.addEventListener('mousemove', (e) => {
-                if (!isDown) return; e.preventDefault();
-                const x = e.pageX - addonSlider.offsetLeft;
-                addonSlider.scrollLeft = scrollLeft - ((x - startX) * 1.5);
-            });
-        });
-        </script>
+// Fungsi pemicu saat menekan tombol ikon Edit di tabel data
+function openEditAddon(data) {
+    if (data) {
+        document.getElementById('modalAddonLabel').innerText = 'Ubah Data Addon';
+        document.getElementById('addon_id').value = data.id;
+        document.getElementById('addon_product_id').value = data.product_id;
+        document.getElementById('addon_name_input').value = data.addon_name;
+        document.getElementById('addon_required').value = data.required;
+        
+        // Ubah nama atribut submit menjadi update beserta style warna kuning peringatan
+        const btnSubmit = document.getElementById('btnSubmitAddon');
+        btnSubmit.setAttribute('name', 'update_addon');
+        btnSubmit.className = "btn btn-sm btn-warning text-dark rounded-3 px-3 py-2 fw-semibold";
+        btnSubmit.innerText = "Simpan Perubahan";
+        
+        // Menampilkan modal programatik sebagai fallback jikalau data-bs-toggle pada tombol loop mengalami delay
+        const modalEl = document.getElementById('modalAddon');
+        const instance = bootstrap.Modal.getOrCreateInstance(modalEl);
+        instance.show();
+    }
+}
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

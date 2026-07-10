@@ -193,10 +193,20 @@ if ($fetchQuery) {
     .card-food:hover { transform:translateY(-2px); border-color:rgba(34,197,94,.35); }
     .food-img { height:150px; background:linear-gradient(180deg, rgba(34,197,94,.10), rgba(2,6,23,.0)); display:flex; align-items:center; justify-content:center; color:rgba(148,163,184,.8); position:relative; }
     .food-img img { width:100%; height:100%; object-fit:cover; }
-    #dragScrollUserContainer, #dragScrollContainer, .drag-scroll-container { -ms-overflow-style:none !important; scrollbar-width:none !important; overflow-x:auto !important; cursor:grab !important; border:none !important; box-shadow:none !important; -webkit-box-shadow:none !important; }
-    #dragScrollUserContainer::-webkit-scrollbar, #dragScrollContainer::-webkit-scrollbar, .drag-scroll-container::-webkit-scrollbar { display:none !important; }
+    
+    /* MODIFIKASI: Memaksa container mengunci sistem overflow */
+    #dragScrollUserContainer, #dragScrollContainer, .drag-scroll-container { -ms-overflow-style:none !important; scrollbar-width:none !important; overflow-x:auto !important; display: block !important; width: 100% !important; cursor:grab !important; border:none !important; box-shadow:none !important; -webkit-box-shadow:none !important; }
+    #dragScrollUserContainer::-webkit-scrollbar, #dragScrollContainer::-webkit-scrollbar, .drag-scroll-container::-webkit-scrollbar { display:none !important; width:0 !important; height:0 !important; }
     #dragScrollUserContainer:active, #dragScrollContainer:active, .drag-scroll-container:active { cursor:grabbing !important; }
     #dragScrollUserContainer table, #dragScrollContainer table, .drag-scroll-container table { border-collapse:collapse !important; border:none !important; }
+    
+    /* TAMBAHAN UTAMA: Memaksa elemen tabel permissions dan sejenisnya melebar keluar batas agar bisa di-drag */
+    #dragScrollPermissionContainer table, .drag-scroll-container table {
+        min-width: 1300px !important; /* Nilai piksel ini wajib berada di atas resolusi monitor Anda */
+        width: 100% !important;
+        table-layout: fixed !important;
+    }
+
     #dragScrollUserContainer table th, #dragScrollUserContainer table td, #dragScrollContainer table th, #dragScrollContainer table td, .drag-scroll-container table th, .drag-scroll-container table td { border-left:none !important; border-right:none !important; border-bottom:1px solid rgba(148, 163, 184, 0.12) !important; }
     .modal-dialog { max-width:800px !important; }
     .modal-body { -ms-overflow-style:none !important; scrollbar-width:none !important; overflow-y:auto !important; max-height:calc(100vh - 200px); }
@@ -218,129 +228,97 @@ if ($fetchQuery) {
     <!-- Container tabel dengan tema gelap transparan -->
     <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
         
-        <!-- HEADER TABEL & TOMBOL TAMBAH PRODUK -->
+        <!-- HEADER TABEL & TOMBOL TAMBAH HAK AKSES -->
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
             <div>
-                <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Products</h2>
+                <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Hak Akses / Permissions</h2>
             </div>
             <div>
-                <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalProduct" onclick="openTambahProduct()">
-                    <i class="bi bi-plus-circle"></i> Tambah Produk
+                <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalPermission" onclick="openTambahPermission()">
+                    <i class="bi bi-plus-circle"></i> Tambah Hak Akses
                 </button>
             </div>
         </div>
 
         <!-- NOTIFIKASI STATUS OPERASI CRUD -->
-        <?php if (!empty($status)): ?>
-            <div class="alert <?= strpos($status, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
+        <?php if (isset($_GET['status'])): ?>
+            <div class="alert <?= strpos($_GET['status'], 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
                 <strong>
                     <?php 
-                    if ($status == 'success_insert') echo "Data produk berhasil ditambahkan!";
-                    elseif ($status == 'success_update') echo "Data produk berhasil diperbarui!";
-                    elseif ($status == 'success_delete') echo "Data produk berhasil dihapus!";
-                    else echo "Operasi gagal: " . htmlspecialchars($msg);
+                    if ($_GET['status'] == 'success_create') echo "Data hak akses berhasil ditambahkan!";
+                    elseif ($_GET['status'] == 'success_update') echo "Data hak akses berhasil diperbarui!";
+                    elseif ($_GET['status'] == 'success_delete') echo "Data hak akses berhasil dihapus!";
+                    else echo "Operasi gagal dijalankan!";
                     ?>
                 </strong>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         <?php endif; ?>
 
-        <!-- STRUKTUR TABEL LIST DATA PRODUK (DRAG SCROLL MOUSE WIDE MODE) -->
-        <div id="dragScrollProductContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
-            <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1200px; user-select: none; border-collapse: collapse !important;">
-                <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
-                    <tr>
-                        <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 80px;">ID</th>
-                        <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;">Gambar</th>
-                        <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 250px;">Nama Produk</th>
-                        <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 150px;">Tenant / Kategori</th>
-                        <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 120px;">SKU / Brand</th>
-                        <th class="py-3 text-end text-white" style="background: transparent !important; border: none !important; width: 130px;">Harga Jual</th>
-                        <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;">Stok</th>
-                        <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 110px;">Status</th>
-                        <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 130px;">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody style="background: transparent !important;">
-                    <?php if (!empty($listProducts)): foreach ($listProducts as $row): ?>
-                        <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
-                            <!-- Kolom ID -->
-                            <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $row['id'] ?></td>
+<!-- STRUKTUR TABEL LIST DATA PERMISSIONS (DRAG SCROLL MOUSE WIDE MODE) -->
+<div id="dragScrollPermissionContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
+    <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1200px !important; table-layout: fixed !important; user-select: none; border-collapse: collapse !important;">
+        <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
+            <tr>
+                <!-- WAJIB MENGUNCI LEBAR DI SETIAP SELEKTOR TH AGAR TABEL MELEBAR KELUAR LAYAR -->
+                <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px !important;">ID</th>
+                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 450px !important;">Nama Modul (Module Name)</th>
+                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 450px !important;">Nama Hak Akses (Permission Name)</th>
+                <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 180px !important;">Aksi</th>
+            </tr>
+        </thead>
+        <tbody style="background: transparent !important;">
+            <?php if ($permissionsData && mysqli_num_rows($permissionsData) > 0): ?>
+                <?php while ($row = mysqli_fetch_assoc($permissionsData)): ?>
+                <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
+                    <!-- Kolom ID -->
+                    <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $row['id'] ?></td>
+                    
+                    <!-- Kolom Module Name -->
+                    <td class="fw-semibold text-white" style="background: transparent !important; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        <div class="text-white-50"><i class="bi bi-box-seam me-2"></i><?= htmlspecialchars($row['module_name']) ?></div>
+                    </td>
+                    
+                    <!-- Kolom Permission Name -->
+                    <td style="background: transparent !important; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        <span class="badge bg-primary-subtle text-primary border border-primary border-opacity-10 rounded-2" style="font-size: 0.8rem; background: rgba(13, 110, 253, 0.12); padding: 6px 12px;">
+                            <i class="bi bi-key me-1"></i><?= htmlspecialchars($row['permission_name']) ?>
+                        </span>
+                    </td>
+                    
+                    <!-- Kolom Aksi Menu CRUD -->
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <div class="d-flex justify-content-center gap-1">
+                            <!-- Tombol Edit -->
+                            <button type="button" class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" 
+                                    onclick='openEditPermission(<?= json_encode($row) ?>)'>
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
                             
-                            <!-- Kolom Gambar -->
-                            <td class="text-center" style="background: transparent !important; border: none !important;">
-                                <?php if (!empty($row['image'])): ?>
-                                    <img src="uploads/products/<?= htmlspecialchars($row['image']) ?>" alt="Gambar" class="rounded-2" style="max-height: 45px; max-width: 45px; object-fit: cover;">
-                                <?php else: ?>
-                                    <span class="text-muted" style="font-size: 0.75rem;">No Image</span>
-                                <?php endif; ?>
-                            </td>
-                            
-                            <!-- Kolom Nama & Deskripsi Pendek -->
-                            <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;">
-                                <div class="text-truncate" style="max-width: 230px;" title="<?= htmlspecialchars($row['name']) ?>"><?= htmlspecialchars($row['name']) ?></div>
-                                <div class="text-muted text-truncate fw-normal" style="font-size: 0.75rem; max-width: 230px;"><?= htmlspecialchars($row['description'] ?: '-') ?></div>
-                            </td>
-                            
-                            <!-- Kolom Tenant & Kategori -->
-                            <td style="background: transparent !important; border: none !important;">
-                                <div class="text-white-50 text-truncate" style="max-width: 140px; font-size: 0.8rem;"><i class="bi bi-shop me-1"></i><?= htmlspecialchars($row['tenant_name']) ?></div>
-                                <span class="badge bg-primary-subtle text-primary border border-primary border-opacity-10 rounded-2 mt-1" style="font-size: 0.72rem; background: rgba(13, 110, 253, 0.12);"><?= htmlspecialchars($row['category_name']) ?></span>
-                            </td>
-                            
-                            <!-- Kolom SKU & Brand -->
-                            <td style="background: transparent !important; border: none !important;">
-                                <div class="font-monospace text-warning" style="font-size: 0.8rem;"><?= htmlspecialchars($row['sku'] ?: '-') ?></div>
-                                <div class="text-white-50 text-truncate mt-0.5" style="font-size: 0.75rem; max-width: 110px;"><i class="bi bi-tag me-1"></i><?= htmlspecialchars($row['brand_name'] ?: 'Tanpa Merek') ?></div>
-                            </td>
-                            
-                            <!-- Kolom Harga -->
-                            <td class="text-end fw-bold text-white" style="background: transparent !important; border: none !important;">
-                                Rp <?= number_format($row['base_price'], 0, ',', '.') ?>
-                            </td>
-                            
-                            <!-- Kolom Stok & Satuan -->
-                            <td class="text-center" style="background: transparent !important; border: none !important;">
-                                <span class="fw-semibold <?= $row['stock'] <= 5 ? 'text-danger' : 'text-white' ?>"><?= $row['stock'] ?></span>
-                                <div class="text-muted" style="font-size: 0.72rem;"><?= htmlspecialchars($row['unit_name'] ?: 'pcs') ?></div>
-                            </td>
-                            
-                            <!-- Kolom Status Keaktifan -->
-                            <td class="text-center" style="background: transparent !important; border: none !important;">
-                                <?php if ($row['status'] == 1): ?>
-                                    <span class="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2 py-0.5" style="font-size: 0.72rem; background: rgba(25, 135, 84, 0.15);">Aktif</span>
-                                <?php else: ?>
-                                    <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2 py-0.5" style="font-size: 0.72rem; background: rgba(220, 53, 69, 0.15);">Nonaktif</span>
-                                <?php endif; ?>
-                            </td>
-                            
-                            <!-- Kolom Aksi -->
-                            <td class="text-center" style="background: transparent !important; border: none !important;">
-                                <div class="d-flex justify-content-center gap-1">
-                                    <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditProduct(<?= json_encode($row) ?>)'>
-                                        <i class="bi bi-pencil-square"></i>
-                                    </button>
-                                    <a href="javascript:void(0);" 
-                                    onclick="triggerDeleteModal('delete_handler.php?delete_product_id=<?= $row['id'] ?>', '<?= htmlspecialchars($row['name'] ?? 'Produk ini', ENT_QUOTES); ?>')" 
-                                    class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" 
-                                    title="Delete">
-                                        <i class="bi bi-trash-fill"></i>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; else: ?>
-                        <tr>
-                            <!-- Sesuaikan jumlah colspan dengan jumlah total kolom tabel Anda, contoh: 10 kolom -->
-                            <td colspan="10" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">
-                                <i class="bi bi-folder-x d-block mb-2" style="font-size: 2rem; color: rgba(148, 163, 184, 0.4);"></i>
-                                Tidak ada data produk saat ini.
-                            </td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
+                            <!-- Tombol Hapus -->
+                            <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete"
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#modalDeletePermission" 
+                                    onclick="document.getElementById('delete_permission_title_display').innerText = '<?php echo addslashes($row['permission_name']); ?>'; document.getElementById('btn_confirm_delete_permission').setAttribute('href', 'permissions.php?delete=<?= $row['id'] ?>')">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                <?php endwhile; ?>
+            <?php else: ?>
+                <!-- State Tampilan jika data kosong -->
+                <tr>
+                    <td colspan="4" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">
+                        <i class="bi bi-folder-x d-block mb-2" style="font-size: 2rem; color: rgba(148, 163, 184, 0.4);"></i>
+                        Tidak ada data hak akses saat ini.
+                    </td>
+                </tr>
+            <?php endif; ?>
+        </tbody>
+    </table>
+</div>
+
     </div>
 </main>
 
@@ -502,106 +480,103 @@ if ($fetchQuery) {
 </div>
 
 <script>
-
-let deleteUrlTarget = '';
-let bootstrapDeleteModalInstance = null;
-
-function triggerDeleteModal(url, productName) {
-    // Menyimpan URL hapus dari tombol yang diklik
-    deleteUrlTarget = url;
-    
-    // Memasukkan nama produk ke dalam modal secara dinamis
-    const namePlaceholder = document.getElementById('delete_target_name');
-    if (namePlaceholder) {
-        namePlaceholder.innerText = productName;
-    }
-    
-    // Menampilkan modal Bootstrap 5
-    if (!bootstrapDeleteModalInstance) {
-        bootstrapDeleteModalInstance = new bootstrap.Modal(document.getElementById('modalConfirmDelete'));
-    }
-    bootstrapDeleteModalInstance.show();
-}
-
-// Eksekusi pemindahan halaman saat tombol "Oke, Hapus" ditekan
-document.getElementById('btnConfirmDeleteAction').addEventListener('click', function() {
-    if (deleteUrlTarget) {
-        window.location.href = deleteUrlTarget;
-    }
-});
+// Variabel global untuk menampung URL hapus data permission
+let deletePermissionUrlTarget = '';
 
 document.addEventListener('DOMContentLoaded', function() {
-    const prodSlider = document.getElementById('dragScrollProductContainer');
-    if (!prodSlider) return;
-    
-    let isDown = false;
-    let startX, scrollLeft;
-    
-    prodSlider.addEventListener('mousedown', (e) => {
-        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
-        isDown = true; 
-        prodSlider.style.cursor = 'grabbing';
-        startX = e.pageX - prodSlider.offsetLeft; 
-        scrollLeft = prodSlider.scrollLeft;
-    });
-    
-    prodSlider.addEventListener('mouseleave', () => { 
-        isDown = false; 
-        prodSlider.style.cursor = 'grab'; 
-    });
-    
-    prodSlider.addEventListener('mouseup', () => { 
-        isDown = false; 
-        prodSlider.style.cursor = 'grab'; 
-    });
-    
-    prodSlider.addEventListener('mousemove', (e) => {
-        if (!isDown) return; 
-        e.preventDefault();
-        const x = e.pageX - prodSlider.offsetLeft;
-        prodSlider.scrollLeft = scrollLeft - ((x - startX) * 1.5);
-    });
+    // ==========================================
+    // LOGIKA SELEKTOR GAYA DRAG SCROLL
+    // ==========================================
+    const permSlider = document.getElementById('dragScrollPermissionContainer');
+    if (permSlider) {
+        let isDown = false;
+        let startX;
+        let scrollLeft;
+
+        permSlider.addEventListener('mousedown', (e) => {
+            isDown = true;
+            permSlider.style.cursor = 'grabbing';
+            startX = e.pageX - permSlider.offsetLeft;
+            scrollLeft = permSlider.scrollLeft;
+        });
+
+        permSlider.addEventListener('mouseleave', () => {
+            isDown = false;
+            permSlider.style.cursor = 'grab';
+        });
+
+        permSlider.addEventListener('mouseup', () => {
+            isDown = false;
+            permSlider.style.cursor = 'grab';
+        });
+
+        permSlider.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - permSlider.offsetLeft;
+            const walk = (x - startX) * 2; // Pengali 2 mempercepat respons pergeseran mouse
+            permSlider.scrollLeft = scrollLeft - walk;
+        });
+    }
+
+    // ==========================================
+    // LOGIKA EKSEKUSI TOMBOL HAPUS DI MODAL
+    // ==========================================
+    const btnConfirmDelete = document.getElementById('btn_confirm_delete_permission');
+    if (btnConfirmDelete) {
+        btnConfirmDelete.addEventListener('click', function(e) {
+            if (deletePermissionUrlTarget) {
+                e.preventDefault();
+                window.location.href = deletePermissionUrlTarget;
+            }
+        });
+    }
 });
 
-function openTambahProduct() {
-    document.getElementById('formProduct').reset();
-    document.getElementById('modalProductLabel').innerText = 'Tambah Produk Baru';
-    document.getElementById('product_id').value = '';
-    document.getElementById('btnSubmitProduct').className = "btn btn-success";
-    document.getElementById('btnSubmitProduct').innerText = "Simpan Data";
-    document.getElementById('product_action_flag').innerHTML = '<input type="hidden" name="action_add_product" value="1">';
+// ==========================================
+// LOGIKA FORM MODAL TAMBAH & EDIT PERMISSION
+// ==========================================
+function openTambahPermission() {
+    const formPerm = document.getElementById('formPermission');
+    if (formPerm) formPerm.reset();
     
-    if (document.getElementById('container_hapus_image')) {
-        document.getElementById('container_hapus_image').style.display = 'none';
-        document.getElementById('delete_current_image').checked = false;
+    if (document.getElementById('modalPermissionLabel')) {
+        document.getElementById('modalPermissionLabel').innerText = 'Tambah Hak Akses';
+    }
+    if (document.getElementById('perm_id')) document.getElementById('perm_id').value = '';
+    if (document.getElementById('perm_module_name')) document.getElementById('perm_module_name').value = '';
+    if (document.getElementById('perm_permission_name')) document.getElementById('perm_permission_name').value = '';
+    
+    const btnSubmit = document.getElementById('btnSubmitPermission');
+    if (btnSubmit) {
+        btnSubmit.setAttribute('name', 'create');
+        btnSubmit.className = "btn btn-sm btn-success rounded-3 px-3 py-2 fw-medium";
+        btnSubmit.innerText = "Simpan Data";
     }
 }
 
-function openEditProduct(data) {
-    openTambahProduct();
-    document.getElementById('modalProductLabel').innerText = 'Ubah Data Produk';
-    document.getElementById('product_id').value = data.id;
-    document.getElementById('product_tenant_id').value = data.tenant_id;
-    document.getElementById('product_category_id').value = data.category_id;
-    document.getElementById('product_brand_id').value = data.brand_id ? data.brand_id : '';
-    document.getElementById('product_unit_id').value = data.unit_id ? data.unit_id : '';
-    document.getElementById('product_sku').value = data.sku;
-    document.getElementById('product_barcode').value = data.barcode;
-    document.getElementById('product_name').value = data.name;
-    document.getElementById('product_description').value = data.description;
-    document.getElementById('product_base_price').value = data.base_price;
-    document.getElementById('product_stock').value = data.stock;
-    document.getElementById('product_status').value = data.status;
-    document.getElementById('btnSubmitProduct').className = "btn btn-warning text-dark fw-medium";
-    document.getElementById('btnSubmitProduct').innerText = "Simpan Perubahan";
-    document.getElementById('product_action_flag').innerHTML = '<input type="hidden" name="action_update_product" value="1">';
-    
-    if (data.image && data.image !== "" && document.getElementById('container_hapus_image')) {
-        document.getElementById('container_hapus_image').style.display = 'block';
+function openEditPermission(data) {
+    if (data) {
+        if (document.getElementById('modalPermissionLabel')) {
+            document.getElementById('modalPermissionLabel').innerText = 'Ubah Hak Akses';
+        }
+        if (document.getElementById('perm_id')) document.getElementById('perm_id').value = data.id;
+        if (document.getElementById('perm_module_name')) document.getElementById('perm_module_name').value = data.module_name;
+        if (document.getElementById('perm_permission_name')) document.getElementById('perm_permission_name').value = data.permission_name;
+        
+        const btnSubmit = document.getElementById('btnSubmitPermission');
+        if (btnSubmit) {
+            btnSubmit.setAttribute('name', 'update');
+            btnSubmit.className = "btn btn-sm btn-warning text-dark rounded-3 px-3 py-2 fw-semibold";
+            btnSubmit.innerText = "Simpan Perubahan";
+        }
+        
+        const modalEl = document.getElementById('modalPermission');
+        if (modalEl) {
+            const instance = bootstrap.Modal.getOrCreateInstance(modalEl);
+            instance.show();
+        }
     }
-    
-    var myModal = new bootstrap.Modal(document.getElementById('modalProduct'));
-    myModal.show();
 }
 </script>
 
