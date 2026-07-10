@@ -61,9 +61,14 @@ if ($fetchQuery) {
     #dragScrollUserContainer table, #dragScrollContainer table, .drag-scroll-container table { border-collapse: collapse !important; border: none !important; }
     #dragScrollUserContainer table th, #dragScrollUserContainer table td, #dragScrollContainer table th, #dragScrollContainer table td, .drag-scroll-container table th, .drag-scroll-container table td { border-left: none !important; border-right: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; }
     .text-white-element { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
-    .modal-dialog { max-width: 800px !important; }
-    .modal-body::-webkit-scrollbar { display: none !important; }
-    .modal-body { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow: visible !important; }
+    
+    /* MODIFIKASI: Memperkecil lebar maksimal dialog agar proposional dengan detail hidangan */
+    .modal-dialog { max-width: 450px !important; }
+    .modal-body::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+    
+    /* PERBAIKAN UTAMA: Mengubah overflow: visible menjadi hidden agar mengunci paksa batang scroll tipis bawah gambar */
+    .modal-body { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow: hidden !important; }
+    
     .bi-clock-history, .text-white-icon { color: #ffffff !important; opacity: 1 !important; filter: drop-shadow(0 0 1px rgba(255,255,255,0.2)); }
     input[type="time"]::-webkit-calendar-picker-indicator,
     input[type="date"]::-webkit-calendar-picker-indicator {filter: invert(1) brightness(100%) contrast(100%) !important;cursor: pointer;}
@@ -149,12 +154,14 @@ if ($fetchQuery) {
                             </div>
 
                             <!-- Harga & Tombol Aksi Tambah Pesanan -->
-                            <div class="d-flex justify-content-between align-items-center mt-3 pt-2" style="border-top: 1px solid rgba(148,163,184,.1);">
+                            <div class="d-flex justify-content-between align-items-center mt-3 pt-2" style="border-top: 1px solid rgba(148, 163, 184, .1);">
                                 <div class="fw-bold text-success" style="font-size: 1rem;">
                                     Rp <?= number_format($prod['base_price'], 0, ',', '.') ?>
                                 </div>
-                                <!-- PERBAIKAN: Menggunakan konversi json_encode agar pengiriman string judul menu ke fungsi javascript aman dari error parser kutipan string -->
-                                <button class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" onclick="event.stopPropagation(); tambahKeKeranjang(<?= (int)$prod['id'] ?>, <?= htmlspecialchars(json_encode($prod['name']), ENT_QUOTES, 'UTF-8') ?>)">
+                                
+                                <!-- PERBAIKAN UTAMA: Melengkapi 4 parameter (id, name, base_price, image) agar fungsi tambah ke keranjang tidak memicu crash javascript -->
+                                <button class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" 
+                                        onclick="event.stopPropagation(); tambahKeKeranjang(<?= (int)$prod['id'] ?>, <?= htmlspecialchars(json_encode($prod['name']), ENT_QUOTES, 'UTF-8') ?>, <?= floatval($prod['base_price']) ?>, '<?= addslashes($prod['image'] ?? '') ?>')">
                                     <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
                                 </button>
                             </div>
@@ -176,204 +183,14 @@ if ($fetchQuery) {
     </div>
 </main>
 
-<!-- MODAL PRODUK -->
-<div class="modal fade" id="modalDetailProduct" tabindex="-1" aria-labelledby="modalDetailProductLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.2); color: #e5e7eb; border-radius: 16px;">
-            <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
-                <h5 class="modal-title fw-bold text-white" id="modalDetailProductLabel">Detail Produk</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body text-center p-4">
-                <img id="detail_product_image" src="" alt="Gambar Produk" class="img-fluid mb-3" style="max-height: 220px; border-radius: 12px; object-fit: cover;">
-                <h4 id="detail_product_name" class="fw-bold text-white mb-1"></h4>
-                <p id="detail_product_category" class="text-muted small text-uppercase mb-3"></p>
-                <div class="p-3 rounded-3 mb-3 text-start" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.1);">
-                    <label class="small text-muted d-block mb-1">Deskripsi Hidangan:</label>
-                    <span id="detail_product_description" class="text-white-50" style="font-size: 0.9rem;"></span>
-                </div>
-                <div class="d-flex justify-content-between align-items-center pt-2">
-                    <div>
-                        <span class="text-muted small d-block text-start">Harga</span>
-                        <h4 id="detail_product_price" class="fw-bold text-success m-0"></h4>
-                    </div>
-                    <!-- PERBAIKAN: Memastikan tombol bersih dari inline-onclick agar dikontrol dinamis lewat fungsi openDetailProduct -->
-                    <button type="button" id="btn_detail_add_cart" class="btn btn-success px-4 py-2 fw-medium rounded-3 d-flex align-items-center gap-2">
-                        <i class="bi bi-cart-plus"></i> Tambah ke Keranjang
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Panggil file komponen HTML modal kustom -->
+<?php include 'detail_product_modal.php'; ?>
 
   <?php include "bottom_nav.php"; ?>
-  
-<!-- JAVASCRIPT EVENT MOUSE DRAG TO SCROLL & HANDLER MODAL -->
-<script>
-    let currentDietFilter = '';
-    let currentQuery = '';
-    
-    // Menggunakan nilai awal dummy 0 agar tidak bergantung pada database PHP
-    let cartCount = 0;
-    let detailProductModalInstance = null;
-
-    const grid = document.getElementById('catalogGrid');
-
-    function openDetailProduct(data) {
-        document.getElementById('detail_product_name').innerText = data.name;
-        document.getElementById('detail_product_category').innerText = data.category_name || 'General';
-        document.getElementById('detail_product_description').innerText = data.description || 'Tidak ada deskripsi untuk menu sehat ini.';
-        
-        const formattedPrice = 'Rp ' + new Intl.NumberFormat('id-ID').format(data.base_price);
-        document.getElementById('detail_product_price').innerText = formattedPrice;
-        
-        const imgElement = document.getElementById('detail_product_image');
-        imgElement.src = 'uploads/products/' + (data.image ? data.image : 'default.png');
-        
-        const cartBtn = document.getElementById('btn_detail_add_cart');
-        cartBtn.onclick = function() {
-            tambahKeKeranjang(data.id, data.name);
-            if (detailProductModalInstance) {
-                detailProductModalInstance.hide();
-            }
-        };
-
-        if (!detailProductModalInstance) {
-            detailProductModalInstance = new bootstrap.Modal(document.getElementById('modalDetailProduct'));
-        }
-        detailProductModalInstance.show();
-    }
-
-    function setDietFilter(diet){
-      currentDietFilter = diet;
-      document.querySelectorAll('[data-filter]').forEach(btn=>{
-        const isActive = btn.getAttribute('data-filter') === diet;
-        btn.dataset.active = isActive ? 'true' : 'false';
-        btn.classList.toggle('btn-success', isActive);
-      });
-      btnStyleRefresh();
-      applyFilters();
-    }
-
-    function btnStyleRefresh(){
-      document.querySelectorAll('[data-filter]').forEach(btn=>{
-        const active = btn.dataset.active === 'true';
-        btn.classList.toggle('diet-pill', true);
-        btn.style.background = active ? 'rgba(34,197,94,.92)' : 'rgba(34,197,94,.08)';
-        btn.style.color = active ? '#06210f' : '#86efac';
-        btn.style.borderColor = active ? 'rgba(34,197,94,.65)' : 'rgba(34,197,94,.35)';
-      });
-    }
-
-    document.getElementById('searchInput').addEventListener('input', (e)=>{
-      currentQuery = (e.target.value || '').trim().toLowerCase();
-      applyFilters();
-    });
-
-    function applyFilters(){
-      if(!grid) return;
-      const cards = grid.querySelectorAll('.col');
-      cards.forEach(card=>{
-        const foodCard = card.querySelector('.card-food');
-        if(!foodCard) return;
-
-        const title = (foodCard.dataset.title || '').toLowerCase();
-        const dietList = (foodCard.dataset.diet || '').toLowerCase();
-
-        const matchQuery = !currentQuery || title.includes(currentQuery);
-        const matchDiet = !currentDietFilter || dietList.includes(currentDietFilter.toLowerCase());
-
-        card.style.display = (matchQuery && matchDiet) ? '' : 'none';
-      });
-    }
-
-    function resetFilters(){
-      currentDietFilter = '';
-      currentQuery = '';
-      const input = document.getElementById('searchInput');
-      if(input) input.value = '';
-      document.querySelectorAll('[data-filter]').forEach(btn=>{
-        const isActive = btn.getAttribute('data-filter') === '';
-        btn.dataset.active = isActive ? 'true' : 'false';
-      });
-      btnStyleRefresh();
-      applyFilters();
-    }
-
-    // --- KODE DUMMY TAMBAH KE KERANJANG ---
-    function tambahKeKeranjang(id, title = 'Menu Sehat'){
-      cartCount += 1;
-      
-      const counterText = document.getElementById('cartTotalText');
-      if(counterText) {
-          counterText.textContent = cartCount + ' item';
-      }
-      
-      const el = document.createElement('div');
-      el.className = 'toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 m-3';
-      el.role = 'alert';
-      el.style.zIndex = 2000;
-      el.innerHTML = `
-        <div class="d-flex">
-          <div class="toast-body">Ditambahkan: <strong>${title}</strong></div>
-        </div>
-      `;
-      document.body.appendChild(el);
-      const toast = new bootstrap.Toast(el, { delay: 1400 });
-      toast.show();
-      setTimeout(() => el.remove(), 1600);
-    }
-
-    // --- KODE DUMMY MODAL DETAIL KERANJANG ---
-    function openCart() {
-        const bodyContainer = document.getElementById('cartModalBody');
-        const totalContainer = document.getElementById('cartModalTotal');
-        const btnCheckout = document.getElementById('btnCheckout');
-        
-        if(!bodyContainer || !totalContainer || !btnCheckout) return;
-
-        let myModal = bootstrap.Modal.getInstance(document.getElementById('modalCartDetail'));
-        if (!myModal) {
-            myModal = new bootstrap.Modal(document.getElementById('modalCartDetail'));
-        }
-        myModal.show();
-
-        if (cartCount > 0) {
-            const subtotal = 15000 * cartCount;
-            const formattedSubtotal = 'Rp ' + new Intl.NumberFormat('id-ID').format(subtotal);
-
-            bodyContainer.innerHTML = `
-            <div class="d-flex align-items-center mb-3 border-bottom pb-2">
-                <img src="uploads/products/default.png" style="width:50px; height:50px; object-fit:cover;" class="rounded me-3" onerror="this.src='https://placeholder.com'">
-                <div class="flex-grow-1">
-                    <h6 class="mb-0 text-white small">Nasi Goreng Kampung Sehat</h6>
-                    <small class="text-muted">Rp 15.000 x ${cartCount}</small>
-                </div>
-                <div class="text-end">
-                    <span class="text-success small fw-bold">${formattedSubtotal}</span>
-                </div>
-            </div>`;
-            
-            totalContainer.innerText = formattedSubtotal;
-            btnCheckout.removeAttribute('disabled');
-        } else {
-            bodyContainer.innerHTML = '<div class="text-center py-4 text-muted small">Keranjang belanja Anda masih kosong.</div>';
-            totalContainer.innerText = 'Rp 0';
-            btnCheckout.setAttribute('disabled', 'disabled');
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", function() {
-        const counterText = document.getElementById('cartTotalText');
-        if(counterText) {
-            counterText.textContent = cartCount + ' item';
-        }
-    });
-
-    btnStyleRefresh();
-    applyFilters();
-</script>
+ 
+<!-- Hubungkan ke file eksternal JavaScript catalog handler -->
+<script src="catalog_handler.js"></script>
+ 
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

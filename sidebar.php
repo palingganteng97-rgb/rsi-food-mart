@@ -4,24 +4,20 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 $currentFile = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
 
 $menu = [
     'home.php'      => [ 'href' => 'home.php', 'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
     
-    // GRUP PRODUK (URUTAN: CATEGORIES, BRANDS, UNITS, PRODUCTS)
+    // PERBAIKAN: Disatukan menjadi satu grup tunggal agar sub-menu lengkap tidak saling menimpa
     'produk_group'  => [
         'label' => 'Produk', 'icon' => 'bi-bag-dash-fill', 'class' => '',
         'sub'   => [
-            'categories.php' => [ 'href' => 'categories.php', 'label' => 'Kategori Produk', 'icon' => 'bi-tags-fill' ],
-            'brands.php'     => [ 'href' => 'brands.php',     'label' => 'Brand / Merk',    'icon' => 'bi-patch-check-fill' ],
-            'units.php'      => [ 'href' => 'units.php',      'label' => 'Satuan / Units',  'icon' => 'bi-calculator-fill' ],
-            'products.php'   => [ 'href' => 'products.php',   'label' => 'Data Produk',     'icon' => 'bi-box-seam-fill' ],
+            'categories.php'     => [ 'href' => 'categories.php',     'label' => 'Kategori Produk', 'icon' => 'bi-tags-fill' ],
+            'brands.php'         => [ 'href' => 'brands.php',         'label' => 'Brand / Merk',    'icon' => 'bi-patch-check-fill' ],
+            'units.php'          => [ 'href' => 'units.php',          'label' => 'Satuan / Units',  'icon' => 'bi-calculator-fill' ],
+            'products.php'       => [ 'href' => 'products.php',       'label' => 'Data Produk',     'icon' => 'bi-box-seam-fill' ],
+            'product_images.php' => [ 'href' => 'product_images.php', 'label' => 'Gambar Produk',   'icon' => 'bi-images' ],
         ]
     ],
 
@@ -35,13 +31,23 @@ $menu = [
         ]
     ],
     
-    // PEMISAHAN HAK AKSES STRUKTUR USER PC DAN SELULER
     'user.php'     => [ 'href' => 'user.php',    'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-none d-lg-block' ], 
     'profile.php'  => [ 'href' => 'profile.php', 'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-block d-lg-none' ], 
     
     'roles.php'       => [ 'href' => 'roles.php',       'label' => 'Roles',       'icon' => 'bi-shield-lock', 'class' => 'd-mobile-none' ], 
     'permissions.php' => [ 'href' => 'permissions.php', 'label' => 'Permissions', 'icon' => 'bi-key',         'class' => 'd-mobile-none' ], 
 ];
+
+// =========================================================================
+// LOGIKA OTOMATIS: Mendeteksi sub-menu aktif agar grup dropdown otomatis terbuka (show)
+// =========================================================================
+foreach ($menu as $key => $item) {
+    if (isset($item['sub'])) {
+        if (array_key_exists($currentFile, $item['sub'])) {
+            $menu[$key]['class'] .= ' show active';
+        }
+    }
+}
 
 function activeClass(string $file, string $currentFile): string {
     return $file === $currentFile ? 'active' : '';
