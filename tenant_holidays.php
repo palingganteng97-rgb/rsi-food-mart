@@ -8,31 +8,53 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     exit;
 }
 
+// Menangkap notifikasi dari session untuk dicocokkan dengan alert komponen HTML Anda
+$status = $_GET['status'] ?? '';
+$msg = $_GET['msg'] ?? '';
+
 // =========================================================================
-// 1. CRUD: LOGIKA INSERT DATA LIBUR TENANT BARU (DARI MODAL TAMBAH)
+// 1. CRUD: LOGIKA INSERT DATA LIBUR TENANT BARU (DARI INPUT DATE DUA KOLOM)
 // =========================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_add_holiday'])) {
-    $tenantId    = (int)($_POST['tenant_id'] ?? 0);
-    $holidayDate = trim($_POST['holiday_date'] ?? '');
+    $tenantId  = (int)($_POST['tenant_id'] ?? 0);
+    $startDate = trim($_POST['start_date'] ?? '');
+    $endDate   = trim($_POST['end_date'] ?? '');
     $description = trim($_POST['description'] ?? '');
 
-    if ($tenantId <= 0 || empty($holidayDate)) {
-        header("Location: tenant_holidays.php?status=error_insert&msg=" . urlencode("Nama tenant dan tanggal libur wajib diisi!"));
+    if ($tenantId <= 0 || empty($startDate) || empty($endDate)) {
+        header("Location: tenant_holidays.php?status=error_insert&msg=" . urlencode("Nama tenant, tanggal mulai, dan tanggal selesai wajib diisi!"));
         exit;
     }
 
     try {
         $insertStmt = $conn->prepare("INSERT INTO tenant_holidays (tenant_id, holiday_date, description) VALUES (?, ?, ?)");
-        $insertStmt->bind_param("iss", $tenantId, $holidayDate, $description);
         
-        if ($insertStmt->execute()) {
-            header("Location: tenant_holidays.php?status=success_insert");
-            exit;
-        } else {
-            header("Location: tenant_holidays.php?status=error_insert&msg=" . urlencode($insertStmt->error));
-            exit;
+        // Melakukan perulangan (looping) hari dari tanggal mulai sampai tanggal selesai
+        $currentTimestamp = strtotime($startDate);
+        $endTimestamp     = strtotime($endDate);
+
+        while ($currentTimestamp <= $endTimestamp) {
+            $date = date('Y-m-d', $currentTimestamp);
+
+            // Validasi: Cegah duplikasi tanggal libur yang sama persis untuk tenant tersebut
+            $queryCheck = "SELECT id FROM tenant_holidays WHERE tenant_id = ? AND holiday_date = ?";
+            $stmtCheck = $conn->prepare($queryCheck);
+            $stmtCheck->bind_param("is", $tenantId, $date);
+            $stmtCheck->execute();
+            $resCheck = $stmtCheck->get_result();
+
+            if ($resCheck->num_rows == 0) {
+                $insertStmt->bind_param("iss", $tenantId, $date, $description);
+                $insertStmt->execute();
+            }
+            $stmtCheck->close();
+            
+            // Maju 1 hari berikutnya
+            $currentTimestamp = strtotime("+1 day", $currentTimestamp);
         }
-        $insertStmt->close();
+        
+        header("Location: tenant_holidays.php?status=success_insert");
+        exit;
     } catch (Throwable $e) {
         header("Location: tenant_holidays.php?status=error_insert&msg=" . urlencode($e->getMessage()));
         exit;
@@ -40,31 +62,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_add_holiday'])
 }
 
 // =========================================================================
-// 2. CRUD: LOGIKA UPDATE DATA LIBUR TENANT (DARI MODAL EDIT)
+// 2. CRUD: LOGIKA UPDATE DATA LIBUR TENANT (DARI INPUT DATE DUA KOLOM)
 // =========================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_holiday'])) {
-    $targetId    = (int)($_POST['id'] ?? 0);
-    $tenantId    = (int)($_POST['tenant_id'] ?? 0);
-    $holidayDate = trim($_POST['holiday_date'] ?? '');
+    $targetId  = (int)($_POST['id'] ?? 0);
+    $tenantId  = (int)($_POST['tenant_id'] ?? 0);
+    $startDate = trim($_POST['start_date'] ?? '');
+    $endDate   = trim($_POST['end_date'] ?? '');
     $description = trim($_POST['description'] ?? '');
 
-    if ($targetId <= 0 || $tenantId <= 0 || empty($holidayDate)) {
-        header("Location: tenant_holidays.php?status=error_update&msg=" . urlencode("Semua data wajib diisi dengan benar."));
+    if ($targetId <= 0 || $tenantId <= 0 || empty($startDate) || empty($endDate)) {
+        header("Location: tenant_holidays.php?status=error_update&msg=" . urlencode("Semua kolom tanggal wajib diisi dengan benar."));
         exit;
     }
 
     try {
-        $updateStmt = $conn->prepare("UPDATE tenant_holidays SET tenant_id = ?, holiday_date = ?, description = ? WHERE id = ?");
-        $updateStmt->bind_param("issi", $tenantId, $holidayDate, $description, $targetId);
-        
-        if ($updateStmt->execute()) {
-            header("Location: tenant_holidays.php?status=success_update");
-            exit;
-        } else {
-            header("Location: tenant_holidays.php?status=error_update&msg=" . urlencode($updateStmt->error));
-            exit;
+        // Langkah A: Cari tahu konfigurasi deskripsi/keterangan lama kelompok data ini sebelum dihapus
+        $queryFindOld = "SELECT tenant_id, description FROM tenant_holidays WHERE id = ?";
+        $stmtFind = $conn->prepare($queryFindOld);
+        $stmtFind->bind_param("i", $targetId);
+        $stmtFind->execute();
+        $resOld = $stmtFind->get_result()->fetch_assoc();
+        $stmtFind->close();
+
+        if ($resOld) {
+            $oldTenantId = $resOld['tenant_id'];
+            $oldDesc     = $resOld['description'];
+
+            // Langkah B: Hapus kelompok data libur lama yang memiliki relasi tenant dan keterangan yang sama
+            $queryDeleteGroup = "DELETE FROM tenant_holidays WHERE tenant_id = ? AND description = ?";
+            $stmtDel = $conn->prepare($queryDeleteGroup);
+            $stmtDel->bind_param("is", $oldTenantId, $oldDesc);
+            $stmtDel->execute();
+            $stmtDel->close();
         }
-        $updateStmt->close();
+
+        // Langkah C: Masukkan kembali baris-baris tanggal baru hasil editan range input
+        $insertStmt = $conn->prepare("INSERT INTO tenant_holidays (tenant_id, holiday_date, description) VALUES (?, ?, ?)");
+        
+        $currentTimestamp = strtotime($startDate);
+        $endTimestamp     = strtotime($endDate);
+
+        while ($currentTimestamp <= $endTimestamp) {
+            $date = date('Y-m-d', $currentTimestamp);
+
+            $queryCheck = "SELECT id FROM tenant_holidays WHERE tenant_id = ? AND holiday_date = ?";
+            $stmtCheck = $conn->prepare($queryCheck);
+            $stmtCheck->bind_param("is", $tenantId, $date);
+            $stmtCheck->execute();
+            
+            if ($stmtCheck->get_result()->num_rows == 0) {
+                $insertStmt->bind_param("iss", $tenantId, $date, $description);
+                $insertStmt->execute();
+            }
+            $stmtCheck->close();
+            
+            $currentTimestamp = strtotime("+1 day", $currentTimestamp);
+        }
+        
+        header("Location: tenant_holidays.php?status=success_update");
+        exit;
     } catch (Throwable $e) {
         header("Location: tenant_holidays.php?status=error_update&msg=" . urlencode($e->getMessage()));
         exit;
@@ -72,24 +129,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_holiday
 }
 
 // =========================================================================
-// 3. CRUD: LOGIKA DELETE DATA LIBUR TENANT (HAPUS PERMANEN)
+// 3. CRUD: LOGIKA DELETE DATA LIBUR TENANT (HAPUS PERMANEN KELOMPOK)
 // =========================================================================
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
     $deleteId = (int)$_GET['id'];
 
     if ($deleteId > 0) {
         try {
-            $deleteStmt = $conn->prepare("DELETE FROM tenant_holidays WHERE id = ?");
-            $deleteStmt->bind_param("i", $deleteId);
-            
-            if ($deleteStmt->execute()) {
-                header("Location: tenant_holidays.php?status=success_delete");
-                exit;
-            } else {
-                header("Location: tenant_holidays.php?status=error_delete&msg=" . urlencode($deleteStmt->error));
-                exit;
+            // Mengambil info relasi data terlebih dahulu agar bisa menghapus satu kelompok grup liburan sekaligus
+            $queryFindOld = "SELECT tenant_id, description FROM tenant_holidays WHERE id = ?";
+            $stmtFind = $conn->prepare($queryFindOld);
+            $stmtFind->bind_param("i", $deleteId);
+            $stmtFind->execute();
+            $resOld = $stmtFind->get_result()->fetch_assoc();
+            $stmtFind->close();
+
+            if ($resOld) {
+                $oldTenantId = $resOld['tenant_id'];
+                $oldDesc     = $resOld['description'];
+
+                $deleteStmt = $conn->prepare("DELETE FROM tenant_holidays WHERE tenant_id = ? AND description = ?");
+                $deleteStmt->bind_param("is", $oldTenantId, $oldDesc);
+                
+                if ($deleteStmt->execute()) {
+                    header("Location: tenant_holidays.php?status=success_delete");
+                    exit;
+                } else {
+                    header("Location: tenant_holidays.php?status=error_delete&msg=" . urlencode($deleteStmt->error));
+                    exit;
+                }
+                $deleteStmt->close();
             }
-            $deleteStmt->close();
         } catch (Throwable $e) {
             header("Location: tenant_holidays.php?status=error_delete&msg=" . urlencode($e->getMessage()));
             exit;
@@ -104,11 +174,14 @@ $listHolidays = [];
 $listActiveTenants = [];
 
 try {
-    // Mengambil data libur dengan LEFT JOIN ke tabel tenants untuk menarik nama tenant asli
-    $queryRead = "SELECT th.id, th.tenant_id, th.holiday_date, th.description, t.name AS tenant_name 
+    // Meringkas deretan tanggal libur yang bermotif/berketerangan sama menjadi 1 baris menggunakan GROUP_CONCAT
+    $queryRead = "SELECT MAX(th.id) AS id, th.tenant_id, th.description, t.name AS tenant_name,
+                  GROUP_CONCAT(th.holiday_date ORDER BY th.holiday_date ASC) AS array_dates 
                   FROM tenant_holidays th 
                   LEFT JOIN tenants t ON th.tenant_id = t.id 
-                  ORDER BY th.holiday_date DESC";
+                  GROUP BY th.tenant_id, th.description, t.name
+                  ORDER BY MAX(th.holiday_date) DESC";
+                  
     $resultRead = $conn->query($queryRead);
     if ($resultRead) {
         while ($row = $resultRead->fetch_assoc()) {
@@ -187,14 +260,17 @@ try {
     </div>
 
     <!-- NOTIFIKASI STATUS OPERASI CRUD -->
-    <?php if (!empty($status)): ?>
-        <div class="alert <?= strpos($status, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
+    <?php if (!empty($status) || isset($_GET['status'])): 
+        $currentStatus = $_GET['status'] ?? $status;
+        $msgError = $_GET['msg'] ?? '';
+    ?>
+        <div class="alert <?= strpos($currentStatus, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
             <strong>
                 <?php 
-                if ($status == 'success_insert') echo "Data hari libur berhasil ditambahkan!";
-                elseif ($status == 'success_update') echo "Data hari libur berhasil diperbarui!";
-                elseif ($status == 'success_delete') echo "Data hari libur berhasil dihapus!";
-                else echo "Operasi gagal: " . htmlspecialchars($msg);
+                if ($currentStatus == 'success_insert') echo "Data hari libur berhasil ditambahkan!";
+                elseif ($currentStatus == 'success_update') echo "Data hari libur berhasil diperbarui!";
+                elseif ($currentStatus == 'success_delete') echo "Data hari libur berhasil dihapus!";
+                else echo "Operasi gagal: " . htmlspecialchars($msgError ?: $msg);
                 ?>
             </strong>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -208,7 +284,7 @@ try {
           <tr>
             <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;"> ID</th>
             <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 250px;"> Tenant Name</th>
-            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 200px;"> Holiday Date</th>
+            <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 300px;"> Holiday Date</th>
             <th class="py-3 text-white" style="background: transparent !important; border: none !important;"> Description</th>
             <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Aksi</th>
           </tr>
@@ -220,7 +296,18 @@ try {
                     <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $row['id'] ?></td>
                     <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($row['tenant_name'] ?? 'NULL (ID: '.$row['tenant_id'].')') ?></td>
                     <td class="text-center" style="background: transparent !important; border: none !important;">
-                        <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem; background: rgba(220, 53, 69, 0.15);"><i class="bi bi-calendar3 me-1"></i><?= date('d M Y', strtotime($row['holiday_date'])) ?></span>
+                        <?php 
+                        $explodedDates = !empty($row['array_dates']) ? explode(',', $row['array_dates']) : [];
+                        if (!empty($explodedDates)): 
+                            $firstDate = date('d M Y', strtotime(trim($explodedDates[0])));
+                            $lastDate = date('d M Y', strtotime(trim($explodedDates[count($explodedDates) - 1])));
+                        ?>
+                            <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem; background: rgba(220, 53, 69, 0.15);">
+                                <i class="bi bi-calendar3 me-1"></i><?= $firstDate ?> s/d <?= $lastDate ?>
+                            </span>
+                        <?php else: ?>
+                            <span class="text-muted">-</span>
+                        <?php endif; ?>
                     </td>
                     <td class="text-white-50" style="background: transparent !important; border: none !important; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><?= htmlspecialchars($row['description'] ?: '-') ?></td>
                     <td class="text-center" style="background: transparent !important; border: none !important;">
@@ -228,9 +315,9 @@ try {
                         <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditHoliday(<?= json_encode($row) ?>)'>
                           <i class="bi bi-pencil-square"></i>
                         </button>
-                        <a href="tenant_holidays.php?action=delete&id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick="return confirm('Apakah Anda yakin ingin menghapus data hari libur ini?')">
+                        <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" data-bs-toggle="modal" data-bs-target="#modalDeleteHoliday" onclick="prepareDeleteHoliday(<?= $row['id'] ?>)">
                           <i class="bi bi-trash-fill"></i>
-                        </a>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -261,7 +348,8 @@ try {
                 <input type="hidden" name="id" id="holiday_id"><div id="holiday_action_flag"></div>
                 <div class="modal-body" style="overflow: visible !important;">
                     <div class="row g-3">
-                        <div class="col-md-6">
+                        <!-- PILIH TENANT -->
+                        <div class="col-12">
                             <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Pilih Tenant <span class="text-danger">*</span></label>
                             <select class="form-select" name="tenant_id" id="holiday_tenant_id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
                                 <option value="" disabled selected>-- Pilih Tenant --</option>
@@ -270,13 +358,23 @@ try {
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        
+                        <!-- TANGGAL MULAI LIBUR -->
                         <div class="col-md-6">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Tanggal Libur <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" name="holiday_date" id="holiday_date" onclick="this.showPicker()" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Tanggal Mulai <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="start_date" id="holiday_start_date" onclick="this.showPicker()" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
                         </div>
+
+                        <!-- TANGGAL SELESAI LIBUR -->
+                        <div class="col-md-6">
+                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Tanggal Selesai <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="end_date" id="holiday_end_date" onclick="this.showPicker()" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                        </div>
+
+                        <!-- KETERANGAN -->
                         <div class="col-12">
                             <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Keterangan / Alasan Libur</label>
-                            <textarea class="form-control" name="description" id="holiday_description" rows="3" placeholder="Contoh: Libur Hari Raya Idul Fitri..." style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;"></textarea>
+                            <textarea class="form-control" name="description" id="holiday_description" rows="3" maxlength="255" placeholder="Contoh: Libur Hari Raya Idul Fitri..."></textarea>
                         </div>
                     </div>
                 </div>
@@ -289,25 +387,69 @@ try {
     </div>
 </div>
 
+<!-- MODAL KONFIRMASI HAPUS HARI LIBUR (THEME GELAP) -->
+<div class="modal fade" id="modalDeleteHoliday" tabindex="-1" aria-labelledby="modalDeleteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(12px); border: 1px solid rgba(239, 68, 68, 0.3); color: #e5e7eb; border-radius: 14px;">
+            <div class="modal-body text-center p-4">
+                <i class="bi bi-exclamation-triangle-fill text-danger d-block mb-3" style="font-size: 3rem;"></i>
+                <h5 class="modal-title fw-bold text-white mb-2" id="modalDeleteLabel">Konfirmasi Hapus</h5>
+                <p class="text-muted small mb-4">Apakah Anda yakin ingin menghapus kelompok data hari libur ini? Semua tanggal dalam grup ini akan dihapus permanen.</p>
+                <div class="d-flex justify-content-center gap-2">
+                    <button type="button" class="btn btn-sm btn-secondary px-3 rounded-2" data-bs-dismiss="modal">Batal</button>
+                    <a id="btnConfirmDeleteHolidayUrl" href="#" class="btn btn-sm btn-danger px-3 rounded-2">Ya, Hapus</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- JAVASCRIPT EVENT MOUSE DRAG TO SCROLL & HANDLER MODAL -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    if (window.history.replaceState && window.location.search) {
+        const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+    }
+
     const holSlider = document.getElementById('dragScrollHolidayContainer');
-    if (!holSlider) return;
-    let isDown = false, startX, scrollLeft;
-    holSlider.addEventListener('mousedown', (e) => {
-        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
-        isDown = true; holSlider.style.cursor = 'grabbing';
-        startX = e.pageX - holSlider.offsetLeft; scrollLeft = holSlider.scrollLeft;
-    });
-    holSlider.addEventListener('mouseleave', () => { isDown = false; holSlider.style.cursor = 'grab'; });
-    holSlider.addEventListener('mouseup', () => { isDown = false; holSlider.style.cursor = 'grab'; });
-    holSlider.addEventListener('mousemove', (e) => {
-        if (!isDown) return; e.preventDefault();
-        const x = e.pageX - holSlider.offsetLeft;
-        holSlider.scrollLeft = scrollLeft - ((x - startX) * 1.5);
-    });
+    if (holSlider) {
+        let isDown = false;
+        let startX, scrollLeft;
+        
+        holSlider.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('select') || e.target.closest('textarea')) return;
+            isDown = true; 
+            holSlider.style.cursor = 'grabbing';
+            startX = e.pageX - holSlider.offsetLeft; 
+            scrollLeft = holSlider.scrollLeft;
+        });
+        
+        holSlider.addEventListener('mouseleave', () => { isDown = false; holSlider.style.cursor = 'grab'; });
+        holSlider.addEventListener('mouseup', () => { isDown = false; holSlider.style.cursor = 'grab'; });
+        
+        holSlider.addEventListener('mousemove', (e) => {
+            if (!isDown) return; 
+            e.preventDefault();
+            const x = e.pageX - holSlider.offsetLeft;
+            holSlider.scrollLeft = scrollLeft - ((x - startX) * 1.5);
+        });
+    }
+
+    const formHoliday = document.getElementById('formHoliday');
+    if (formHoliday) {
+        formHoliday.addEventListener('submit', function (e) {
+            const startDate = document.getElementById('holiday_start_date').value;
+            const endDate = document.getElementById('holiday_end_date').value;
+
+            if (startDate && endDate && endDate < startDate) {
+                e.preventDefault();
+                alert('⚠️ Logika Salah: Tanggal Selesai tidak boleh mendahului Tanggal Mulai!');
+            }
+        });
+    }
 });
+
 function openTambahHoliday() {
     document.getElementById('formHoliday').reset();
     document.getElementById('modalHolidayLabel').innerText = 'Tambah Hari Libur Tenant';
@@ -316,20 +458,35 @@ function openTambahHoliday() {
     document.getElementById('btnSubmitHoliday').innerText = "Simpan Data";
     document.getElementById('holiday_action_flag').innerHTML = '<input type="hidden" name="action_add_holiday" value="1">';
 }
+
 function openEditHoliday(data) {
-    openTambahHoliday();
+    document.getElementById('formHoliday').reset();
     document.getElementById('modalHolidayLabel').innerText = 'Ubah Data Hari Libur';
     document.getElementById('holiday_id').value = data.id;
     document.getElementById('holiday_tenant_id').value = data.tenant_id;
-    document.getElementById('holiday_date').value = data.holiday_date;
-    document.getElementById('holiday_description').value = data.description;
+    document.getElementById('holiday_description').value = data.description ?? '';
     document.getElementById('btnSubmitHoliday').className = "btn btn-warning text-dark fw-medium";
     document.getElementById('btnSubmitHoliday').innerText = "Simpan Perubahan";
     document.getElementById('holiday_action_flag').innerHTML = '<input type="hidden" name="action_update_holiday" value="1">';
+    
+    if (data.array_dates) {
+        const dates = data.array_dates.split(',');
+        document.getElementById('holiday_start_date').value = dates[0].trim();
+        document.getElementById('holiday_end_date').value = dates[dates.length - 1].trim();
+    } else if (data.holiday_date) {
+        document.getElementById('holiday_start_date').value = data.holiday_date;
+        document.getElementById('holiday_end_date').value = data.holiday_date;
+    }
+    
     var myModal = new bootstrap.Modal(document.getElementById('modalHoliday'));
     myModal.show();
 }
+
+function prepareDeleteHoliday(id) {
+    document.getElementById('btnConfirmDeleteHolidayUrl').href = 'tenant_holidays.php?action=delete&id=' + id;
+}
 </script>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

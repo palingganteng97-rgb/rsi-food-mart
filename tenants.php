@@ -1,5 +1,5 @@
 <?php
-// tenant.php
+// tenants.php
 include "db.php"; // Memanggil koneksi database ($conn) & session_start()
 
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
@@ -18,15 +18,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
             $deleteStmt = $conn->prepare("UPDATE tenants SET deleted_at = NOW() WHERE id = ?");
             $deleteStmt->bind_param("i", $idToDelete);
             if ($deleteStmt->execute()) {
-                header("Location: tenant.php?status=success_delete");
+                header("Location: tenants.php?status=success_delete");
                 exit;
             } else {
-                header("Location: tenant.php?status=error_delete&msg=" . urlencode($deleteStmt->error));
+                header("Location: tenants.php?status=error_delete&msg=" . urlencode($deleteStmt->error));
                 exit;
             }
             $deleteStmt->close();
         } catch (Throwable $e) {
-            header("Location: tenant.php?status=error_delete&msg=" . urlencode($e->getMessage()));
+            header("Location: tenants.php?status=error_delete&msg=" . urlencode($e->getMessage()));
             exit;
         }
     }
@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_add_tenant']))
     $errorMessage = '';
 
     if (empty($tenantName) || empty($tenantType)) {
-        header("Location: tenant.php?status=error_insert&msg=" . urlencode("Nama tenant dan tipe kategori wajib diisi!"));
+        header("Location: tenants.php?status=error_insert&msg=" . urlencode("Nama tenant dan tipe kategori wajib diisi!"));
         exit;
     }
 
@@ -73,19 +73,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_add_tenant']))
             $insertStmt->bind_param("ssssssii", $tenantName, $tenantType, $tenantDesc, $uploadedLogoName, $tenantPhone, $tenantEmail, $prepTime, $defaultStatus);
             
             if ($insertStmt->execute()) {
-                header("Location: tenant.php?status=success_insert");
+                header("Location: tenants.php?status=success_insert");
                 exit;
             } else {
-                header("Location: tenant.php?status=error_insert&msg=" . urlencode($insertStmt->error));
+                header("Location: tenants.php?status=error_insert&msg=" . urlencode($insertStmt->error));
                 exit;
             }
             $insertStmt->close();
         } catch (Throwable $e) { 
-            header("Location: tenant.php?status=error_insert&msg=" . urlencode($e->getMessage()));
+            header("Location: tenants.php?status=error_insert&msg=" . urlencode($e->getMessage()));
             exit;
         }
     } else {
-        header("Location: tenant.php?status=error_insert&msg=" . urlencode($errorMessage));
+        header("Location: tenants.php?status=error_insert&msg=" . urlencode($errorMessage));
         exit;
     }
 }
@@ -130,20 +130,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_tenant'
             $updateStmt->bind_param("ssssssii", $upName, $upType, $upDesc, $finalLogoName, $upPhone, $upEmail, $upPrepTime, $targetId);
             
             if ($updateStmt->execute()) {
-                header("Location: tenant.php?status=success_update");
+                header("Location: tenants.php?status=success_update");
                 exit;
             } else {
-                header("Location: tenant.php?status=error_update&msg=" . urlencode($updateStmt->error));
+                header("Location: tenants.php?status=error_update&msg=" . urlencode($updateStmt->error));
                 exit;
             }
             $updateStmt->close();
         } catch (Throwable $e) {
-            header("Location: tenant.php?status=error_update&msg=" . urlencode($e->getMessage()));
+            header("Location: tenants.php?status=error_update&msg=" . urlencode($e->getMessage()));
             exit;
         }
     } else {
         $errorMsg = !empty($errorMessage) ? $errorMessage : "Semua kolom wajib harus diisi dengan benar.";
-        header("Location: tenant.php?status=error_update&msg=" . urlencode($errorMsg));
+        header("Location: tenants.php?status=error_update&msg=" . urlencode($errorMsg));
         exit;
     }
 }
@@ -164,7 +164,7 @@ try {
 $currentFile = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
 $menu = [
     'home.php'        => [ 'href' => 'home.php',        'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
-    'tenant.php'      => [ 'href' => 'tenant.php',      'label' => 'Tenants',      'icon' => 'bi-house' ], 
+    'tenants.php'     => [ 'href' => 'tenants.php',     'label' => 'Tenants',      'icon' => 'bi-house' ], 
     'user.php'        => [ 'href' => 'user.php',        'label' => 'User',         'icon' => 'bi-person' ],
     'roles.php'       => [ 'href' => 'roles.php',       'label' => 'Roles',        'icon' => 'bi-shield-lock' ],
     'permissions.php' => [ 'href' => 'permissions.php', 'label' => 'Permissions',  'icon' => 'bi-key' ],
@@ -222,9 +222,9 @@ $menu = [
         <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;"> Data Tenant </h2>
       </div>
       <div>
-        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalTenantRight" onclick="openTambahModal()">
-          <i class="bi bi-house-add-fill"></i> Tambah Tenant
-        </button>
+<button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" onclick="openTambahModal()">
+    <i class="bi bi-house-add-fill"></i> Tambah Tenant
+</button>
       </div>
     </div>
 
@@ -289,11 +289,12 @@ $menu = [
                         
                         <td class="text-center" style="background: transparent !important; border: none !important;">
                           <div class="d-flex justify-content-center gap-1">
-                            <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit Tenant" onclick='openEditModal(<?= json_encode($tenantRow) ?>)'>
-                              <i class="bi bi-pencil-square"></i>
+                            <button type="button" class="btn btn-sm btn-success" onclick='editTenant(<?= json_encode($tenantRow, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>
+                                <i class="bi bi-pencil-square"></i>
                             </button>
-                            <a href="tenant.php?action=delete&id=<?= $tenantRow['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete Tenant" onclick="return confirm('Apakah Anda yakin ingin menghapus tenant ini?')">
-                              <i class="bi bi-trash-fill"></i>
+                            <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger p-1" title="Delete Tenant" onclick='confirmDeleteTenant(<?= json_encode($tenantRow) ?>)'>
+                                <i class="bi bi-trash-fill" style="font-size: 1.15rem;"></i>
+                            </button>
                             </a>
                           </div>
                         </td>
@@ -328,11 +329,9 @@ $menu = [
                 <h5 class="modal-title fw-bold text-white" id="modalTenantLabel">Form Tenant</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <!-- PERBAIKAN 1: Mengubah action ke tenant.php (tanpa s) -->
-            <form id="formTenant" action="tenant.php" method="POST" enctype="multipart/form-data">
+            <form id="formTenant" action="tenants.php" method="POST" enctype="multipart/form-data">
                 <div class="modal-body" style="overflow-y: auto; max-height: calc(100vh - 130px); padding-bottom: 80px;">
                     
-                    <!-- PERBAIKAN 2: Input penanda dinamis untuk Add/Update menggunakan JavaScript -->
                     <input type="hidden" name="id" id="tenant_id">
                     <input type="hidden" name="action_add_tenant" id="action_add_trigger" value="1">
                     <input type="hidden" name="action_update_tenant" id="action_update_trigger" value="1" disabled>
@@ -344,7 +343,7 @@ $menu = [
                     </div>
                     <div class="mb-3">
                         <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Tipe Tenant</label>
-                        <select class="form-select" name="type" id="tenant_type" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                        <select class="form-select" name="type" id="tenant_type" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" onchange="toggleCustomType(this.value)" required>
                             <option value="kantin">Kantin</option>
                             <option value="cafe">Cafe</option>
                             <option value="koperasi">Koperasi</option>
@@ -354,6 +353,13 @@ $menu = [
                             <option value="lainnya">Lainnya</option>
                         </select>
                     </div>
+                    
+                    <!-- PERBAIKAN: Wadah Input Ketik Manual Saat Memilih Opsi "Lainnya" -->
+                    <div class="mb-3" id="custom_type_container" style="display: none;">
+                        <label class="form-label" style="color: #22c55e !important; font-weight: 500;">Masukkan Tipe Baru</label>
+                        <input type="text" class="form-control" id="tenant_type_custom" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(34, 197, 94, 0.4) !important; color: #e5e7eb !important;">
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Upload Logo</label>
                         <input type="file" class="form-control" name="logo" id="tenant_logo" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
@@ -384,23 +390,65 @@ $menu = [
     </div>
 </div>
 
-  <?php include "bottom_nav.php"; ?>
+<!-- Modal Konfirmasi Hapus Tenant -->
+<div class="modal fade" id="modalDeleteTenant" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px); border: 1px solid rgba(239, 68, 68, 0.25); color: #e5e7eb; border-radius: 16px;">
+            <div class="modal-body text-center p-4">
+                <div class="text-danger mb-3">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem; filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.3));"></i>
+                </div>
+                <h5 class="fw-bold text-white mb-2">Hapus Tenant?</h5>
+                <p class="text-muted small mb-4">Tindakan ini akan menghapus data tenant <span id="delete_tenant_name" class="text-white fw-semibold"></span>. Data yang dihapus tidak dapat dikembalikan.</p>
+                <div class="d-flex gap-2 justify-content-center">
+                    <button type="button" class="btn btn-sm btn-secondary rounded-3 px-3 py-2" data-bs-dismiss="modal" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8;">Batal</button>
+                    <a id="btn_confirm_delete" href="#" class="btn btn-sm btn-danger rounded-3 px-3 py-2 fw-medium">Ya, Hapus</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
   
 <!-- JavaScript Integrasi Modal, Isian Form, dan Drag to Scroll -->
 <script>
+let deleteModalInstance = null;
+let tenantModalInstance = null;
+
+function confirmDeleteTenant(data) {
+    document.getElementById('delete_tenant_name').innerText = '"' + data.name + '"';
+    document.getElementById('btn_confirm_delete').href = 'tenants.php?action=delete&id=' + data.id;
+    
+    if (!deleteModalInstance) {
+        deleteModalInstance = new bootstrap.Modal(document.getElementById('modalDeleteTenant'));
+    }
+    deleteModalInstance.show();
+}
+
+function getTenantModal() {
+    if (!tenantModalInstance) {
+        tenantModalInstance = new bootstrap.Modal(document.getElementById('modalTenantRight'));
+    }
+    return tenantModalInstance;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const slider = document.querySelector('.table-responsive');
     if (!slider) return;
     let isDown = false, startX, scrollLeft;
+    
     slider.addEventListener('mousedown', (e) => {
         if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
-        isDown = true; startX = e.pageX - slider.offsetLeft; scrollLeft = slider.scrollLeft;
+        isDown = true; 
+        startX = e.pageX - slider.offsetLeft; 
+        scrollLeft = slider.scrollLeft;
     });
     slider.addEventListener('mouseleave', () => { isDown = false; });
     slider.addEventListener('mouseup', () => { isDown = false; });
     slider.addEventListener('mousemove', (e) => {
-        if (!isDown) return; e.preventDefault();
-        const x = e.pageX - slider.offsetLeft; const walk = (x - startX) * 1.5;
+        if (!isDown) return; 
+        e.preventDefault();
+        const x = e.pageX - slider.offsetLeft; 
+        const walk = (x - startX) * 1.5;
         slider.scrollLeft = scrollLeft - walk;
     });
 });
@@ -408,12 +456,12 @@ document.addEventListener('DOMContentLoaded', function() {
 function openTambahModal() {
     resetForm();
     document.getElementById('modalTenantLabel').innerText = 'Tambah Tenant';
+    getTenantModal().show();
 }
 
 function resetForm() {
     document.getElementById('formTenant').reset();
     document.getElementById('tenant_id').value = '';
-    document.getElementById('modalTenantLabel').innerText = 'Tambah Tenant';
     document.getElementById('action_add_trigger').removeAttribute('disabled');
     document.getElementById('action_update_trigger').setAttribute('disabled', 'disabled');
     toggleCustomType('kantin'); 
@@ -424,24 +472,32 @@ function editTenant(data) {
     document.getElementById('modalTenantLabel').innerText = 'Ubah Data Tenant';
     document.getElementById('action_add_trigger').setAttribute('disabled', 'disabled');
     document.getElementById('action_update_trigger').removeAttribute('disabled');
+    
     document.getElementById('tenant_id').value = data.id;
     document.getElementById('tenant_name').value = data.name;
-    document.getElementById('tenant_description').value = data.description;
-    document.getElementById('tenant_phone').value = data.phone;
-    document.getElementById('tenant_email').value = data.email;
-    document.getElementById('tenant_prep').value = data.preparation_time;
-    if (document.getElementById('tenant_old_photo')) { document.getElementById('tenant_old_photo').value = data.logo || ''; }
+    document.getElementById('tenant_description').value = data.description || '';
+    document.getElementById('tenant_phone').value = data.phone || '';
+    document.getElementById('tenant_email').value = data.email || '';
+    document.getElementById('tenant_prep').value = data.preparation_time || 15;
+    
+    if (document.getElementById('tenant_old_photo')) { 
+        document.getElementById('tenant_old_photo').value = data.logo || ''; 
+    }
 
     const selectType = document.getElementById('tenant_type');
     const standardOptions = ['kantin', 'cafe', 'koperasi', 'laundry', 'florist', 'giftshop'];
+    
     if (data.type && standardOptions.includes(data.type.toLowerCase())) {
-        selectType.value = data.type.toLowerCase(); toggleCustomType(data.type.toLowerCase());
+        selectType.value = data.type.toLowerCase(); 
+        toggleCustomType(data.type.toLowerCase());
     } else {
-        selectType.value = 'lainnya'; toggleCustomType('lainnya');
-        if (document.getElementById('tenant_type_custom')) { document.getElementById('tenant_type_custom').value = data.type || ''; }
+        selectType.value = 'lainnya'; 
+        toggleCustomType('lainnya');
+        if (document.getElementById('tenant_type_custom')) { 
+            document.getElementById('tenant_type_custom').value = data.type || ''; 
+        }
     }
-    var myModal = new bootstrap.Modal(document.getElementById('modalTenantRight'));
-    myModal.show();
+    getTenantModal().show();
 }
 
 function toggleCustomType(value) {
@@ -449,12 +505,17 @@ function toggleCustomType(value) {
     const inputCustom = document.getElementById('tenant_type_custom');
     const selectType = document.getElementById('tenant_type');
     if (!container || !inputCustom || !selectType) return;
+    
     if (value === 'lainnya') {
-        container.style.display = 'block'; inputCustom.setAttribute('name', 'type');
-        inputCustom.setAttribute('required', 'required'); selectType.removeAttribute('name');
+        container.style.display = 'block'; 
+        inputCustom.setAttribute('name', 'type');
+        inputCustom.setAttribute('required', 'required'); 
+        selectType.removeAttribute('name');
     } else {
-        container.style.display = 'none'; inputCustom.removeAttribute('name');
-        inputCustom.removeAttribute('required'); selectType.setAttribute('name', 'type');
+        container.style.display = 'none'; 
+        inputCustom.removeAttribute('name');
+        inputCustom.removeAttribute('required'); 
+        selectType.setAttribute('name', 'type');
     }
 }
 </script>

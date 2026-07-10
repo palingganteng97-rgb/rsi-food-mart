@@ -125,11 +125,11 @@ function activeClass(string $file, string $currentFile): string {
         <?php foreach ($menu as $key => $item): ?>
           <?php if (isset($item['sub'])): $isSubActive = array_key_exists($currentFile, $item['sub']); ?>
             <div class="w-100 mb-1">
-              <button class="nav-link w-100 border-0 text-start d-flex align-items-center gap-2 <?= $isSubActive ? 'active' : ''; ?>" data-bs-toggle="collapse" data-bs-target="#dropTenantsMenu" aria-expanded="<?= $isSubActive ? 'true' : 'false'; ?>" style="background:transparent; color:inherit;">
+              <button class="nav-link w-100 border-0 text-start d-flex align-items-center gap-2 <?= $isSubActive ? 'active' : ''; ?>" data-bs-toggle="collapse" data-bs-target="#dropMenu-<?= $key ?>" aria-expanded="<?= $isSubActive ? 'true' : 'false'; ?>" style="background:transparent; color:inherit;">
                 <i class="bi <?= $item['icon']; ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
                 <i class="bi bi-chevron-down small transition-arrow" style="transition: transform 0.2s; font-size: 0.75rem; opacity: 0.7;"></i>
               </button>
-              <div class="collapse <?= $isSubActive ? 'show' : ''; ?> ms-3" id="dropTenantsMenu">
+              <div class="collapse <?= $isSubActive ? 'show' : ''; ?> ms-3" id="dropMenu-<?= $key ?>">
                 <?php foreach ($item['sub'] as $subFile => $subItem): ?>
                   <a class="nav-link <?= ($currentFile === $subFile) ? 'active' : ''; ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding-left:15px;">
                     <i class="bi <?= $subItem['icon']; ?> me-2"></i><?= htmlspecialchars($subItem['label']); ?>
@@ -138,7 +138,8 @@ function activeClass(string $file, string $currentFile): string {
               </div>
             </div>
           <?php else: ?>
-            <a class="nav-link <?= ($currentFile === $key) ? 'active' : ''; ?>" href="<?= htmlspecialchars($item['href']); ?>">
+            <!-- PERBAIKAN: Menambahkan kelas utilitas layar dari array menu -->
+            <a class="nav-link <?= ($currentFile === $key) ? 'active' : ''; ?> <?= $item['class'] ?? ''; ?>" href="<?= htmlspecialchars($item['href']); ?>">
               <i class="bi <?= htmlspecialchars($item['icon']); ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
             </a>
           <?php endif; ?>
@@ -169,14 +170,16 @@ function activeClass(string $file, string $currentFile): string {
     <div class="sidebar-scroll-container py-3">
       <div class="navmenu">
         <?php foreach ($menu as $key => $item): ?>
+          <!-- FILTER MOBILE: Hanya izinkan key 'home.php' dan 'profile.php' -->
+          <?php if (!in_array($key, ['home.php', 'profile.php'])) { continue; } ?>
+
           <?php if (isset($item['sub'])): $isSubActive = array_key_exists($currentFile, $item['sub']); ?>
-            <!-- Menambahkan class pendeteksi layar mobile untuk menyembunyikan grup dropdown -->
             <div class="w-100 mb-1 <?= $item['class'] ?? ''; ?>">
-              <button class="nav-link w-100 border-0 text-start d-flex align-items-center gap-2 <?= $isSubActive ? 'active' : ''; ?>" data-bs-toggle="collapse" data-bs-target="#dropMobileTenantsMenu" aria-expanded="<?= $isSubActive ? 'true' : 'false'; ?>" style="background:transparent; color:inherit;" data-mobile-nav="1">
+              <button class="nav-link w-100 border-0 text-start d-flex align-items-center gap-2 <?= $isSubActive ? 'active' : ''; ?>" data-bs-toggle="collapse" data-bs-target="#dropMobileMenu-<?= $key ?>" aria-expanded="<?= $isSubActive ? 'true' : 'false'; ?>" style="background:transparent; color:inherit;" data-mobile-nav="1">
                 <i class="bi <?= $item['icon']; ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
                 <i class="bi bi-chevron-down small transition-arrow" style="transition: transform 0.2s; font-size: 0.75rem; opacity: 0.7;"></i>
               </button>
-              <div class="collapse <?= $isSubActive ? 'show' : ''; ?> ms-3" id="dropMobileTenantsMenu">
+              <div class="collapse <?= $isSubActive ? 'show' : ''; ?> ms-3" id="dropMobileMenu-<?= $key ?>">
                 <?php foreach ($item['sub'] as $subFile => $subItem): ?>
                   <a class="nav-link <?= ($currentFile === $subFile) ? 'active' : ''; ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding-left:15px;" data-mobile-nav="1">
                     <i class="bi <?= $subItem['icon']; ?> me-2"></i><?= htmlspecialchars($subItem['label']); ?>
@@ -185,7 +188,6 @@ function activeClass(string $file, string $currentFile): string {
               </div>
             </div>
           <?php else: ?>
-            <!-- Menambahkan class pendeteksi layar mobile untuk menyembunyikan menu tunggal -->
             <a class="nav-link <?= ($currentFile === $key) ? 'active' : ''; ?> <?= $item['class'] ?? ''; ?>" href="<?= htmlspecialchars($item['href']); ?>" data-mobile-nav="1">
               <i class="bi <?= htmlspecialchars($item['icon']); ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
             </a>

@@ -1,49 +1,35 @@
 <?php
-// ====================================================================
-// SKRIP BACKEND PHP: CRUD BRANDS (MENGGUNAKAN HEIDISQL DATA)
-// ====================================================================
-include 'db.php'; // Pastikan koneksi database Anda disimpan di variabel $conn
+include 'db.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Proteksi halaman login (Opsional)
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
 }
 
-// Inisialisasi variabel status dan pesan untuk mencegah Undefined Variable
 $status = "";
 $msg = "";
-
-// SOLUSI: Tentukan kembali direktori penyimpanan file logo brand
 $uploadDir = "uploads/brands/";
 
-// Pastikan folder penyimpanan sudah dibuat
 if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0775, true);
 }
 
-// -------------------------------------------------------------
-// LOGIKA 1: TAMBAH DATA (INSERT)
-// -------------------------------------------------------------
 if (isset($_POST['action_add_brand'])) {
     $name = mysqli_real_escape_string($conn, $_POST['name']);
-    $logoName = ""; // Default jika tidak ada upload logo
+    $logoName = "";
 
-    // Validasi dan proses upload jika ada file yang diunggah
     if (isset($_FILES['logo']) && !empty($_FILES['logo']['name'])) {
         $fileName = $_FILES['logo']['name'];
         $fileTmp  = $_FILES['logo']['tmp_name'];
         $fileExt  = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
         
-        // Atur nama unik baru untuk file mencegah nama ganda
         $logoName = "brand_" . time() . "_" . uniqid() . "." . $fileExt;
         $targetFile = $uploadDir . $logoName;
 
-        // Validasi ekstensi file gambar
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
         if (in_array($fileExt, $allowedExtensions)) {
             if (!move_uploaded_file($fileTmp, $targetFile)) {
@@ -56,7 +42,6 @@ if (isset($_POST['action_add_brand'])) {
         }
     }
 
-    // Eksekusi Query ke Database jika tidak ada error upload sebelumnya
     if ($status !== "error") {
         $query = "INSERT INTO brands (name, logo) VALUES ('$name', '$logoName')";
         if (mysqli_query($conn, $query)) {
@@ -68,21 +53,16 @@ if (isset($_POST['action_add_brand'])) {
     }
 }
 
-// -------------------------------------------------------------
-// LOGIKA 2: UBAH DATA (UPDATE)
-// -------------------------------------------------------------
 if (isset($_POST['action_update_brand'])) {
     $id = intval($_POST['id']);
     $name = mysqli_real_escape_string($conn, $_POST['name']);
 
-    // Ambil info logo lama terlebih dahulu
     $checkQuery = mysqli_query($conn, "SELECT logo FROM brands WHERE id = $id");
     $currentData = mysqli_fetch_assoc($checkQuery);
     $oldLogo = $currentData['logo'];
 
-    $logoName = $oldLogo; // Default menggunakan logo lama
+    $logoName = $oldLogo;
 
-    // Perbaikan: Pastikan array 'logo' ada sebelum dibaca
     if (isset($_FILES['logo']) && !empty($_FILES['logo']['name'])) {
         $fileName = $_FILES['logo']['name'];
         $fileTmp  = $_FILES['logo']['tmp_name'];
@@ -107,7 +87,6 @@ if (isset($_POST['action_update_brand'])) {
         }
     }
 
-    // Perbarui rekor ke database
     if ($status !== "error") {
         $query = "UPDATE brands SET name = '$name', logo = '$logoName' WHERE id = $id";
         if (mysqli_query($conn, $query)) {
@@ -119,22 +98,16 @@ if (isset($_POST['action_update_brand'])) {
     }
 }
 
-// -------------------------------------------------------------
-// LOGIKA 3: HAPUS DATA (DELETE)
-// -------------------------------------------------------------
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
 
-    // Ambil info nama file gambar lama sebelum rekornya dihapus
     $checkQuery = mysqli_query($conn, "SELECT logo FROM brands WHERE id = $id");
     if (mysqli_num_rows($checkQuery) > 0) {
         $currentData = mysqli_fetch_assoc($checkQuery);
         $oldLogo = $currentData['logo'];
 
-        // Jalankan perintah hapus rekor di database
         $query = "DELETE FROM brands WHERE id = $id";
         if (mysqli_query($conn, $query)) {
-            // Jika sukses, hapus juga file fisik gambarnya dari server
             if (!empty($oldLogo) && file_exists($uploadDir . $oldLogo)) {
                 unlink($uploadDir . $oldLogo);
             }
@@ -146,9 +119,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id']))
     }
 }
 
-// -------------------------------------------------------------
-// AMBIL DATA UNTUK DITAMPILKAN DI TABEL
-// -------------------------------------------------------------
 $listBrands = [];
 $fetchQuery = mysqli_query($conn, "SELECT * FROM brands ORDER BY id DESC");
 if ($fetchQuery) {
@@ -262,9 +232,9 @@ if ($fetchQuery) {
                                     <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditBrand(<?= json_encode($row) ?>)'>
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
-                                    <a href="brands.php?action=delete&id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick="return confirm('Apakah Anda yakin ingin menghapus brand ini?')">
+                                    <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick='confirmDeleteBrand(<?= json_encode($row) ?>)'>
                                         <i class="bi bi-trash-fill"></i>
-                                    </a>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -326,8 +296,31 @@ if ($fetchQuery) {
     </div>
 </div>
 
+<!-- MODAL HAPUS -->
+<div class="modal fade" id="modalDeleteBrand" tabindex="-1" aria-labelledby="modalDeleteBrandLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(12px); border: 1px solid rgba(239, 68, 68, 0.2); color: #e5e7eb; border-radius: 16px;">
+            <div class="modal-body text-center p-4">
+                <div class="text-danger mb-3">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem;"></i>
+                </div>
+                <h5 class="modal-title fw-bold text-white mb-2" id="modalDeleteBrandLabel">Hapus Brand / Merk?</h5>
+                <p class="text-white-50 small mb-4">
+                    Apakah Anda yakin ingin menghapus brand <span id="delete_brand_name" class="fw-bold text-white"></span>? Tindakan ini tidak dapat dibatalkan.
+                </p>
+                <div class="d-flex justify-content-center gap-2">
+                    <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal" style="border-radius: 8px;">Batal</button>
+                    <a id="btn_confirm_delete_brand" href="#" class="btn btn-danger px-4" style="border-radius: 8px;">Ya, Hapus</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- JAVASCRIPT EVENT MOUSE DRAG TO SCROLL & HANDLER MODAL -->
 <script>
+let deleteBrandModalInstance = null;
+
 function openTambahBrand() {
     document.getElementById('formBrand').reset();
     document.getElementById('modalBrandLabel').innerText = 'Tambah Brand Baru';
@@ -348,6 +341,17 @@ function openEditBrand(data) {
     var myModal = new bootstrap.Modal(document.getElementById('modalBrand'));
     myModal.show();
 }
+
+function confirmDeleteBrand(data) {
+    document.getElementById('delete_brand_name').innerText = '"' + data.name + '"';
+    document.getElementById('btn_confirm_delete_brand').href = 'brands.php?action=delete&id=' + data.id;
+    
+    if (!deleteBrandModalInstance) {
+        deleteBrandModalInstance = new bootstrap.Modal(document.getElementById('modalDeleteBrand'));
+    }
+    deleteBrandModalInstance.show();
+}
+
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

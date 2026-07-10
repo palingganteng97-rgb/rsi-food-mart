@@ -1,82 +1,93 @@
 <?php
-// ====================================================================
-// SKRIP BACKEND PHP: CRUD CATEGORIES (MENGGUNAKAN HEIDISQL DATA)
-// ====================================================================
-include 'db.php'; // Pastikan koneksi database Anda disimpan di variabel $conn
+include 'db.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Proteksi halaman login (Opsional)
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
 }
 
-// 1. PROSES TAMBAH KATEGORI BARU (INSERT)
-if (isset($_POST['tambah_category'])) {
-    $name = mysqli_real_escape_string($conn, trim($_POST['name'] ?? ''));
-    
-    // Ambil tenant_id dari session jika sistem Anda menggunakan multi-tenant
-    // Jika tidak menggunakan tenant_id, ganti menjadi NULL
-    $tenant_id = isset($_SESSION['tenant_id']) && !empty($_SESSION['tenant_id']) ? (int)$_SESSION['tenant_id'] : "NULL";
+if (isset($_POST['action_add_category'])) {
+    $name      = mysqli_real_escape_string($conn, trim($_POST['name'] ?? ''));
+    $tenant_id = isset($_POST['tenant_id']) ? (int)$_POST['tenant_id'] : 0;
 
-    if (!empty($name)) {
-        $query = "INSERT INTO categories (tenant_id, name) VALUES ($tenant_id, '$name')";
-        if (mysqli_query($conn, $query)) {
-            echo "<script>alert('Kategori baru berhasil ditambahkan!'); window.location='categories.php';</script>";
-            exit();
+    if ($tenant_id > 0 && !empty($name)) {
+        $checkTenant = mysqli_query($conn, "SELECT id FROM tenants WHERE id = $tenant_id");
+        if (mysqli_num_rows($checkTenant) > 0) {
+            $query = "INSERT INTO categories (tenant_id, name) VALUES ($tenant_id, '$name')";
+            if (mysqli_query($conn, $query)) {
+                echo "<script>alert('Kategori baru berhasil ditambahkan!'); window.location='categories.php';</script>";
+                exit();
+            } else {
+                echo "<script>alert('Gagal menyimpan: " . mysqli_real_escape_string($conn, mysqli_error($conn)) . "'); window.location='categories.php';</script>";
+                exit();
+            }
         } else {
-            echo "Error: " . mysqli_error($conn);
+            echo "<script>alert('ID Tenant tidak terdaftar!'); window.location='categories.php';</script>";
+            exit();
         }
     } else {
-        echo "<script>alert('Nama kategori tidak boleh kosong!'); window.location='categories.php';</script>";
+        echo "<script>alert('Tenant dan Nama kategori wajib diisi!'); window.location='categories.php';</script>";
         exit();
     }
 }
 
-// 2. PROSES UBAH DATA KATEGORI (UPDATE)
-if (isset($_POST['edit_category'])) {
-    $id   = (int)($_POST['id'] ?? 0);
-    $name = mysqli_real_escape_string($conn, trim($_POST['name'] ?? ''));
+if (isset($_POST['action_update_category'])) {
+    $id        = (int)($_POST['id'] ?? 0);
+    $name      = mysqli_real_escape_string($conn, trim($_POST['name'] ?? ''));
+    $tenant_id = isset($_POST['tenant_id']) ? (int)$_POST['tenant_id'] : 0;
 
-    if ($id > 0 && !empty($name)) {
-        $query = "UPDATE categories SET name = '$name' WHERE id = '$id'";
+    if ($id > 0 && $tenant_id > 0 && !empty($name)) {
+        $query = "UPDATE categories SET tenant_id = $tenant_id, name = '$name' WHERE id = $id";
         if (mysqli_query($conn, $query)) {
             echo "<script>alert('Kategori berhasil diperbarui!'); window.location='categories.php';</script>";
             exit();
         } else {
-            echo "Error: " . mysqli_error($conn);
+            echo "<script>alert('Gagal memperbarui: " . mysqli_real_escape_string($conn, mysqli_error($conn)) . "'); window.location='categories.php';</script>";
+            exit();
         }
     } else {
-        echo "<script>alert('Data tidak valid!'); window.location='categories.php';</script>";
+        echo "<script>alert('Data input ubah tidak valid!'); window.location='categories.php';</script>";
         exit();
     }
 }
 
-// 3. PROSES HAPUS KATEGORI (DELETE)
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
     $id = (int)$_GET['id'];
 
     if ($id > 0) {
-        $query = "DELETE FROM categories WHERE id = '$id'";
+        $query = "DELETE FROM categories WHERE id = $id";
         if (mysqli_query($conn, $query)) {
             echo "<script>alert('Kategori berhasil dihapus!'); window.location='categories.php';</script>";
             exit();
         } else {
-            echo "Error: " . mysqli_error($conn);
+            echo "<script>alert('Gagal menghapus data!'); window.location='categories.php';</script>";
+            exit();
         }
     }
 }
 
-// 4. MEMBACA DATA KATEGORI UNTUK DITAMPILKAN KE TABEL DESKTOP
 $listCategories = [];
-$query_select = "SELECT * FROM categories ORDER BY id ASC";
+$query_select = "SELECT categories.*, tenants.name AS tenant_name 
+                 FROM categories 
+                 INNER JOIN tenants ON categories.tenant_id = tenants.id 
+                 ORDER BY categories.id ASC";
+
 $result = mysqli_query($conn, $query_select);
 if ($result) {
     while ($row = mysqli_fetch_assoc($result)) {
         $listCategories[] = $row;
+    }
+}
+
+$listActiveTenants = [];
+$query_tenant = mysqli_query($conn, "SELECT id, name FROM tenants ORDER BY name ASC");
+if ($query_tenant) {
+    while ($row_t = mysqli_fetch_assoc($query_tenant)) {
+        $listActiveTenants[] = $row_t;
     }
 }
 ?>
@@ -123,22 +134,19 @@ if ($result) {
   <?php require __DIR__ . '/sidebar.php'; ?>
 
 <main class="content-shift p-4">
-    <!-- Container tabel dengan tema gelap transparan -->
     <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
         
-        <!-- HEADER TABEL & TOMBOL TAMBAH KATEGORI -->
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
             <div>
                 <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Categories</h2>
             </div>
             <div>
-                <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalCategory" onclick="openTambahCategory()">
+                <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" onclick="openTambahCategory()">
                     <i class="bi bi-plus-circle"></i> Tambah Kategori
                 </button>
             </div>
         </div>
 
-        <!-- NOTIFIKASI STATUS OPERASI CRUD -->
         <?php if (!empty($status)): ?>
             <div class="alert <?= strpos($status, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
                 <strong>
@@ -153,7 +161,6 @@ if ($result) {
             </div>
         <?php endif; ?>
 
-        <!-- STRUKTUR TABEL LIST DATA KATEGORI -->
         <div id="dragScrollCategoryContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
             <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 800px; user-select: none; border-collapse: collapse !important;">
                 <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
@@ -181,9 +188,9 @@ if ($result) {
                                     <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditCategory(<?= json_encode($row) ?>)'>
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
-                                    <a href="categories.php?action=delete&id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick="return confirm('Apakah Anda yakin ingin menghapus kategori ini?')">
+                                    <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick='confirmDeleteCategory(<?= json_encode($row) ?>)'>
                                         <i class="bi bi-trash-fill"></i>
-                                    </a>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -201,7 +208,6 @@ if ($result) {
     </div>
 </main>
 
-<!-- MODAL FORM INPUT MELEBAR DI TENGAH (WIDE MODE & BEBAS SCROLLBAR) -->
 <div class="modal fade" id="modalCategory" tabindex="-1" aria-labelledby="modalCategoryLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content" style="background: rgba(15, 23, 42, 0.93) !important; backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.2); color: #e5e7eb; border-radius: 16px;">
@@ -238,8 +244,37 @@ if ($result) {
     </div>
 </div>
 
+<div class="modal fade" id="modalDeleteCategory" tabindex="-1" aria-labelledby="modalDeleteCategoryLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(12px); border: 1px solid rgba(239, 68, 68, 0.2); color: #e5e7eb; border-radius: 16px;">
+            <div class="modal-body text-center p-4">
+                <div class="text-danger mb-3">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem;"></i>
+                </div>
+                <h5 class="modal-title fw-bold text-white mb-2" id="modalDeleteCategoryLabel">Hapus Kategori?</h5>
+                <p class="text-white-50 small mb-4">
+                    Apakah Anda yakin ingin menghapus kategori <span id="delete_category_name" class="fw-bold text-white"></span>? Tindakan ini tidak dapat dibatalkan.
+                </p>
+                <div class="d-flex justify-content-center gap-2">
+                    <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal" style="border-radius: 8px;">Batal</button>
+                    <a id="btn_confirm_delete_category" href="#" class="btn btn-danger px-4" style="border-radius: 8px;">Ya, Hapus</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- JAVASCRIPT EVENT MOUSE DRAG TO SCROLL & HANDLER MODAL -->
 <script>
+let deleteCategoryModalInstance = null;
+let categoryModalInstance = null;
+
+function getCategoryModal() {
+    if (!categoryModalInstance) {
+        categoryModalInstance = new bootstrap.Modal(document.getElementById('modalCategory'));
+    }
+    return categoryModalInstance;
+}
 
 function openTambahCategory() {
     document.getElementById('formCategory').reset();
@@ -248,10 +283,11 @@ function openTambahCategory() {
     document.getElementById('btnSubmitCategory').className = "btn btn-success";
     document.getElementById('btnSubmitCategory').innerText = "Simpan Data";
     document.getElementById('category_action_flag').innerHTML = '<input type="hidden" name="action_add_category" value="1">';
+    getCategoryModal().show();
 }
 
 function openEditCategory(data) {
-    openTambahCategory();
+    document.getElementById('formCategory').reset();
     document.getElementById('modalCategoryLabel').innerText = 'Ubah Data Kategori';
     document.getElementById('category_id').value = data.id;
     document.getElementById('category_tenant_id').value = data.tenant_id;
@@ -259,8 +295,17 @@ function openEditCategory(data) {
     document.getElementById('btnSubmitCategory').className = "btn btn-warning text-dark fw-medium";
     document.getElementById('btnSubmitCategory').innerText = "Simpan Perubahan";
     document.getElementById('category_action_flag').innerHTML = '<input type="hidden" name="action_update_category" value="1">';
-    var myModal = new bootstrap.Modal(document.getElementById('modalCategory'));
-    myModal.show();
+    getCategoryModal().show();
+}
+
+function confirmDeleteCategory(data) {
+    document.getElementById('delete_category_name').innerText = '"' + data.name + '"';
+    document.getElementById('btn_confirm_delete_category').href = 'categories.php?action=delete&id=' + data.id;
+    
+    if (!deleteCategoryModalInstance) {
+        deleteCategoryModalInstance = new bootstrap.Modal(document.getElementById('modalDeleteCategory'));
+    }
+    deleteCategoryModalInstance.show();
 }
 </script>
 

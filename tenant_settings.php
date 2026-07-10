@@ -20,7 +20,7 @@ if (isset($_SESSION['status'])) {
 // ==========================================
 // 1. PROSES SIMPAN / TAMBAH DATA (CREATE)
 // ==========================================
-if (isset($_POST['action']) && $_POST['action'] == 'store') {
+if (isset($_POST['action']) && $_POST['action'] == 'insert') {
     $tenant_id     = $_POST['tenant_id'];
     $auto_accept   = isset($_POST['auto_accept']) ? (int)$_POST['auto_accept'] : 0;
     $accept_order  = isset($_POST['accept_order']) ? (int)$_POST['accept_order'] : 1;
@@ -89,7 +89,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete') {
 // ==========================================
 // 4. AMBIL DATA UNTUK DITAMPILKAN (READ)
 // ==========================================
-// Query gabungan (JOIN) diasumsikan ada tabel master 'tenants' untuk mengambil 'tenant_name'
 $query  = "SELECT ts.*, t.name AS tenant_name 
            FROM tenant_settings ts 
            LEFT JOIN tenants t ON ts.tenant_id = t.id 
@@ -102,7 +101,6 @@ if ($result && $result->num_rows > 0) {
     }
 }
 
-// Mengambil list tenant aktif untuk pilihan dropdown di modal form
 $listActiveTenants = [];
 $tResult = $conn->query("SELECT id, name FROM tenants ORDER BY name ASC");
 if ($tResult && $tResult->num_rows > 0) {
@@ -185,7 +183,7 @@ if ($tResult && $tResult->num_rows > 0) {
     <?php endif; ?>
 
     <!-- STRUKTUR TABEL LIST DATA CONFIG TENANT (DRAG SCROLL & TRANSPARAN) -->
-    <div id="dragScrollSettingContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
+    <div id="dragScrollProductContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
       <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1000px; user-select: none; border-collapse: collapse !important;">
         <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
           <tr>
@@ -199,8 +197,8 @@ if ($tResult && $tResult->num_rows > 0) {
           </tr>
         </thead>
         <tbody style="background: transparent !important;">
-          <?php if (!empty($listTenantSettings)): 
-              foreach ($listTenantSettings as $row): ?>
+          <?php if (!empty($listSettings)): 
+              foreach ($listSettings as $row): ?>
                   <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
                     <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $row['id'] ?></td>
                     <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($row['tenant_name'] ?? 'ID: '.$row['tenant_id']) ?></td>
@@ -275,12 +273,15 @@ if ($tResult && $tResult->num_rows > 0) {
                         <!-- PILIH TENANT -->
                         <div class="col-12">
                             <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Pilih Tenant <span class="text-danger">*</span></label>
-                            <select class="form-select" name="tenant_id" id="setting_tenant_id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                                <option value="" disabled selected>-- Pilih Tenant --</option>
-                                <?php foreach ($listActiveTenants as $tOption): ?>
-                                    <option value="<?= $tOption['id'] ?>"><?= htmlspecialchars($tOption['name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                            <!-- Kontainer Tambahan Untuk Menjaga Dropdown Kunci Tetap Terbaca -->
+                            <div id="tenant_select_wrapper">
+                                <select class="form-select" name="tenant_id" id="setting_tenant_id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                                    <option value="" disabled selected>-- Pilih Tenant --</option>
+                                    <?php foreach ($listActiveTenants as $tOption): ?>
+                                        <option value="<?= $tOption['id'] ?>"><?= htmlspecialchars($tOption['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
                         </div>
 
                         <!-- AUTO ACCEPT -->
@@ -325,12 +326,55 @@ if ($tResult && $tResult->num_rows > 0) {
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+    const prodSlider = document.getElementById('dragScrollProductContainer');
+    if (prodSlider) {
+        let isDown = false;
+        let startX, scrollLeft;
+        
+        prodSlider.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('select')) return;
+            isDown = true; 
+            prodSlider.style.cursor = 'grabbing';
+            startX = e.pageX - prodSlider.offsetLeft; 
+            scrollLeft = prodSlider.scrollLeft;
+        });
+        
+        prodSlider.addEventListener('mouseleave', () => { isDown = false; prodSlider.style.cursor = 'grab'; });
+        prodSlider.addEventListener('mouseup', () => { isDown = false; prodSlider.style.cursor = 'grab'; });
+        
+        prodSlider.addEventListener('mousemove', (e) => {
+            if (!isDown) return; 
+            e.preventDefault();
+            const x = e.pageX - prodSlider.offsetLeft;
+            prodSlider.scrollLeft = scrollLeft - ((x - startX) * 1.5);
+        });
+    }
+
+    const formSetting = document.getElementById('formTenantSetting');
+    if (formSetting) {
+        formSetting.addEventListener('submit', function (e) {
+            const minOrder = parseFloat(document.getElementById('setting_minimum_order').value) || 0;
+            const maxOrder = parseFloat(document.getElementById('setting_maximum_order').value) || 0;
+
+            if (maxOrder > 0 && maxOrder < minOrder) {
+                e.preventDefault();
+                alert('⚠️ Logika Salah: Maximum Order tidak boleh lebih kecil dari Minimum Order!');
+            }
+        });
+    }
+});
+
 function openTambahTenantSetting() {
     document.getElementById('formTenantSetting').reset();
     document.getElementById('modalTenantSettingLabel').innerText = 'Tambah Konfigurasi Tenant';
     document.getElementById('setting_id').value = '';
     
-    // Set default value dropdown sesuai struktur bawaan DB
+    const tenantSelect = document.getElementById('setting_tenant_id');
+    tenantSelect.disabled = false;
+    tenantSelect.style.pointerEvents = 'auto';
+    tenantSelect.style.backgroundColor = 'rgba(2, 6, 23, 0.4)';
+    
     document.getElementById('setting_auto_accept').value = '0';
     document.getElementById('setting_accept_order').value = '1';
     document.getElementById('setting_minimum_order').value = '0.00';
@@ -338,14 +382,20 @@ function openTambahTenantSetting() {
     
     document.getElementById('btnSubmitTenantSetting').className = "btn btn-success";
     document.getElementById('btnSubmitTenantSetting').innerText = "Simpan Data";
-    document.getElementById('setting_action_flag').innerHTML = '<input type="hidden" name="action_add_setting" value="1">';
+    document.getElementById('setting_action_flag').innerHTML = '<input type="hidden" name="action" value="insert">';
 }
 
 function openEditTenantSetting(data) {
-    openTambahTenantSetting();
+    document.getElementById('formTenantSetting').reset();
     document.getElementById('modalTenantSettingLabel').innerText = 'Ubah Konfigurasi Tenant';
     document.getElementById('setting_id').value = data.id;
-    document.getElementById('setting_tenant_id').value = data.tenant_id;
+    
+    const tenantSelect = document.getElementById('setting_tenant_id');
+    tenantSelect.disabled = false;
+    tenantSelect.value = data.tenant_id;
+    tenantSelect.style.pointerEvents = 'none';
+    tenantSelect.style.backgroundColor = 'rgba(15, 23, 42, 0.6)';
+    
     document.getElementById('setting_auto_accept').value = data.auto_accept;
     document.getElementById('setting_accept_order').value = data.accept_order;
     document.getElementById('setting_minimum_order').value = data.minimum_order;
@@ -353,12 +403,11 @@ function openEditTenantSetting(data) {
     
     document.getElementById('btnSubmitTenantSetting').className = "btn btn-warning text-dark fw-medium";
     document.getElementById('btnSubmitTenantSetting').innerText = "Simpan Perubahan";
-    document.getElementById('setting_action_flag').innerHTML = '<input type="hidden" name="action_update_setting" value="1">';
+    document.getElementById('setting_action_flag').innerHTML = '<input type="hidden" name="action" value="update">';
     
     var myModal = new bootstrap.Modal(document.getElementById('modalTenantSetting'));
     myModal.show();
 }
-
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

@@ -2,54 +2,108 @@
 // tenant_operating_hours.php
 include "db.php"; // Memanggil koneksi database ($conn) & session_start()
 
-// Proteksi Halaman: Jika sesi user_id kosong, tendang kembali ke login.php
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
+// Menangkap notifikasi dari session untuk dicocokkan dengan alert komponen HTML Anda
+$status = '';
+$msg = '';
+if (isset($_SESSION['success'])) {
+    $status = $_SESSION['success']; 
+    unset($_SESSION['success']);
+}
+if (isset($_SESSION['error'])) {
+    $status = 'error';
+    $msg = $_SESSION['error'];
+    unset($_SESSION['error']);
+}
+
 // ==========================================
-// 1. PROSES SIMPAN / TAMBAH DATA (CREATE)
+// 1. PROSES SIMPAN / TAMBAH DATA (CREATE MULTI-HARI)
 // ==========================================
-if (isset($_POST['action']) && $_POST['action'] == 'store') {
+if (isset($_POST['action']) && $_POST['action'] == 'insert') {
     $tenant_id   = $_POST['tenant_id'];
-    $day_of_week = $_POST['day_of_week'];
+    $days        = isset($_POST['day_of_week']) ? $_POST['day_of_week'] : []; // Menangkap array hari []
     $open_time   = $_POST['open_time'];
     $close_time  = $_POST['close_time'];
-    $is_open     = isset($_POST['is_open']) ? 1 : 0; // Default di DB adalah '1' jika tidak diisi
+    $is_open     = $_POST['is_open']; 
 
-    $query = "INSERT INTO tenant_operating_hours (tenant_id, day_of_week, open_time, close_time, is_open) VALUES (?, ?, ?, ?, ?)";
-    $stmt  = $conn->prepare($query);
-    $stmt->bind_param("iissi", $tenant_id, $day_of_week, $open_time, $close_time, $is_open);
-    
-    if ($stmt->execute()) {
-        $_SESSION['success'] = "Data berhasil ditambahkan!";
+    if (!empty($days)) {
+        $query = "INSERT INTO tenant_operating_hours (tenant_id, day_of_week, open_time, close_time, is_open) VALUES (?, ?, ?, ?, ?)";
+        $stmt  = $conn->prepare($query);
+        
+        foreach ($days as $day_of_week) {
+            // Mencegah duplikasi hari yang sama untuk tenant ini agar tidak bentrok
+            $queryCheck = "SELECT id FROM tenant_operating_hours WHERE tenant_id = ? AND day_of_week = ?";
+            $stmtCheck = $conn->prepare($queryCheck);
+            $stmtCheck->bind_param("ii", $tenant_id, $day_of_week);
+            $stmtCheck->execute();
+            $resCheck = $stmtCheck->get_result();
+            
+            if ($resCheck->num_rows == 0) {
+                $stmt->bind_param("iissi", $tenant_id, $day_of_week, $open_time, $close_time, $is_open);
+                $stmt->execute();
+            }
+        }
+        $_SESSION['success'] = "success_insert";
     } else {
-        $_SESSION['error'] = "Gagal menambahkan data: " . $conn->error;
+        $_SESSION['error'] = "Silakan pilih minimal satu hari operasional!";
     }
     header("Location: tenant_operating_hours.php");
     exit;
 }
 
 // ==========================================
-// 2. PROSES UPDATE DATA (UPDATE)
+// 2. PROSES UPDATE DATA (SINKRONISASI KELOMPOK HARI AMAN)
 // ==========================================
 if (isset($_POST['action']) && $_POST['action'] == 'update') {
     $id          = $_POST['id'];
     $tenant_id   = $_POST['tenant_id'];
-    $day_of_week = $_POST['day_of_week'];
+    $days        = isset($_POST['day_of_week']) ? $_POST['day_of_week'] : []; // Menangkap array hari []
     $open_time   = $_POST['open_time'];
     $close_time  = $_POST['close_time'];
-    $is_open     = isset($_POST['is_open']) ? 1 : 0;
+    $is_open     = $_POST['is_open']; 
 
-    $query = "UPDATE tenant_operating_hours SET tenant_id = ?, day_of_week = ?, open_time = ?, close_time = ?, is_open = ? WHERE id = ?";
-    $stmt  = $conn->prepare($query);
-    $stmt->bind_param("iissii", $tenant_id, $day_of_week, $open_time, $close_time, $is_open, $id);
-    
-    if ($stmt->execute()) {
-        $_SESSION['success'] = "Data berhasil diperbarui!";
+    if (!empty($days)) {
+        // Langkah A: Cari tahu konfigurasi waktu lama sebelum di-update berdasarkan ID baris trigger
+        $queryFindOld = "SELECT open_time, close_time, is_open FROM tenant_operating_hours WHERE id = ?";
+        $stmtFind = $conn->prepare($queryFindOld);
+        $stmtFind->bind_param("i", $id);
+        $stmtFind->execute();
+        $resOld = $stmtFind->get_result()->fetch_assoc();
+
+        if ($resOld) {
+            $old_open  = $resOld['open_time'];
+            $old_close = $resOld['close_time'];
+            $old_is_open = $resOld['is_open'];
+
+            // Langkah B: Hapus kelompok waktu operasional lama yang cocok saja agar tidak merusak kelompok hari lain
+            $queryDeleteGroup = "DELETE FROM tenant_operating_hours WHERE tenant_id = ? AND open_time = ? AND close_time = ? AND is_open = ?";
+            $stmtDel = $conn->prepare($queryDeleteGroup);
+            $stmtDel->bind_param("issi", $tenant_id, $old_open, $old_close, $old_is_open);
+            $stmtDel->execute();
+        }
+
+        // Langkah C: Daftarkan ulang baris data hari yang baru dicentang di modal
+        $queryInsertNew = "INSERT INTO tenant_operating_hours (tenant_id, day_of_week, open_time, close_time, is_open) VALUES (?, ?, ?, ?, ?)";
+        $stmtIns = $conn->prepare($queryInsertNew);
+        
+        foreach ($days as $day_of_week) {
+            // Validasi: Cegah tabrakan hari jika hari baru yang dipilih sudah terpakai di kelompok jam kerja lain
+            $queryCheck = "SELECT id FROM tenant_operating_hours WHERE tenant_id = ? AND day_of_week = ?";
+            $stmtCheck = $conn->prepare($queryCheck);
+            $stmtCheck->bind_param("ii", $tenant_id, $day_of_week);
+            $stmtCheck->execute();
+            if ($stmtCheck->get_result()->num_rows == 0) {
+                $stmtIns->bind_param("iissi", $tenant_id, $day_of_week, $open_time, $close_time, $is_open);
+                $stmtIns->execute();
+            }
+        }
+        $_SESSION['success'] = "success_update";
     } else {
-        $_SESSION['error'] = "Gagal memperbarui data: " . $conn->error;
+        $_SESSION['error'] = "Silakan pilih minimal satu hari operasional!";
     }
     header("Location: tenant_operating_hours.php");
     exit;
@@ -58,27 +112,47 @@ if (isset($_POST['action']) && $_POST['action'] == 'update') {
 // ==========================================
 // 3. PROSES HAPUS DATA (DELETE)
 // ==========================================
-if (isset($_GET['delete'])) {
-    $id = $_GET['delete'];
-    
+if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
+    $id = $_GET['id'];
     $query = "DELETE FROM tenant_operating_hours WHERE id = ?";
     $stmt  = $conn->prepare($query);
     $stmt->bind_param("i", $id);
-    
     if ($stmt->execute()) {
-        $_SESSION['success'] = "Data berhasil dihapus!";
+        $_SESSION['success'] = "success_delete";
     } else {
-        $_SESSION['error'] = "Gagal menghapus data: " . $conn->error;
+        $_SESSION['error'] = $conn->error;
     }
     header("Location: tenant_operating_hours.php");
     exit;
 }
 
 // ==========================================
-// 4. AMBIL DATA UNTUK DITAMPILKAN (READ)
+// 4. AMBIL DATA UNTUK DROPDOWN & TABEL
 // ==========================================
-$query  = "SELECT * FROM tenant_operating_hours ORDER BY tenant_id ASC, day_of_week ASC";
+$listActiveTenants = [];
+$queryActiveTenants = "SELECT id, name FROM tenants WHERE deleted_at IS NULL ORDER BY name ASC";
+$resultActiveTenants = $conn->query($queryActiveTenants);
+if ($resultActiveTenants) {
+    while ($row = $resultActiveTenants->fetch_assoc()) {
+        $listActiveTenants[] = $row;
+    }
+}
+
+// PERBAIKAN GROUP BY & ONLY_FULL_GROUP_BY COMPATIBLE
+$listOperatingHours = [];
+$query  = "SELECT MAX(toh.id) as id, toh.tenant_id, toh.open_time, toh.close_time, toh.is_open, t.name as tenant_name, 
+          GROUP_CONCAT(toh.day_of_week ORDER BY toh.day_of_week ASC) as array_days 
+          FROM tenant_operating_hours toh 
+          LEFT JOIN tenants t ON toh.tenant_id = t.id 
+          GROUP BY toh.tenant_id, toh.open_time, toh.close_time, toh.is_open, t.name
+          ORDER BY toh.tenant_id ASC";
+          
 $result = $conn->query($query);
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        $listOperatingHours[] = $row;
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -122,6 +196,7 @@ $result = $conn->query($query);
 <body>
   <?php require __DIR__ . '/sidebar.php'; ?>
 
+<!-- MAIN KONTEN -->
 <main class="content-shift p-4">
   <!-- Container tabel dengan tema gelap transparan yang selaras sempurna -->
   <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
@@ -154,7 +229,7 @@ $result = $conn->query($query);
     <?php endif; ?>
 
     <!-- STRUKTUR TABEL LIST DATA JAM OPERASIONAL (DRAG SCROLL & TRANSPARAN) -->
-    <div id="dragScrollOperatingContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
+    <div id="dragScrollProductContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
       <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1000px; user-select: none; border-collapse: collapse !important;">
         <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
           <tr>
@@ -175,12 +250,68 @@ $result = $conn->query($query);
                     <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $row['id'] ?></td>
                     <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($row['tenant_name'] ?? 'ID: '.$row['tenant_id']) ?></td>
                     <td class="text-center fw-medium" style="background: transparent !important; border: none !important; color: #cbd5e1 !important;">
-                        <?= isset($hari[$row['day_of_week']]) ? $hari[$row['day_of_week']] : $row['day_of_week'] ?>
+                        <?php 
+                        $hari_map = [
+                            '1' => 'Senin', 
+                            '2' => 'Selasa', 
+                            '3' => 'Rabu', 
+                            '4' => 'Kamis', 
+                            '5' => 'Jumat', 
+                            '6' => 'Sabtu', 
+                            '0' => 'Minggu'
+                        ];
+                        
+                        $current_days = !empty($row['array_days']) ? explode(',', $row['array_days']) : [];
+                        $nama_hari = [];
+                        
+                        foreach ($current_days as $d) {
+                            if (isset($hari_map[$d])) {
+                                $nama_hari[] = $hari_map[$d];
+                            }
+                        }
+                        
+                        if (count($nama_hari) === 7) {
+                            echo 'Setiap Hari';
+                        } else {
+                            echo implode(', ', $nama_hari);
+                        }
+                        ?>
                     </td>
                     <td class="text-center text-white-50" style="background: transparent !important; border: none !important;"><?= substr($row['open_time'], 0, 5) ?></td>
                     <td class="text-center text-white-50" style="background: transparent !important; border: none !important;"><?= substr($row['close_time'], 0, 5) ?></td>
                     <td class="text-center" style="background: transparent !important; border: none !important;">
-                        <?php if ($row['is_open'] == 1): ?>
+                        <?php 
+                        // 1. Ambil waktu dan tanggal saat ini berdasarkan zona waktu lokal
+                        date_default_timezone_set('Asia/Jakarta');
+                        $currentDate = date('Y-m-d'); // Mendapatkan tanggal hari ini (Format: YYYY-MM-DD)
+                        $currentTime = date('H:i:s'); // Mendapatkan jam menit detik sekarang
+
+                        // 2. Langkah A: Periksa ke database apakah tenant ini sedang memiliki agenda libur pada TANGGAL HARI INI
+                        $queryCheckHoliday = "SELECT id FROM tenant_holidays WHERE tenant_id = ? AND holiday_date = ?";
+                        $stmtCheckHoliday = $conn->prepare($queryCheckHoliday);
+                        $stmtCheckHoliday->bind_param("is", $row['tenant_id'], $currentDate);
+                        $stmtCheckHoliday->execute();
+                        $isHoliday = $stmtCheckHoliday->get_result()->num_rows > 0;
+                        $stmtCheckHoliday->close();
+
+                        // 3. Langkah B: Tentukan status real-time berdasarkan libur kalender dan rentang jam kerja
+                        $isRealOpen = false;
+
+                        // Jika hari ini TIDAK LIBUR dan status master database bernilai aktif (1)
+                        if (!$isHoliday && $row['is_open'] == 1) {
+                            if ($row['close_time'] < $row['open_time']) {
+                                if ($currentTime >= $row['open_time'] || $currentTime <= $row['close_time']) {
+                                    $isRealOpen = true;
+                                }
+                            } else {
+                                if ($currentTime >= $row['open_time'] && $currentTime <= $row['close_time']) {
+                                    $isRealOpen = true;
+                                }
+                            }
+                        }
+                        
+                        // 4. Tampilkan badge status visual yang sesuai
+                        if ($isRealOpen): ?>
                             <span class="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem; background: rgba(25, 135, 84, 0.15);"><i class="bi bi-door-open-fill me-1"></i>Buka</span>
                         <?php else: ?>
                             <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem; background: rgba(220, 53, 69, 0.15);"><i class="bi bi-door-closed-fill me-1"></i>Tutup</span>
@@ -191,8 +322,9 @@ $result = $conn->query($query);
                         <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditOperatingHour(<?= json_encode($row) ?>)'>
                           <i class="bi bi-pencil-square"></i>
                         </button>
-                        <a href="tenant_operating_hours.php?action=delete&id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick="return confirm('Apakah Anda yakin ingin menghapus data operasional ini?')">
-                          <i class="bi bi-trash-fill"></i>
+                        <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" data-bs-toggle="modal" data-bs-target="#modalDeleteOperatingHour" onclick="prepareDeleteOperatingHour(<?= $row['id'] ?>)">
+                        <i class="bi bi-trash-fill"></i>
+                        </button>
                         </a>
                       </div>
                     </td>
@@ -237,19 +369,23 @@ $result = $conn->query($query);
                             </select>
                         </div>
 
-                        <!-- PILIH HARI -->
+                        <!-- PILIH HARI MULTIPLE (ALARM STYLE MULTI-CHECKBOX) -->
                         <div class="col-md-6">
-                            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Hari <span class="text-danger">*</span></label>
-                            <select class="form-select" name="day_of_week" id="operating_day_of_week" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                                <option value="" disabled selected>-- Pilih Hari --</option>
-                                <option value="1">Senin</option>
-                                <option value="2">Selasa</option>
-                                <option value="3">Rabu</option>
-                                <option value="4">Kamis</option>
-                                <option value="5">Jumat</option>
-                                <option value="6">Sabtu</option>
-                                <option value="0">Minggu</option>
-                            </select>
+                            <label class="form-label d-block" style="color: #94a3b8 !important; font-weight: 500;">Hari <span class="text-danger">*</span></label>
+                            <div class="d-flex flex-wrap gap-1 mt-1">
+                                <?php 
+                                $days = [
+                                    '1' => 'Sen', '2' => 'Sel', '3' => 'Rab', 
+                                    '4' => 'Kam', '5' => 'Jum', '6' => 'Sab', '0' => 'Min'
+                                ];
+                                foreach ($days as $val => $label): 
+                                ?>
+                                    <input type="checkbox" class="btn-check operating-day-checkbox" name="day_of_week[]" value="<?= $val ?>" id="day_<?= $val ?>">
+                                    <label class="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center text-white p-0" for="day_<?= $val ?>" style="width: 38px; height: 38px; font-size: 0.78rem; border-color: rgba(148, 163, 184, 0.25); cursor: pointer;">
+                                        <?= $label ?>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
 
                         <!-- JAM BUKA -->
@@ -284,39 +420,143 @@ $result = $conn->query($query);
     </div>
 </div>
 
+<!-- MODAL KONFIRMASI HAPUS (THEME GELAP) -->
+<div class="modal fade" id="modalDeleteOperatingHour" tabindex="-1" aria-labelledby="modalDeleteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(12px); border: 1px solid rgba(239, 68, 68, 0.3); color: #e5e7eb; border-radius: 14px;">
+            <div class="modal-body text-center p-4">
+                <i class="bi bi-exclamation-triangle-fill text-danger d-block mb-3" style="font-size: 3rem;"></i>
+                <h5 class="modal-title fw-bold text-white mb-2" id="modalDeleteLabel">Konfirmasi Hapus</h5>
+                <p class="text-muted small mb-4">Apakah Anda yakin ingin menghapus data operasional ini? Tindakan ini tidak dapat dibatalkan.</p>
+                <div class="d-flex justify-content-center gap-2">
+                    <button type="button" class="btn btn-sm btn-secondary px-3 rounded-2" data-bs-dismiss="modal">Batal</button>
+                    <a id="btnConfirmDeleteUrl" href="#" class="btn btn-sm btn-danger px-3 rounded-2">Ya, Hapus</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-function openTambahTenantSetting() {
-    document.getElementById('formTenantSetting').reset();
-    document.getElementById('modalTenantSettingLabel').innerText = 'Tambah Konfigurasi Tenant';
-    document.getElementById('setting_id').value = '';
-    
-    // Set default value dropdown sesuai struktur bawaan DB
-    document.getElementById('setting_auto_accept').value = '0';
-    document.getElementById('setting_accept_order').value = '1';
-    document.getElementById('setting_minimum_order').value = '0.00';
-    document.getElementById('setting_maximum_order').value = '0.00';
-    
-    document.getElementById('btnSubmitTenantSetting').className = "btn btn-success";
-    document.getElementById('btnSubmitTenantSetting').innerText = "Simpan Data";
-    document.getElementById('setting_action_flag').innerHTML = '<input type="hidden" name="action_add_setting" value="1">';
+document.addEventListener('DOMContentLoaded', function() {
+    const prodSlider = document.getElementById('dragScrollProductContainer');
+    if (prodSlider) {
+        let isDown = false;
+        let startX, scrollLeft;
+        
+        prodSlider.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('select')) return;
+            isDown = true; 
+            prodSlider.style.cursor = 'grabbing';
+            startX = e.pageX - prodSlider.offsetLeft; 
+            scrollLeft = prodSlider.scrollLeft;
+        });
+        
+        prodSlider.addEventListener('mouseleave', () => { 
+            isDown = false; 
+            prodSlider.style.cursor = 'grab'; 
+        });
+        
+        prodSlider.addEventListener('mouseup', () => { 
+            isDown = false; 
+            prodSlider.style.cursor = 'grab'; 
+        });
+        
+        prodSlider.addEventListener('mousemove', (e) => {
+            if (!isDown) return; 
+            e.preventDefault();
+            const x = e.pageX - prodSlider.offsetLeft;
+            prodSlider.scrollLeft = scrollLeft - ((x - startX) * 1.5);
+        });
+    }
+
+    const operatingIsOpen = document.getElementById('operating_is_open');
+    if (operatingIsOpen) {
+        operatingIsOpen.addEventListener('change', function () {
+            toggleTimeRequired(this.value);
+        });
+    }
+
+    const formOperating = document.getElementById('formOperatingHour');
+    if (formOperating) {
+        formOperating.addEventListener('submit', function (e) {
+            const openTimeInput = document.getElementById('operating_open_time').value;
+            const closeTimeInput = document.getElementById('operating_close_time').value;
+            const isOpen = document.getElementById('operating_is_open').value;
+
+            const checkedDays = document.querySelectorAll('.operating-day-checkbox:checked');
+            if (checkedDays.length === 0) {
+                e.preventDefault();
+                alert('⚠️ Silakan pilih minimal satu hari operasional!');
+                return;
+            }
+
+            if (isOpen === "1" && openTimeInput && closeTimeInput) {
+                if (closeTimeInput <= openTimeInput) {
+                    e.preventDefault();
+                    alert('⚠️ Logika Salah: Jam Tutup harus lebih lambat daripada Jam Buka!');
+                }
+            }
+        });
+    }
+});
+
+function openTambahOperatingHour() {
+    document.getElementById('formOperatingHour').reset();
+    document.getElementById('modalOperatingHourLabel').innerText = 'Tambah Jam Operasional';
+    document.getElementById('operating_id').value = '';
+    document.getElementById('operating_action_flag').innerHTML = '<input type="hidden" name="action" value="insert">';
+    document.getElementById('operating_tenant_id').disabled = false;
+    document.getElementById('operating_open_time').required = true;
+    document.getElementById('operating_close_time').required = true;
+
+    document.querySelectorAll('.operating-day-checkbox').forEach(cb => {
+        cb.checked = false;
+        cb.disabled = false;
+    });
 }
 
-function openEditTenantSetting(data) {
-    openTambahTenantSetting();
-    document.getElementById('modalTenantSettingLabel').innerText = 'Ubah Konfigurasi Tenant';
-    document.getElementById('setting_id').value = data.id;
-    document.getElementById('setting_tenant_id').value = data.tenant_id;
-    document.getElementById('setting_auto_accept').value = data.auto_accept;
-    document.getElementById('setting_accept_order').value = data.accept_order;
-    document.getElementById('setting_minimum_order').value = data.minimum_order;
-    document.getElementById('setting_maximum_order').value = data.maximum_order;
+function openEditOperatingHour(data) {
+    document.getElementById('formOperatingHour').reset();
+    document.getElementById('modalOperatingHourLabel').innerText = 'Edit Jam Operasional';
+    document.getElementById('operating_id').value = data.id;
+    document.getElementById('operating_action_flag').innerHTML = '<input type="hidden" name="action" value="update">';
+    document.getElementById('operating_tenant_id').value = data.tenant_id;
     
-    document.getElementById('btnSubmitTenantSetting').className = "btn btn-warning text-dark fw-medium";
-    document.getElementById('btnSubmitTenantSetting').innerText = "Simpan Perubahan";
-    document.getElementById('setting_action_flag').innerHTML = '<input type="hidden" name="action_update_setting" value="1">';
+    if (data.open_time) document.getElementById('operating_open_time').value = data.open_time.substring(0, 5);
+    if (data.close_time) document.getElementById('operating_close_time').value = data.close_time.substring(0, 5);
     
-    var myModal = new bootstrap.Modal(document.getElementById('modalTenantSetting'));
+    document.getElementById('operating_is_open').value = data.is_open;
+    toggleTimeRequired(data.is_open.toString());
+
+    // PERBAIKAN: Aktifkan semua hari & perbolehkan memilih lebih dari 1 hari secara bebas
+    document.querySelectorAll('.operating-day-checkbox').forEach(cb => {
+        cb.checked = (cb.value == data.day_of_week);
+        cb.disabled = false; 
+    });
+    
+    const modalElement = document.getElementById('modalOperatingHour');
+    const myModal = new bootstrap.Modal(modalElement);
     myModal.show();
+}
+
+function prepareDeleteOperatingHour(id) {
+    document.getElementById('btnConfirmDeleteUrl').href = 'tenant_operating_hours.php?action=delete&id=' + id;
+}
+
+function toggleTimeRequired(isOpenValue) {
+    const openTime = document.getElementById('operating_open_time');
+    const closeTime = document.getElementById('operating_close_time');
+    
+    if (isOpenValue === "0") {
+        openTime.required = false;
+        closeTime.required = false;
+        if (!openTime.value) openTime.value = "00:00";
+        if (!closeTime.value) closeTime.value = "00:00";
+    } else {
+        openTime.required = true;
+        closeTime.required = true;
+    }
 }
 </script>
 

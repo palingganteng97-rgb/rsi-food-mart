@@ -1,26 +1,18 @@
 <?php
-// ====================================================================
-// SKRIP BACKEND PHP: CRUD UNITS (SATUAN)
-// ====================================================================
-include 'db.php'; // Hubungkan ke koneksi database $conn
+include 'db.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Proteksi halaman login (Opsional)
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
 }
 
-// Inisialisasi variabel status untuk notifikasi alert
 $status = isset($_GET['status']) ? $_GET['status'] : "";
 $msg = "";
 
-// -------------------------------------------------------------
-// LOGIKA 1: TAMBAH DATA (INSERT)
-// -------------------------------------------------------------
 if (isset($_POST['action_add_unit'])) {
     $name = mysqli_real_escape_string($conn, $_POST['name']);
     $symbol = mysqli_real_escape_string($conn, $_POST['symbol']);
@@ -29,7 +21,6 @@ if (isset($_POST['action_add_unit'])) {
         $status = "error";
         $msg = "Semua bidang bertanda bintang wajib diisi.";
     } else {
-        // Validasi duplikasi simbol satuan
         $check = mysqli_query($conn, "SELECT id FROM units WHERE symbol = '$symbol' LIMIT 1");
         if (mysqli_num_rows($check) > 0) {
             $status = "error";
@@ -46,9 +37,6 @@ if (isset($_POST['action_add_unit'])) {
     }
 }
 
-// -------------------------------------------------------------
-// LOGIKA 2: UBAH DATA (UPDATE)
-// -------------------------------------------------------------
 if (isset($_POST['action_update_unit'])) {
     $id = intval($_POST['id']);
     $name = mysqli_real_escape_string($conn, $_POST['name']);
@@ -58,7 +46,6 @@ if (isset($_POST['action_update_unit'])) {
         $status = "error";
         $msg = "Semua bidang bertanda bintang wajib diisi.";
     } else {
-        // Validasi duplikasi simbol satuan pada ID yang berbeda
         $check = mysqli_query($conn, "SELECT id FROM units WHERE symbol = '$symbol' AND id != $id LIMIT 1");
         if (mysqli_num_rows($check) > 0) {
             $status = "error";
@@ -75,15 +62,8 @@ if (isset($_POST['action_update_unit'])) {
     }
 }
 
-// -------------------------------------------------------------
-// LOGIKA 3: HAPUS DATA (DELETE DIRECT / VIA PARAMETER)
-// -------------------------------------------------------------
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
-
-    // Validasi opsional: Cegah hapus jika satuan masih terikat di tabel produk
-    // $checkProduct = mysqli_query($conn, "SELECT id FROM products WHERE unit_id = $id LIMIT 1");
-    // if (mysqli_num_rows($checkProduct) > 0) { ... }
 
     $query = "DELETE FROM units WHERE id = $id";
     if (mysqli_query($conn, $query)) {
@@ -94,9 +74,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id']))
     }
 }
 
-// -------------------------------------------------------------
-// AMBIL DATA UNTUK DITAMPILKAN DI TABEL
-// -------------------------------------------------------------
 $listUnits = [];
 $fetchQuery = mysqli_query($conn, "SELECT * FROM units ORDER BY id DESC");
 if ($fetchQuery) {
@@ -147,23 +124,21 @@ if ($fetchQuery) {
 <body>
   <?php require __DIR__ . '/sidebar.php'; ?>
 
+<!-- MAIN KONTEN -->
 <main class="content-shift p-4">
-    <!-- Container tabel dengan tema gelap transparan -->
     <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
         
-        <!-- HEADER TABEL & TOMBOL TAMBAH UNIT -->
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
             <div>
                 <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Units</h2>
             </div>
             <div>
-                <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalUnit" onclick="openTambahUnit()">
+                <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" onclick="openTambahUnit()">
                     <i class="bi bi-plus-circle"></i> Tambah Satuan
                 </button>
             </div>
         </div>
 
-        <!-- NOTIFIKASI STATUS OPERASI CRUD -->
         <?php if (!empty($status)): ?>
             <div class="alert <?= strpos($status, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
                 <strong>
@@ -178,7 +153,6 @@ if ($fetchQuery) {
             </div>
         <?php endif; ?>
 
-        <!-- STRUKTUR TABEL LIST DATA UNIT -->
         <div id="dragScrollUnitContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
             <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 800px; user-select: none; border-collapse: collapse !important;">
                 <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
@@ -206,9 +180,9 @@ if ($fetchQuery) {
                                     <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditUnit(<?= json_encode($row) ?>)'>
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
-                                    <a href="units.php?action=delete&id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick="return confirm('Apakah Anda yakin ingin menghapus satuan ini?')">
+                                    <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick='confirmDeleteUnit(<?= json_encode($row) ?>)'>
                                         <i class="bi bi-trash-fill"></i>
-                                    </a>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -258,8 +232,39 @@ if ($fetchQuery) {
     </div>
 </div>
 
+<!-- MODAL HAPUS -->
+<div class="modal fade" id="modalDeleteUnit" tabindex="-1" aria-labelledby="modalDeleteUnitLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(12px); border: 1px solid rgba(239, 68, 68, 0.2); color: #e5e7eb; border-radius: 16px;">
+            <div class="modal-body text-center p-4">
+                <div class="text-danger mb-3">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem;"></i>
+                </div>
+                <h5 class="modal-title fw-bold text-white mb-2" id="modalDeleteUnitLabel">Hapus Satuan?</h5>
+                <p class="text-white-50 small mb-4">
+                    Apakah Anda yakin ingin menghapus satuan <span id="delete_unit_name" class="fw-bold text-white"></span>? Tindakan ini tidak dapat dibatalkan.
+                </p>
+                <div class="d-flex justify-content-center gap-2">
+                    <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal" style="border-radius: 8px;">Batal</button>
+                    <a id="btn_confirm_delete_unit" href="#" class="btn btn-danger px-4" style="border-radius: 8px;">Ya, Hapus</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- JAVASCRIPT EVENT MOUSE DRAG TO SCROLL & HANDLER MODAL -->
 <script>
+let deleteUnitModalInstance = null;
+let unitModalInstance = null;
+
+function getUnitModal() {
+    if (!unitModalInstance) {
+        unitModalInstance = new bootstrap.Modal(document.getElementById('modalUnit'));
+    }
+    return unitModalInstance;
+}
+
 function openTambahUnit() {
     document.getElementById('formUnit').reset();
     document.getElementById('modalUnitLabel').innerText = 'Tambah Satuan Baru';
@@ -267,10 +272,11 @@ function openTambahUnit() {
     document.getElementById('btnSubmitUnit').className = "btn btn-success";
     document.getElementById('btnSubmitUnit').innerText = "Simpan Data";
     document.getElementById('unit_action_flag').innerHTML = '<input type="hidden" name="action_add_unit" value="1">';
+    getUnitModal().show();
 }
 
 function openEditUnit(data) {
-    openTambahUnit();
+    document.getElementById('formUnit').reset();
     document.getElementById('modalUnitLabel').innerText = 'Ubah Data Satuan';
     document.getElementById('unit_id').value = data.id;
     document.getElementById('unit_name').value = data.name;
@@ -278,8 +284,17 @@ function openEditUnit(data) {
     document.getElementById('btnSubmitUnit').className = "btn btn-warning text-dark fw-medium";
     document.getElementById('btnSubmitUnit').innerText = "Simpan Perubahan";
     document.getElementById('unit_action_flag').innerHTML = '<input type="hidden" name="action_update_unit" value="1">';
-    var myModal = new bootstrap.Modal(document.getElementById('modalUnit'));
-    myModal.show();
+    getUnitModal().show();
+}
+
+function confirmDeleteUnit(data) {
+    document.getElementById('delete_unit_name').innerText = '"' + data.name + '"';
+    document.getElementById('btn_confirm_delete_unit').href = 'units.php?action=delete&id=' + data.id;
+    
+    if (!deleteUnitModalInstance) {
+        deleteUnitModalInstance = new bootstrap.Modal(document.getElementById('modalDeleteUnit'));
+    }
+    deleteUnitModalInstance.show();
 }
 </script>
 

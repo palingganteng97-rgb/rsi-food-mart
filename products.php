@@ -498,7 +498,6 @@ if ($fetchQuery) {
 </div>
 
 
-<!-- JAVASCRIPT EVENT MOUSE DRAG TO SCROLL & HANDLER MODAL -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const prodSlider = document.getElementById('dragScrollProductContainer');
@@ -541,7 +540,6 @@ function openTambahProduct() {
     document.getElementById('btnSubmitProduct').innerText = "Simpan Data";
     document.getElementById('product_action_flag').innerHTML = '<input type="hidden" name="action_add_product" value="1">';
     
-    // Sembunyikan opsi hapus gambar saat tambah data baru
     if (document.getElementById('container_hapus_image')) {
         document.getElementById('container_hapus_image').style.display = 'none';
         document.getElementById('delete_current_image').checked = false;
@@ -552,8 +550,6 @@ function openEditProduct(data) {
     openTambahProduct();
     document.getElementById('modalProductLabel').innerText = 'Ubah Data Produk';
     document.getElementById('product_id').value = data.id;
-    
-    // Mengisi elemen input dropdown & teks berdasarkan skema tabel database
     document.getElementById('product_tenant_id').value = data.tenant_id;
     document.getElementById('product_category_id').value = data.category_id;
     document.getElementById('product_brand_id').value = data.brand_id ? data.brand_id : '';
@@ -565,12 +561,10 @@ function openEditProduct(data) {
     document.getElementById('product_base_price').value = data.base_price;
     document.getElementById('product_stock').value = data.stock;
     document.getElementById('product_status').value = data.status;
-    
     document.getElementById('btnSubmitProduct').className = "btn btn-warning text-dark fw-medium";
     document.getElementById('btnSubmitProduct').innerText = "Simpan Perubahan";
     document.getElementById('product_action_flag').innerHTML = '<input type="hidden" name="action_update_product" value="1">';
     
-    // Tampilkan opsi hapus gambar jika produk tersebut saat ini memiliki gambar
     if (data.image && data.image !== "" && document.getElementById('container_hapus_image')) {
         document.getElementById('container_hapus_image').style.display = 'block';
     }
