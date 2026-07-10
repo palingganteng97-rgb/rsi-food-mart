@@ -7,7 +7,6 @@ let detailProductModalInstance = null;
 
 const grid = document.getElementById('catalogGrid');
 
-// Fungsi utama pemicu buka detail dan pengisian bodi carousel gambar dinamis
 function openDetailProduct(data) {
     document.getElementById('detail_product_name').innerText = data.name;
     document.getElementById('detail_product_category').innerText = data.category_name || 'General';
@@ -16,6 +15,49 @@ function openDetailProduct(data) {
     const formattedPrice = 'Rp ' + new Intl.NumberFormat('id-ID').format(data.base_price);
     document.getElementById('detail_product_price').innerText = formattedPrice;
 
+    // =========================================================================
+    // LOGIKA DINAMIS: MEMUAT VARIAN PRODUK DARI DATABASE KE DROPDOWN
+    // =========================================================================
+    const variantSelect = document.getElementById('detail_product_variant_select');
+    if (variantSelect) {
+        variantSelect.innerHTML = '<option value="">Memuat varian...</option>';
+
+        fetch(`get_variants.php?product_id=${data.id}`)
+            .then(response => response.json())
+            .then(variants => {
+                variantSelect.innerHTML = ''; // Bersihkan loading
+                
+                if (Array.isArray(variants) && variants.length > 0) {
+                    // Jika produk memiliki pilihan varian terdaftar
+                    variants.forEach(v => {
+                        const option = document.createElement('option');
+                        option.value = v.id;
+                        option.className = 'bg-dark text-white'; // Menyelaraskan tema gelap select option
+                        option.innerText = v.name;
+                        variantSelect.appendChild(option);
+                    });
+                } else {
+                    // Jika produk tidak diatur memiliki varian
+                    variantSelect.innerHTML = '<option value="" class="bg-dark text-white">Original / Normal</option>';
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching variants:', err);
+                variantSelect.innerHTML = '<option value="" class="bg-dark text-white">Gagal memuat varian</option>';
+            });
+    }
+
+    // =========================================================================
+    // LOGIKA DINAMIS: RESET AREA INPUTAN TEXT CATATAN KUSTOM SETIAP BUKA MODAL
+    // =========================================================================
+    const notesInput = document.getElementById('detail_product_notes_input');
+    if (notesInput) {
+        notesInput.value = ""; // Mengosongkan ketikan pembeli sebelumnya
+    }
+
+    // =========================================================================
+    // LOGIKA SLIDER GAMBAR GALERI
+    // =========================================================================
     const carouselInner = document.getElementById('detail_product_carousel_inner');
     const prevBtn = document.getElementById('carousel_btn_prev');
     const nextBtn = document.getElementById('carousel_btn_next');
@@ -23,7 +65,6 @@ function openDetailProduct(data) {
     if (carouselInner) {
         carouselInner.innerHTML = '<div class="text-center p-3 text-white-50 small"><div class="spinner-border spinner-border-sm text-success me-2"></div>Memuat foto...</div>';
         
-        // Memanggil API Fetch independen
         fetch(`api_get_gallery.php?product_id=${data.id}`)
             .then(response => response.json())
             .then(galleryImages => {
@@ -43,7 +84,7 @@ function openDetailProduct(data) {
                     const activeClass = index === 0 ? 'active' : '';
                     carouselInner.innerHTML += `
                         <div class="carousel-item ${activeClass}" style="overflow: hidden !important;">
-                            <img src="${src}" class="d-block mx-auto" style="width: 250px !important; min-width: 250px !important; max-width: 250px !important; height: 220px !important; object-fit: cover; border-radius: 12px;" onerror="this.src='uploads/products/default.png'">
+                            <img src="${src}" class="d-block mx-auto" style="width: 380px !important; min-width: 380px !important; max-width: 380px !important; height: 320px !important; object-fit: cover; border-radius: 14px;" onerror="this.src='uploads/products/default.png'">
                         </div>
                     `;
                 });
@@ -63,7 +104,7 @@ function openDetailProduct(data) {
                 const mainSrc = data.image ? `uploads/products/${data.image}` : 'uploads/products/default.png';
                 carouselInner.innerHTML = `
                     <div class="carousel-item active">
-                        <img src="${mainSrc}" class="d-block w-100" style="height: 220px; object-fit: cover; border-radius: 12px;">
+                        <img src="${mainSrc}" class="d-block w-100" style="height: 320px; object-fit: cover; border-radius: 14px;">
                     </div>
                 `;
                 if (prevBtn && nextBtn) {
@@ -73,11 +114,25 @@ function openDetailProduct(data) {
             });
     }
     
+    // =========================================================================
+    // LOGIKA TOMBOL KERANJANG BELI (GABUNGAN VARIAN & CATATAN)
+    // =========================================================================
     const cartBtn = document.getElementById('btn_detail_add_cart');
     cartBtn.onclick = function() {
-        tambahKeKeranjang(data.id, data.name, data.base_price, data.image);
+        // 1. Ambil teks nama varian terpilih dari dropdown (misal: "Pedas")
+        const selectedVariantText = variantSelect && variantSelect.options[variantSelect.selectedIndex] ? variantSelect.options[variantSelect.selectedIndex].text : '';
         
-        // Penutupan modal yang aman dari resiko backdrop hitam transparan tersangkut macet
+        // Gabungkan ke nama produk utama jika bukan opsi default bawaan
+        const finalProductName = selectedVariantText && !selectedVariantText.includes('Original') && !selectedVariantText.includes('Memuat') && !selectedVariantText.includes('Gagal') 
+            ? `${data.name} (${selectedVariantText})` 
+            : data.name;
+        
+        // 2. Ambil teks kustom ketikan bebas dari input catatan pembeli
+        const userNotes = notesInput ? notesInput.value.trim() : "";
+        
+        // Kirim data gabungan varian dan catatan teks langsung ke fungsi keranjang belanja Anda
+        tambahKeKeranjang(data.id, finalProductName, data.base_price, data.image, userNotes);
+        
         const modalEl = document.getElementById('modalDetailProduct');
         if (modalEl) {
             const instance = bootstrap.Modal.getInstance(modalEl);

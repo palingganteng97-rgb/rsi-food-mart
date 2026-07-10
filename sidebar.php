@@ -18,6 +18,7 @@ $menu = [
             'units.php'          => [ 'href' => 'units.php',          'label' => 'Satuan / Units',  'icon' => 'bi-calculator-fill' ],
             'products.php'       => [ 'href' => 'products.php',       'label' => 'Data Produk',     'icon' => 'bi-box-seam-fill' ],
             'product_images.php' => [ 'href' => 'product_images.php', 'label' => 'Gambar Produk',   'icon' => 'bi-images' ],
+            'product_variants.php' => [ 'href' => 'product_variants.php', 'label' => 'Varian Produk',   'icon' => 'bi-grid-3x3-gap-fill' ],
         ]
     ],
 

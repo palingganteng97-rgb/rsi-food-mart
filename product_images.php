@@ -296,7 +296,6 @@ if ($fetchQuery) {
     </div>
 </main>
 
-
 <div class="modal fade" id="modalGallery" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <form action="product_images.php" method="POST" id="formGallery" enctype="multipart/form-data" class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb; border-radius: 16px;">
@@ -344,7 +343,6 @@ if ($fetchQuery) {
     </div>
 </div>
 
-
 <div class="modal fade" id="modalConfirmDeleteGallery" tabindex="-1" aria-labelledby="modalConfirmDeleteGalleryLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content text-bg-dark border-secondary" style="background-color: #111827 !important; border-color: #374151 !important; border-radius: 16px;">
@@ -368,7 +366,6 @@ if ($fetchQuery) {
     </div>
   </div>
 </div>
-
 
 <script>
 function openTambahGallery() {
