@@ -40,6 +40,49 @@ function openDetailProduct(data) {
             .catch(err => { variantSelect.innerHTML = '<option value="">Gagal memuat</option>'; });
     }
 
+        // =========================================================================
+    // LOGIKA DINAMIS: MEMUAT RIWAYAT ULASAN & TESTIMONI DARI DATABASE
+    // =========================================================================
+    const reviewsContainer = document.getElementById('detail_product_reviews_container');
+    if (reviewsContainer) {
+        reviewsContainer.innerHTML = '<div class="text-white-50 small"><div class="spinner-border spinner-border-sm text-warning me-2"></div>Memuat ulasan pasien...</div>';
+        
+        fetch(`get_reviews.php?product_id=${data.id}`)
+            .then(response => response.json())
+            .then(reviews => {
+                reviewsContainer.innerHTML = ''; // Bersihkan loading
+                
+                if (Array.isArray(reviews) && reviews.length > 0) {
+                    reviews.forEach(r => {
+                        // Membuat representasi visual bintang emas (★) dan abu-abu (☆)
+                        let starsHtml = '';
+                        const starCount = parseInt(r.rating);
+                        for (let i = 1; i <= 5; i++) {
+                            starsHtml += i <= starCount ? '★' : '☆';
+                        }
+
+                        // Menyuntikkan template boks ulasan dengan tema premium gelap transparan
+                        reviewsContainer.innerHTML += `
+                            <div class="p-3 rounded-3" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.1);">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-warning fw-bold" style="letter-spacing: 1px;">${starsHtml}</span>
+                                    <span class="text-muted small" style="font-size: 0.75rem;">Pasien RSI</span>
+                                </div>
+                                <p class="text-light-50 m-0 small" style="line-height: 1.5;">"${r.review}"</p>
+                            </div>
+                        `;
+                    });
+                } else {
+                    // Tampilan jika produk tersebut belum pernah diulas oleh pasien mana pun
+                    reviewsContainer.innerHTML = '<div class="text-white-50 small opacity-50 text-center py-2">Belum ada ulasan untuk menu sehat ini.</div>';
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching reviews:', err);
+                reviewsContainer.innerHTML = '<div class="text-danger small">Gagal memuat ulasan produk.</div>';
+            });
+    }
+
     // =========================================================================
     // LOGIKA DINAMIS: MEMUAT TOPPING / ADDON PRODUK (SELECT DROPDOWN)
     // =========================================================================

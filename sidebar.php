@@ -9,17 +9,22 @@ $currentFile = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
 $menu = [
     'home.php'      => [ 'href' => 'home.php', 'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
     
-    // PERBAIKAN: Disatukan menjadi satu grup tunggal agar sub-menu lengkap tidak saling menimpa
-    'produk_group'  => [
-        'label' => 'Produk', 'icon' => 'bi-bag-dash-fill', 'class' => '',
+    'master_group'  => [
+        'label' => 'Master Data', 'icon' => 'bi-layers-half', 'class' => '',
         'sub'   => [
             'categories.php'     => [ 'href' => 'categories.php',     'label' => 'Kategori Produk', 'icon' => 'bi-tags-fill' ],
             'brands.php'         => [ 'href' => 'brands.php',         'label' => 'Brand / Merk',    'icon' => 'bi-patch-check-fill' ],
             'units.php'          => [ 'href' => 'units.php',          'label' => 'Satuan / Units',  'icon' => 'bi-calculator-fill' ],
+        ]
+    ],
+    'produk_group'  => [
+        'label' => 'Produk', 'icon' => 'bi-bag-dash-fill', 'class' => '',
+        'sub'   => [
             'products.php'       => [ 'href' => 'products.php',       'label' => 'Data Produk',     'icon' => 'bi-box-seam-fill' ],
             'product_images.php' => [ 'href' => 'product_images.php', 'label' => 'Gambar Produk',   'icon' => 'bi-images' ],
             'product_variants.php' => [ 'href' => 'product_variants.php', 'label' => 'Varian Produk',   'icon' => 'bi-grid-3x3-gap-fill' ],
             'product_addons.php'   => [ 'href' => 'product_addons.php',   'label' => 'Topping Produk',  'icon' => 'bi-egg-fried' ],
+            'product_reviews.php'  => [ 'href' => 'product_reviews.php',  'label' => 'Ulasan Produk',   'icon' => 'bi-star-fill' ],
         ]
     ],
 
