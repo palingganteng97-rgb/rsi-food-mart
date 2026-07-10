@@ -10,6 +10,13 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
 
 $userName = $_SESSION['name'] ?? 'Pasien';
 
+// --- TAMBAHKAN QUERY INI UNTUK MENGHITUNG KELUARAN JUMLAH ITEM AWAL ---
+$patient_session_id = $_SESSION['patient_session_id'] ?? 1;
+$countCartQuery = mysqli_query($conn, "SELECT SUM(ci.qty) AS total_items FROM cart_items ci JOIN carts c ON ci.cart_id = c.id WHERE c.patient_session_id = $patient_session_id");
+$countCartData = mysqli_fetch_assoc($countCartQuery);
+$initialCartCount = (int)($countCartData['total_items'] ?? 0);
+// --------------------------------------------------------------------
+
 // AMBIL DATA UTAMA PRODUK UNTUK ETALASE HOME
 $listActiveProducts = [];
 $sql = "SELECT p.*, c.name AS category_name 
@@ -111,7 +118,6 @@ if ($fetchQuery) {
         <div id="catalogGrid" class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mt-2 mb-5">
             <?php if (!empty($listActiveProducts)): foreach ($listActiveProducts as $prod): ?>
                 <div class="col">
-                    <!-- PERBAIKAN: Menambahkan role, cursor pointer, dan fungsi onclick manual untuk memicu detail produk -->
                     <div class="card-food h-100 d-flex flex-column text-white" 
                          data-title="<?= htmlspecialchars($prod['name']) ?>" 
                          data-diet="<?= htmlspecialchars($prod['category_name'] ?? '') ?>"
@@ -147,8 +153,8 @@ if ($fetchQuery) {
                                 <div class="fw-bold text-success" style="font-size: 1rem;">
                                     Rp <?= number_format($prod['base_price'], 0, ',', '.') ?>
                                 </div>
-                                <!-- PERBAIKAN: Menambahkan event.stopPropagation() agar klik tombol keranjang tidak memicu modal terbuka -->
-                                <button class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" onclick="event.stopPropagation(); tambahKeKeranjang(<?= $prod['id'] ?>, '<?= htmlspecialchars(addslashes($prod['name'])) ?>')">
+                                <!-- PERBAIKAN: Menggunakan konversi json_encode agar pengiriman string judul menu ke fungsi javascript aman dari error parser kutipan string -->
+                                <button class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" onclick="event.stopPropagation(); tambahKeKeranjang(<?= (int)$prod['id'] ?>, <?= htmlspecialchars(json_encode($prod['name']), ENT_QUOTES, 'UTF-8') ?>)">
                                     <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
                                 </button>
                             </div>
@@ -191,6 +197,7 @@ if ($fetchQuery) {
                         <span class="text-muted small d-block text-start">Harga</span>
                         <h4 id="detail_product_price" class="fw-bold text-success m-0"></h4>
                     </div>
+                    <!-- PERBAIKAN: Memastikan tombol bersih dari inline-onclick agar dikontrol dinamis lewat fungsi openDetailProduct -->
                     <button type="button" id="btn_detail_add_cart" class="btn btn-success px-4 py-2 fw-medium rounded-3 d-flex align-items-center gap-2">
                         <i class="bi bi-cart-plus"></i> Tambah ke Keranjang
                     </button>
@@ -206,6 +213,8 @@ if ($fetchQuery) {
 <script>
     let currentDietFilter = '';
     let currentQuery = '';
+    
+    // Menggunakan nilai awal dummy 0 agar tidak bergantung pada database PHP
     let cartCount = 0;
     let detailProductModalInstance = null;
 
@@ -223,7 +232,12 @@ if ($fetchQuery) {
         imgElement.src = 'uploads/products/' + (data.image ? data.image : 'default.png');
         
         const cartBtn = document.getElementById('btn_detail_add_cart');
-        cartBtn.setAttribute('onclick', `tambahKeKeranjang(${data.id}, '${data.name.replace(/'/g, "\\'")}'); bootstrap.Modal.getInstance(document.getElementById('modalDetailProduct')).hide();`);
+        cartBtn.onclick = function() {
+            tambahKeKeranjang(data.id, data.name);
+            if (detailProductModalInstance) {
+                detailProductModalInstance.hide();
+            }
+        };
 
         if (!detailProductModalInstance) {
             detailProductModalInstance = new bootstrap.Modal(document.getElementById('modalDetailProduct'));
@@ -287,8 +301,10 @@ if ($fetchQuery) {
       applyFilters();
     }
 
+    // --- KODE DUMMY TAMBAH KE KERANJANG ---
     function tambahKeKeranjang(id, title = 'Menu Sehat'){
-      cartCount++;
+      cartCount += 1;
+      
       const counterText = document.getElementById('cartTotalText');
       if(counterText) {
           counterText.textContent = cartCount + ' item';
@@ -297,8 +313,6 @@ if ($fetchQuery) {
       const el = document.createElement('div');
       el.className = 'toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 m-3';
       el.role = 'alert';
-      el.ariaLive = 'assertive';
-      el.ariaAtomic = 'true';
       el.style.zIndex = 2000;
       el.innerHTML = `
         <div class="d-flex">
@@ -308,12 +322,54 @@ if ($fetchQuery) {
       document.body.appendChild(el);
       const toast = new bootstrap.Toast(el, { delay: 1400 });
       toast.show();
-      setTimeout(()=> el.remove(), 1600);
+      setTimeout(() => el.remove(), 1600);
     }
 
-    function openCart(){
-      alert('Placeholder: tombol Lihat Keranjang belum terhubung ke halaman cart.');
+    // --- KODE DUMMY MODAL DETAIL KERANJANG ---
+    function openCart() {
+        const bodyContainer = document.getElementById('cartModalBody');
+        const totalContainer = document.getElementById('cartModalTotal');
+        const btnCheckout = document.getElementById('btnCheckout');
+        
+        if(!bodyContainer || !totalContainer || !btnCheckout) return;
+
+        let myModal = bootstrap.Modal.getInstance(document.getElementById('modalCartDetail'));
+        if (!myModal) {
+            myModal = new bootstrap.Modal(document.getElementById('modalCartDetail'));
+        }
+        myModal.show();
+
+        if (cartCount > 0) {
+            const subtotal = 15000 * cartCount;
+            const formattedSubtotal = 'Rp ' + new Intl.NumberFormat('id-ID').format(subtotal);
+
+            bodyContainer.innerHTML = `
+            <div class="d-flex align-items-center mb-3 border-bottom pb-2">
+                <img src="uploads/products/default.png" style="width:50px; height:50px; object-fit:cover;" class="rounded me-3" onerror="this.src='https://placeholder.com'">
+                <div class="flex-grow-1">
+                    <h6 class="mb-0 text-white small">Nasi Goreng Kampung Sehat</h6>
+                    <small class="text-muted">Rp 15.000 x ${cartCount}</small>
+                </div>
+                <div class="text-end">
+                    <span class="text-success small fw-bold">${formattedSubtotal}</span>
+                </div>
+            </div>`;
+            
+            totalContainer.innerText = formattedSubtotal;
+            btnCheckout.removeAttribute('disabled');
+        } else {
+            bodyContainer.innerHTML = '<div class="text-center py-4 text-muted small">Keranjang belanja Anda masih kosong.</div>';
+            totalContainer.innerText = 'Rp 0';
+            btnCheckout.setAttribute('disabled', 'disabled');
+        }
     }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const counterText = document.getElementById('cartTotalText');
+        if(counterText) {
+            counterText.textContent = cartCount + ' item';
+        }
+    });
 
     btnStyleRefresh();
     applyFilters();
