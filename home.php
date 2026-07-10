@@ -67,6 +67,7 @@ if ($fetchQuery) {
 <body>
   <?php require __DIR__ . '/sidebar.php'; ?>
 
+<!-- MAIN KONTEN -->
 <main class="content-shift page-body">
     <div class="container py-3">
         <!-- HEADER ETALASE MENU -->
@@ -110,9 +111,13 @@ if ($fetchQuery) {
         <div id="catalogGrid" class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mt-2 mb-5">
             <?php if (!empty($listActiveProducts)): foreach ($listActiveProducts as $prod): ?>
                 <div class="col">
+                    <!-- PERBAIKAN: Menambahkan role, cursor pointer, dan fungsi onclick manual untuk memicu detail produk -->
                     <div class="card-food h-100 d-flex flex-column text-white" 
                          data-title="<?= htmlspecialchars($prod['name']) ?>" 
-                         data-diet="<?= htmlspecialchars($prod['category_name'] ?? '') ?>">
+                         data-diet="<?= htmlspecialchars($prod['category_name'] ?? '') ?>"
+                         role="button"
+                         onclick='openDetailProduct(<?= json_encode($prod) ?>)'
+                         style="cursor: pointer;">
                         
                         <!-- Area Gambar Produk -->
                         <div class="food-img">
@@ -142,7 +147,8 @@ if ($fetchQuery) {
                                 <div class="fw-bold text-success" style="font-size: 1rem;">
                                     Rp <?= number_format($prod['base_price'], 0, ',', '.') ?>
                                 </div>
-                                <button class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" onclick="tambahKeKeranjang(<?= $prod['id'] ?>, '<?= htmlspecialchars(addslashes($prod['name'])) ?>')">
+                                <!-- PERBAIKAN: Menambahkan event.stopPropagation() agar klik tombol keranjang tidak memicu modal terbuka -->
+                                <button class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" onclick="event.stopPropagation(); tambahKeKeranjang(<?= $prod['id'] ?>, '<?= htmlspecialchars(addslashes($prod['name'])) ?>')">
                                     <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
                                 </button>
                             </div>
@@ -150,7 +156,6 @@ if ($fetchQuery) {
                     </div>
                 </div>
             <?php endforeach; else: ?>
-                <!-- FIX TAMPILAN TEXT TERANG KETIKA DATA KOSONG -->
                 <div class="col-12 text-center py-5 w-100">
                     <div class="p-4 rounded-4" style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(148, 163, 184, 0.15);">
                         <i class="bi bi-inboxes d-block mb-3" style="font-size: 3rem; color: #94a3b8; opacity: 0.8;"></i>
@@ -165,15 +170,66 @@ if ($fetchQuery) {
     </div>
 </main>
 
+<!-- MODAL PRODUK -->
+<div class="modal fade" id="modalDetailProduct" tabindex="-1" aria-labelledby="modalDetailProductLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.2); color: #e5e7eb; border-radius: 16px;">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
+                <h5 class="modal-title fw-bold text-white" id="modalDetailProductLabel">Detail Produk</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <img id="detail_product_image" src="" alt="Gambar Produk" class="img-fluid mb-3" style="max-height: 220px; border-radius: 12px; object-fit: cover;">
+                <h4 id="detail_product_name" class="fw-bold text-white mb-1"></h4>
+                <p id="detail_product_category" class="text-muted small text-uppercase mb-3"></p>
+                <div class="p-3 rounded-3 mb-3 text-start" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.1);">
+                    <label class="small text-muted d-block mb-1">Deskripsi Hidangan:</label>
+                    <span id="detail_product_description" class="text-white-50" style="font-size: 0.9rem;"></span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center pt-2">
+                    <div>
+                        <span class="text-muted small d-block text-start">Harga</span>
+                        <h4 id="detail_product_price" class="fw-bold text-success m-0"></h4>
+                    </div>
+                    <button type="button" id="btn_detail_add_cart" class="btn btn-success px-4 py-2 fw-medium rounded-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-cart-plus"></i> Tambah ke Keranjang
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
   <?php include "bottom_nav.php"; ?>
   
+<!-- JAVASCRIPT EVENT MOUSE DRAG TO SCROLL & HANDLER MODAL -->
 <script>
     let currentDietFilter = '';
     let currentQuery = '';
     let cartCount = 0;
+    let detailProductModalInstance = null;
 
-    // Menyesuaikan ID penampung grid katalog produk dari home.php
     const grid = document.getElementById('catalogGrid');
+
+    function openDetailProduct(data) {
+        document.getElementById('detail_product_name').innerText = data.name;
+        document.getElementById('detail_product_category').innerText = data.category_name || 'General';
+        document.getElementById('detail_product_description').innerText = data.description || 'Tidak ada deskripsi untuk menu sehat ini.';
+        
+        const formattedPrice = 'Rp ' + new Intl.NumberFormat('id-ID').format(data.base_price);
+        document.getElementById('detail_product_price').innerText = formattedPrice;
+        
+        const imgElement = document.getElementById('detail_product_image');
+        imgElement.src = 'uploads/products/' + (data.image ? data.image : 'default.png');
+        
+        const cartBtn = document.getElementById('btn_detail_add_cart');
+        cartBtn.setAttribute('onclick', `tambahKeKeranjang(${data.id}, '${data.name.replace(/'/g, "\\'")}'); bootstrap.Modal.getInstance(document.getElementById('modalDetailProduct')).hide();`);
+
+        if (!detailProductModalInstance) {
+            detailProductModalInstance = new bootstrap.Modal(document.getElementById('modalDetailProduct'));
+        }
+        detailProductModalInstance.show();
+    }
 
     function setDietFilter(diet){
       currentDietFilter = diet;
@@ -203,10 +259,8 @@ if ($fetchQuery) {
 
     function applyFilters(){
       if(!grid) return;
-      // Perbaikan penargetan kelas dari .food-card menjadi .col pembungkus luar kartu
       const cards = grid.querySelectorAll('.col');
       cards.forEach(card=>{
-        // Ambil elemen pencarian di dalam card-food
         const foodCard = card.querySelector('.card-food');
         if(!foodCard) return;
 
@@ -233,16 +287,13 @@ if ($fetchQuery) {
       applyFilters();
     }
 
-    // Perbaikan: Mapping alias fungsi agar cocok dengan pemicu onclick="tambahKeKeranjang()" di home.php
     function tambahKeKeranjang(id, title = 'Menu Sehat'){
       cartCount++;
-      // Memperbarui elemen teks counter di footer bar bawah
       const counterText = document.getElementById('cartTotalText');
       if(counterText) {
           counterText.textContent = cartCount + ' item';
       }
       
-      // Render animasi Toast pemberitahuan sukses
       const el = document.createElement('div');
       el.className = 'toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 m-3';
       el.role = 'alert';
@@ -264,7 +315,6 @@ if ($fetchQuery) {
       alert('Placeholder: tombol Lihat Keranjang belum terhubung ke halaman cart.');
     }
 
-    // Jalankan inisialisasi awal
     btnStyleRefresh();
     applyFilters();
 </script>
