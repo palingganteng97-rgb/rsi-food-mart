@@ -245,7 +245,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_admin']
 <body>
   <?php require __DIR__ . '/sidebar.php'; ?>
 
-<!-- TAHAP 1: PEMBUNGKUS LUAR UTAMA (MAIN CONTAINER)    -->
 <main class="content-shift p-4">
   <!-- Container tabel dengan tema gelap transparan -->
   <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
@@ -326,8 +325,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_admin']
                             <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit User" onclick='openEditUser(<?= json_encode($userRow) ?>)'>
                               <i class="bi bi-pencil-square"></i>
                             </button>
-                            <a href="user.php?action=delete&id=<?= $userRow['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete User" onclick="return confirm('Apakah Anda yakin ingin menghapus data pengguna ini?')">
-                              <i class="bi bi-trash-fill"></i>
+                            <button type="button" class="btn btn-sm btn-danger" 
+                                    onclick="triggerDeleteUser('user.php?action=delete&id=<?php echo $row['id']; ?>', '<?php echo addslashes($row['email']); ?>')">
+                                <i class="bi bi-trash"></i>
+                            </button>
                             </a>
                           </div>
                         </td>
@@ -592,6 +593,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_admin']
     </div>
 </div>
 
+<!-- Modal Konfirmasi Hapus User -->
+<div class="modal fade" id="modalDeleteUser" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px); border: 1px solid rgba(239, 68, 68, 0.25); color: #e5e7eb; border-radius: 16px;">
+            <div class="modal-body text-center p-4">
+                <div class="text-danger mb-3">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem; filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.3));"></i>
+                </div>
+                <h5 class="fw-bold text-white mb-2">Hapus Pengguna?</h5>
+                
+                <!-- PERBAIKAN: Mengganti text-muted menjadi text-white-50 agar teks deskripsi terlihat jelas di latar belakang gelap -->
+                <p class="text-white-50 small mb-4">Tindakan ini akan menghapus data pengguna <span id="delete_user_email" class="text-white fw-semibold"></span>. Data yang dihapus tidak dapat dikembalikan.</p>
+                
+                <div class="d-flex gap-2 justify-content-center">
+                    <button type="button" class="btn btn-sm btn-secondary rounded-3 px-3 py-2" data-bs-dismiss="modal" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8;">Batal</button>
+                    <a id="btn_confirm_delete_user" href="#" class="btn btn-sm btn-danger rounded-3 px-3 py-2 fw-medium">Ya, Hapus</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- SCRIPT MANAJEMEN USER (PREVIEW, POPULATE & DRAG TO SCROLL - PERBAIKAN SCROLL MODAL) -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -611,6 +634,40 @@ document.addEventListener('DOMContentLoaded', function() {
         userSlider.scrollLeft = scrollLeft - ((x - startX) * 1.5);
     });
 });
+
+let deleteUserUrlTarget = '';
+let bootstrapDeleteUserModalInstance = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Handler untuk mengeksekusi penghapusan saat tombol "Ya, Hapus" di modal diklik
+    const btnConfirmDeleteUser = document.getElementById('btn_confirm_delete_user');
+    if (btnConfirmDeleteUser) {
+        btnConfirmDeleteUser.addEventListener('click', function(e) {
+            if (deleteUserUrlTarget) {
+                e.preventDefault();
+                window.location.href = deleteUserUrlTarget;
+            }
+        });
+    }
+});
+
+// Fungsi untuk memicu kemunculan modal secara dinamis
+function triggerDeleteUser(url, userEmail) {
+    deleteUserUrlTarget = url;
+    
+    const emailPlaceholder = document.getElementById('delete_user_email');
+    if (emailPlaceholder) {
+        emailPlaceholder.innerText = userEmail;
+    }
+    
+    const modalElement = document.getElementById('modalDeleteUser');
+    if (modalElement) {
+        if (!bootstrapDeleteUserModalInstance) {
+            bootstrapDeleteUserModalInstance = new bootstrap.Modal(modalElement);
+        }
+        bootstrapDeleteUserModalInstance.show();
+    }
+}
 
 function previewImage(input) {
     const preview = document.getElementById('tambah_preview_photo');

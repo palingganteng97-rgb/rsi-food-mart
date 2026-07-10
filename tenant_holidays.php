@@ -315,9 +315,12 @@ try {
                         <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditHoliday(<?= json_encode($row) ?>)'>
                           <i class="bi bi-pencil-square"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" data-bs-toggle="modal" data-bs-target="#modalDeleteHoliday" onclick="prepareDeleteHoliday(<?= $row['id'] ?>)">
-                          <i class="bi bi-trash-fill"></i>
-                        </button>
+<a href="javascript:void(0);" 
+   onclick="triggerDeleteHoliday('tenant_holidays_handler.php?action=delete&id=<?= $row['id'] ?>', '<?= htmlspecialchars($row['tenant_name'] ?? 'Tenant ini', ENT_QUOTES); ?>', '<?= htmlspecialchars($row['holiday_date'] ?? '', ENT_QUOTES); ?>')" 
+   class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" 
+   title="Delete">
+    <i class="bi bi-trash-fill"></i>
+</a>
                       </div>
                     </td>
                   </tr>
@@ -387,25 +390,29 @@ try {
     </div>
 </div>
 
-<!-- MODAL KONFIRMASI HAPUS HARI LIBUR (THEME GELAP) -->
-<div class="modal fade" id="modalDeleteHoliday" tabindex="-1" aria-labelledby="modalDeleteLabel" aria-hidden="true">
+<!-- Modal Konfirmasi Hapus Tenant -->
+<div class="modal fade" id="modalDeleteTenant" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
-        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(12px); border: 1px solid rgba(239, 68, 68, 0.3); color: #e5e7eb; border-radius: 14px;">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px); border: 1px solid rgba(239, 68, 68, 0.25); color: #e5e7eb; border-radius: 16px;">
             <div class="modal-body text-center p-4">
-                <i class="bi bi-exclamation-triangle-fill text-danger d-block mb-3" style="font-size: 3rem;"></i>
-                <h5 class="modal-title fw-bold text-white mb-2" id="modalDeleteLabel">Konfirmasi Hapus</h5>
-                <p class="text-muted small mb-4">Apakah Anda yakin ingin menghapus kelompok data hari libur ini? Semua tanggal dalam grup ini akan dihapus permanen.</p>
-                <div class="d-flex justify-content-center gap-2">
-                    <button type="button" class="btn btn-sm btn-secondary px-3 rounded-2" data-bs-dismiss="modal">Batal</button>
-                    <a id="btnConfirmDeleteHolidayUrl" href="#" class="btn btn-sm btn-danger px-3 rounded-2">Ya, Hapus</a>
+                <div class="text-danger mb-3">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem; filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.3));"></i>
+                </div>
+                <h5 class="fw-bold text-white mb-2">Hapus Holidays?</h5>
+                <p class="text-muted small mb-4">Tindakan ini akan menghapus data holidays <span id="delete_tenant_name" class="text-white fw-semibold"></span>. Data yang dihapus tidak dapat dikembalikan.</p>
+                <div class="d-flex gap-2 justify-content-center">
+                    <button type="button" class="btn btn-sm btn-secondary rounded-3 px-3 py-2" data-bs-dismiss="modal" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8;">Batal</button>
+                    <a id="btn_confirm_delete" href="#" class="btn btn-sm btn-danger rounded-3 px-3 py-2 fw-medium">Ya, Hapus</a>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-<!-- JAVASCRIPT EVENT MOUSE DRAG TO SCROLL & HANDLER MODAL -->
+  
 <script>
+let deleteHolidayUrlTarget = '';
+let bootstrapDeleteHolidayModalInstance = null;
+
 document.addEventListener('DOMContentLoaded', function() {
     if (window.history.replaceState && window.location.search) {
         const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
@@ -448,6 +455,17 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Menghubungkan aksi klik tombol "Ya, Hapus" di dalam modal konfirmasi baru
+    const btnActionDeleteHoliday = document.getElementById('btnConfirmDeleteHolidayAction') || document.getElementById('btn_confirm_delete');
+    if (btnActionDeleteHoliday) {
+        btnActionDeleteHoliday.addEventListener('click', function(e) {
+            if (deleteHolidayUrlTarget) {
+                e.preventDefault();
+                window.location.href = deleteHolidayUrlTarget;
+            }
+        });
+    }
 });
 
 function openTambahHoliday() {
@@ -482,8 +500,27 @@ function openEditHoliday(data) {
     myModal.show();
 }
 
-function prepareDeleteHoliday(id) {
-    document.getElementById('btnConfirmDeleteHolidayUrl').href = 'tenant_holidays.php?action=delete&id=' + id;
+function triggerDeleteHoliday(url, tenantName, holidayDate) {
+    deleteHolidayUrlTarget = url;
+    
+    // Sinkronisasi dengan elemen HTML modal hapus (bisa mendeteksi ID lama maupun ID baru)
+    const tenantPlaceholder = document.getElementById('delete_holiday_tenant') || document.getElementById('delete_tenant_name');
+    const datePlaceholder = document.getElementById('delete_holiday_date');
+    
+    if (tenantPlaceholder) tenantPlaceholder.innerText = tenantName;
+    if (datePlaceholder) {
+        datePlaceholder.innerText = holidayDate || '';
+        datePlaceholder.style.display = holidayDate ? 'inline-block' : 'none';
+    }
+    
+    // Sinkronisasi pendeteksian ID Modal Konfirmasi
+    const modalTarget = document.getElementById('modalConfirmDeleteHoliday') || document.getElementById('modalDeleteTenant');
+    if (modalTarget) {
+        if (!bootstrapDeleteHolidayModalInstance) {
+            bootstrapDeleteHolidayModalInstance = new bootstrap.Modal(modalTarget);
+        }
+        bootstrapDeleteHolidayModalInstance.show();
+    }
 }
 </script>
 

@@ -322,9 +322,12 @@ if ($result) {
                         <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditOperatingHour(<?= json_encode($row) ?>)'>
                           <i class="bi bi-pencil-square"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" data-bs-toggle="modal" data-bs-target="#modalDeleteOperatingHour" onclick="prepareDeleteOperatingHour(<?= $row['id'] ?>)">
-                        <i class="bi bi-trash-fill"></i>
-                        </button>
+                            <a href="javascript:void(0);" 
+                            onclick="triggerDeleteOperatingHour('delete_operating_hours_handler.php?id=<?= $row['id'] ?>', '<?= htmlspecialchars($row['tenant_name'] ?? 'Tenant ini', ENT_QUOTES); ?>', '<?= htmlspecialchars($row['day_of_week'] ?? '', ENT_QUOTES); ?>')" 
+                            class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" 
+                            title="Delete">
+                                <i class="bi bi-trash-fill"></i>
+                            </a>
                         </a>
                       </div>
                     </td>
@@ -420,24 +423,41 @@ if ($result) {
     </div>
 </div>
 
-<!-- MODAL KONFIRMASI HAPUS (THEME GELAP) -->
-<div class="modal fade" id="modalDeleteOperatingHour" tabindex="-1" aria-labelledby="modalDeleteLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
-        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(12px); border: 1px solid rgba(239, 68, 68, 0.3); color: #e5e7eb; border-radius: 14px;">
-            <div class="modal-body text-center p-4">
-                <i class="bi bi-exclamation-triangle-fill text-danger d-block mb-3" style="font-size: 3rem;"></i>
-                <h5 class="modal-title fw-bold text-white mb-2" id="modalDeleteLabel">Konfirmasi Hapus</h5>
-                <p class="text-muted small mb-4">Apakah Anda yakin ingin menghapus data operasional ini? Tindakan ini tidak dapat dibatalkan.</p>
-                <div class="d-flex justify-content-center gap-2">
-                    <button type="button" class="btn btn-sm btn-secondary px-3 rounded-2" data-bs-dismiss="modal">Batal</button>
-                    <a id="btnConfirmDeleteUrl" href="#" class="btn btn-sm btn-danger px-3 rounded-2">Ya, Hapus</a>
-                </div>
-            </div>
+<!-- Modal Konfirmasi Hapus Jam Operasional -->
+<div class="modal fade" id="modalConfirmDeleteHours" tabindex="-1" aria-labelledby="modalConfirmDeleteHoursLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-bg-dark border-secondary" style="background-color: #111827 !important; border-color: #374151 !important;">
+      
+      <div class="modal-header border-bottom border-secondary">
+        <h5 class="modal-title text-white fw-bold d-flex align-items-center" id="modalConfirmDeleteHoursLabel">
+          <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i> Konfirmasi Hapus
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <div class="modal-body text-center p-4">
+        <div class="mb-3">
+          <i class="bi bi-clock-history text-danger" style="font-size: 3.5rem;"></i>
         </div>
+        <p class="text-light fs-6 mb-1">Apakah Anda yakin ingin menghapus jam operasional untuk tenant berikut?</p>
+        <h6 id="delete_tenant_name" class="text-warning fw-bold mt-2 mb-0"></h6>
+        <small id="delete_tenant_day" class="text-muted d-block mt-1"></small>
+      </div>
+      
+      <div class="modal-footer border-top border-secondary justify-content-center">
+        <button type="button" class="btn btn-secondary px-4 rounded-2" data-bs-dismiss="modal">Batal</button>
+        <button type="button" id="btnConfirmDeleteHoursAction" class="btn btn-danger px-4 rounded-2 fw-bold">Oke, Hapus</button>
+      </div>
+
     </div>
+  </div>
 </div>
 
+<!-- JAVASCRIPT LOGIC -->
 <script>
+let deleteHoursUrlTarget = '';
+let bootstrapDeleteHoursModalInstance = null;
+
 document.addEventListener('DOMContentLoaded', function() {
     const prodSlider = document.getElementById('dragScrollProductContainer');
     if (prodSlider) {
@@ -499,6 +519,16 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Hubungkan aksi ke tombol "Oke, Hapus" di dalam modal konfirmasi baru
+    const btnActionDelete = document.getElementById('btnConfirmDeleteHoursAction');
+    if (btnActionDelete) {
+        btnActionDelete.addEventListener('click', function() {
+            if (deleteHoursUrlTarget) {
+                window.location.href = deleteHoursUrlTarget;
+            }
+        });
+    }
 });
 
 function openTambahOperatingHour() {
@@ -529,7 +559,6 @@ function openEditOperatingHour(data) {
     document.getElementById('operating_is_open').value = data.is_open;
     toggleTimeRequired(data.is_open.toString());
 
-    // PERBAIKAN: Aktifkan semua hari & perbolehkan memilih lebih dari 1 hari secara bebas
     document.querySelectorAll('.operating-day-checkbox').forEach(cb => {
         cb.checked = (cb.value == data.day_of_week);
         cb.disabled = false; 
@@ -540,8 +569,23 @@ function openEditOperatingHour(data) {
     myModal.show();
 }
 
-function prepareDeleteOperatingHour(id) {
-    document.getElementById('btnConfirmDeleteUrl').href = 'tenant_operating_hours.php?action=delete&id=' + id;
+// PERBAIKAN: Nama fungsi diselaraskan menjadi triggerDeleteOperatingHour sesuai tag <a> Anda
+function triggerDeleteOperatingHour(url, tenantName, dayOfWeek) {
+    // Menyimpan target URL handler (delete_operating_hours_handler.php?id=...)
+    deleteHoursUrlTarget = url;
+    
+    // Memasukkan info teks nama tenant dan hari operasional ke dalam komponen modal
+    const tenantPlaceholder = document.getElementById('delete_tenant_name');
+    const dayPlaceholder = document.getElementById('delete_tenant_day');
+    
+    if (tenantPlaceholder) tenantPlaceholder.innerText = tenantName;
+    if (dayPlaceholder) dayPlaceholder.innerText = "Hari: " + dayOfWeek;
+    
+    // Membuka jendela dialog konfirmasi modal Bootstrap 5
+    if (!bootstrapDeleteHoursModalInstance) {
+        bootstrapDeleteHoursModalInstance = new bootstrap.Modal(document.getElementById('modalConfirmDeleteHours'));
+    }
+    bootstrapDeleteHoursModalInstance.show();
 }
 
 function toggleTimeRequired(isOpenValue) {
@@ -559,7 +603,6 @@ function toggleTimeRequired(isOpenValue) {
     }
 }
 </script>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

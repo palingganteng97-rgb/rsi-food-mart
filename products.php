@@ -1,34 +1,24 @@
 <?php
-// ====================================================================
-// SKRIP BACKEND PHP: CRUD PRODUCTS (PRODUK)
-// ====================================================================
+// products.php
 include 'db.php'; // Hubungkan ke koneksi database $conn
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Proteksi halaman login (Opsional)
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
 }
 
-// Inisialisasi variabel status untuk notifikasi alert
 $status = isset($_GET['status']) ? $_GET['status'] : "";
 $msg = "";
-
-// Tentukan direktori penyimpanan file gambar produk
 $uploadDir = "uploads/products/";
 
-// Pastikan folder penyimpanan sudah dibuat
 if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0775, true);
 }
 
-// -------------------------------------------------------------
-// LOGIKA 1: TAMBAH DATA (INSERT)
-// -------------------------------------------------------------
 if (isset($_POST['action_add_product'])) {
     $tenant_id   = intval($_POST['tenant_id']);
     $category_id = intval($_POST['category_id']);
@@ -43,7 +33,6 @@ if (isset($_POST['action_add_product'])) {
     $p_status    = isset($_POST['status']) ? intval($_POST['status']) : 1;
     $imageName   = ""; 
 
-    // Validasi duplikasi SKU jika diisi
     if (!empty($sku)) {
         $checkSku = mysqli_query($conn, "SELECT id FROM products WHERE sku = '$sku' LIMIT 1");
         if (mysqli_num_rows($checkSku) > 0) {
@@ -51,7 +40,6 @@ if (isset($_POST['action_add_product'])) {
         }
     }
 
-    // Proses upload file gambar produk jika ada
     if ($status !== "error" && isset($_FILES['image']) && !empty($_FILES['image']['name'])) {
         $fileName = $_FILES['image']['name'];
         $fileTmp  = $_FILES['image']['tmp_name'];
@@ -70,7 +58,6 @@ if (isset($_POST['action_add_product'])) {
         }
     }
 
-    // Eksekusi Query Insert ke Database
     if ($status !== "error") {
         $query = "INSERT INTO products (tenant_id, category_id, brand_id, unit_id, sku, barcode, name, description, base_price, stock, image, status) 
                   VALUES ($tenant_id, $category_id, $brand_id, $unit_id, '$sku', '$barcode', '$name', '$description', $base_price, $stock, '$imageName', $p_status)";
@@ -83,9 +70,6 @@ if (isset($_POST['action_add_product'])) {
     }
 }
 
-// -------------------------------------------------------------
-// LOGIKA 2: UBAH DATA (UPDATE)
-// -------------------------------------------------------------
 if (isset($_POST['action_update_product'])) {
     $id          = intval($_POST['id']);
     $tenant_id   = intval($_POST['tenant_id']);
@@ -99,14 +83,11 @@ if (isset($_POST['action_update_product'])) {
     $base_price  = floatval($_POST['base_price']);
     $stock       = intval($_POST['stock']);
     $p_status    = isset($_POST['status']) ? intval($_POST['status']) : 1;
-
-    // Ambil info gambar lama
     $checkQuery = mysqli_query($conn, "SELECT image FROM products WHERE id = $id");
     $currentData = mysqli_fetch_assoc($checkQuery);
     $oldImage = $currentData['image'];
     $imageName = $oldImage;
 
-    // Opsi Hapus Gambar Saat Ini
     if (isset($_POST['delete_current_image']) && $_POST['delete_current_image'] == '1') {
         if (!empty($oldImage) && file_exists($uploadDir . $oldImage)) {
             unlink($uploadDir . $oldImage);
@@ -114,15 +95,12 @@ if (isset($_POST['action_update_product'])) {
         $imageName = "";
     }
 
-    // Proses upload gambar baru jika diganti
     if (isset($_FILES['image']) && !empty($_FILES['image']['name'])) {
         $fileName = $_FILES['image']['name'];
         $fileTmp  = $_FILES['image']['tmp_name'];
         $fileExt  = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-        
         $imageName = "prod_" . time() . "_" . uniqid() . "." . $fileExt;
         $targetFile = $uploadDir . $imageName;
-
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
         if (in_array($fileExt, $allowedExtensions)) {
             if (move_uploaded_file($fileTmp, $targetFile)) {
@@ -137,7 +115,6 @@ if (isset($_POST['action_update_product'])) {
         }
     }
 
-    // Eksekusi Query Update ke Database
     if ($status !== "error") {
         $query = "UPDATE products SET 
                     tenant_id = $tenant_id, 
@@ -162,29 +139,19 @@ if (isset($_POST['action_update_product'])) {
     }
 }
 
-// -------------------------------------------------------------
-// AMBIL DATA RELASI UNTUK FORM INPUT (DROPDOWN MODAL)
-// -------------------------------------------------------------
 $listTenants    = [];
 $listCategories = [];
 $listBrands     = [];
 $listUnits      = [];
-
 $qTenant = mysqli_query($conn, "SELECT id, name FROM tenants ORDER BY name ASC");
 while ($r = mysqli_fetch_assoc($qTenant)) { $listTenants[] = $r; }
-
 $qCat = mysqli_query($conn, "SELECT id, name FROM categories ORDER BY name ASC");
 while ($r = mysqli_fetch_assoc($qCat)) { $listCategories[] = $r; }
-
 $qBrand = mysqli_query($conn, "SELECT id, name FROM brands ORDER BY name ASC");
 while ($r = mysqli_fetch_assoc($qBrand)) { $listBrands[] = $r; }
-
 $qUnit = mysqli_query($conn, "SELECT id, name FROM units ORDER BY name ASC");
 while ($r = mysqli_fetch_assoc($qUnit)) { $listUnits[] = $r; }
 
-// -------------------------------------------------------------
-// AMBIL DATA UTAMA PRODUK UNTUK DITAMPILKAN DI TABEL
-// -------------------------------------------------------------
 $listProducts = [];
 $sql = "SELECT p.*, t.name AS tenant_name, c.name AS category_name, b.name AS brand_name, u.name AS unit_name 
         FROM products p 
@@ -353,7 +320,10 @@ if ($fetchQuery) {
                                     <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditProduct(<?= json_encode($row) ?>)'>
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
-                                    <a href="delete_handler.php?delete_product_id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick="return confirm('Apakah Anda yakin ingin menghapus produk ini?')">
+                                    <a href="javascript:void(0);" 
+                                    onclick="triggerDeleteModal('delete_handler.php?delete_product_id=<?= $row['id'] ?>', '<?= htmlspecialchars($row['name'] ?? 'Produk ini', ENT_QUOTES); ?>')" 
+                                    class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" 
+                                    title="Delete">
                                         <i class="bi bi-trash-fill"></i>
                                     </a>
                                 </div>
@@ -497,8 +467,69 @@ if ($fetchQuery) {
     </div>
 </div>
 
+<!-- Modal Konfirmasi Hapus Produk -->
+<div class="modal fade" id="modalConfirmDelete" tabindex="-1" aria-labelledby="modalConfirmDeleteLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-bg-dark border-secondary" style="background-color: #111827 !important; border-color: #374151 !important;">
+      
+      <!-- Bagian Atas / Header Modal -->
+      <div class="modal-header border-bottom border-secondary">
+        <h5 class="modal-title text-white fw-bold d-flex align-items-center" id="modalConfirmDeleteLabel">
+          <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i> Konfirmasi Hapus
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <!-- Bagian Tengah / Isi Modal -->
+      <div class="modal-body text-center p-4">
+        <div class="mb-3">
+          <!-- Ikon Tempat Sampah Besar berwarna Merah -->
+          <i class="bi bi-trash3-fill text-danger" style="font-size: 3.5rem;"></i>
+        </div>
+        <p class="text-light fs-6 mb-1">Apakah Anda yakin ingin menghapus produk ini?</p>
+        <!-- Tempat nama produk akan muncul secara dinamis -->
+        <h6 id="delete_target_name" class="text-warning fw-bold mt-2"></h6>
+      </div>
+      
+      <!-- Bagian Bawah / Tombol Aksi -->
+      <div class="modal-footer border-top border-secondary justify-content-center">
+        <button type="button" class="btn btn-secondary px-4 rounded-2" data-bs-dismiss="modal">Batal</button>
+        <button type="button" id="btnConfirmDeleteAction" class="btn btn-danger px-4 rounded-2 fw-bold">Oke, Hapus</button>
+      </div>
+
+    </div>
+  </div>
+</div>
 
 <script>
+
+let deleteUrlTarget = '';
+let bootstrapDeleteModalInstance = null;
+
+function triggerDeleteModal(url, productName) {
+    // Menyimpan URL hapus dari tombol yang diklik
+    deleteUrlTarget = url;
+    
+    // Memasukkan nama produk ke dalam modal secara dinamis
+    const namePlaceholder = document.getElementById('delete_target_name');
+    if (namePlaceholder) {
+        namePlaceholder.innerText = productName;
+    }
+    
+    // Menampilkan modal Bootstrap 5
+    if (!bootstrapDeleteModalInstance) {
+        bootstrapDeleteModalInstance = new bootstrap.Modal(document.getElementById('modalConfirmDelete'));
+    }
+    bootstrapDeleteModalInstance.show();
+}
+
+// Eksekusi pemindahan halaman saat tombol "Oke, Hapus" ditekan
+document.getElementById('btnConfirmDeleteAction').addEventListener('click', function() {
+    if (deleteUrlTarget) {
+        window.location.href = deleteUrlTarget;
+    }
+});
+
 document.addEventListener('DOMContentLoaded', function() {
     const prodSlider = document.getElementById('dragScrollProductContainer');
     if (!prodSlider) return;

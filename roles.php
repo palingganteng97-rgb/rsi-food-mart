@@ -220,9 +220,13 @@ if (isset($_GET['action_delete'])) {
                             <button class="btn btn-sm btn-outline-success border-0 rounded-2" title="Edit Role" data-bs-toggle="modal" data-bs-target="#modalEditRole" onclick="populateEditRoleModal(<?= htmlspecialchars(json_encode($roleRow)) ?>)">
                               <i class="bi bi-pencil"></i>
                             </button>
-                            <!-- Tombol Hapus mengarah ke query delete dengan konfirmasi dialog -->
-                            <a href="roles.php?action_delete=<?= $roleRow['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2" title="Hapus Role" onclick="return confirm('Apakah Anda yakin ingin menghapus data role ini secara permanen?')">
-                              <i class="bi bi-trash"></i>
+                            <button type="button" 
+                                    class="btn btn-sm btn-danger" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#modalDeleteRole" 
+                                    onclick="document.getElementById('delete_role_name').innerText = '<?php echo addslashes($row['role_name']); ?>'; document.getElementById('btn_confirm_delete_role').setAttribute('href', 'roles.php?action_delete=<?php echo $row['id']; ?>')">
+                                <i class="bi bi-trash"></i>
+                            </button>
                             </a>
                           </div>
                         </td>
@@ -290,14 +294,85 @@ if (isset($_GET['action_delete'])) {
     </div>
 </div>
 
+<!-- Modal Konfirmasi Hapus Role -->
+<div class="modal fade" id="modalDeleteRole" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px); border: 1px solid rgba(239, 68, 68, 0.25); color: #e5e7eb; border-radius: 16px;">
+            <div class="modal-body text-center p-4">
+                <div class="text-danger mb-3">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem; filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.3));"></i>
+                </div>
+                <h5 class="fw-bold text-white mb-2">Hapus Data Role?</h5>
+                <p class="text-white-50 small mb-4">Tindakan ini akan menghapus data role <span id="delete_role_name" class="text-white fw-semibold"></span> secara permanen. Data yang dihapus tidak dapat dikembalikan.</p>
+                <div class="d-flex gap-2 justify-content-center">
+                    <button type="button" class="btn btn-sm btn-secondary rounded-3 px-3 py-2" data-bs-dismiss="modal" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8;">Batal</button>
+                    <a id="btn_confirm_delete_role" href="#" class="btn btn-sm btn-danger rounded-3 px-3 py-2 fw-medium">Ya, Hapus</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-// Fungsi JavaScript jembatan untuk melempar baris data tabel kedalam modal update role
+let deleteRoleUrlTarget = '';
+let bootstrapDeleteRoleModalInstance = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Handler untuk mengeksekusi aksi hapus saat tombol konfirmasi diklik
+    const btnConfirmDeleteRole = document.getElementById('btn_confirm_delete_role');
+    if (btnConfirmDeleteRole) {
+        btnConfirmDeleteRole.addEventListener('click', function(e) {
+            if (deleteRoleUrlTarget) {
+                e.preventDefault();
+                window.location.href = deleteRoleUrlTarget;
+            }
+        });
+    }
+});
+
+function triggerDeleteRole(url, roleName) {
+    // 1. Suntik nama ke teks deskripsi modal
+    const namePlaceholder = document.getElementById('delete_role_name');
+    if (namePlaceholder) {
+        namePlaceholder.innerText = roleName;
+    }
+    
+    // 2. Ubah URL tujuan tombol "Ya, Hapus" secara langsung
+    const btnConfirm = document.getElementById('btn_confirm_delete_role');
+    if (btnConfirm) {
+        btnConfirm.setAttribute('href', url);
+    }
+    
+    // 3. Tampilkan modal secara aman dan bersih
+    const modalElement = document.getElementById('modalDeleteRole');
+    if (modalElement) {
+        const existingInstance = bootstrap.Modal.getInstance(modalElement);
+        if (existingInstance) {
+            existingInstance.dispose(); // Hapus sisa instans memori lama yang macet
+        }
+        
+        const newModalInstance = new bootstrap.Modal(modalElement);
+        newModalInstance.show();
+    }
+}
+
+// Fungsi pengisi data modal edit role otomatis sekaligus memicu tampilnya modal kustom
 function populateEditRoleModal(role) {
     if (role) {
         document.getElementById('edit_role_id').value = role.id;
-        document.getElementById('edit_role_name').value = role.name;
+        
+        // Menangani penyesuaian jika properti data object dari backend menggunakan role.name atau role.role_name
+        document.getElementById('edit_role_name').value = role.name || role.role_name || '';
+        
+        // Membuka bootstrap modal edit kustom Anda secara terprogram
+        const editModalElement = document.getElementById('modalEditRole');
+        if (editModalElement) {
+            const bootstrapEditModalInstance = new bootstrap.Modal(editModalElement);
+            bootstrapEditModalInstance.show();
+        }
     }
 }
+
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

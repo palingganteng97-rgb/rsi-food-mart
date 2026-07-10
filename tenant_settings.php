@@ -235,8 +235,10 @@ if ($tResult && $tResult->num_rows > 0) {
                         <button class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit" onclick='openEditTenantSetting(<?= json_encode($row) ?>)'>
                           <i class="bi bi-pencil-square"></i>
                         </button>
-                        <a href="tenant_settings.php?action=delete&id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Delete" onclick="return confirm('Apakah Anda yakin ingin menghapus konfigurasi tenant ini?')">
-                          <i class="bi bi-trash-fill"></i>
+                        <button type="button" class="btn btn-sm btn-danger" 
+                                onclick="triggerDeleteTenantSetting('tenant_settings.php?action=delete&id=<?php echo $row['id']; ?>', '<?php echo addslashes($row['tenant_name']); ?>')">
+                            <i class="bi bi-trash"></i>
+                        </button>
                         </a>
                       </div>
                     </td>
@@ -325,7 +327,29 @@ if ($tResult && $tResult->num_rows > 0) {
     </div>
 </div>
 
+<!-- Modal Konfirmasi Hapus Tenant -->
+<div class="modal fade" id="modalDeleteTenant" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px); border: 1px solid rgba(239, 68, 68, 0.25); color: #e5e7eb; border-radius: 16px;">
+            <div class="modal-body text-center p-4">
+                <div class="text-danger mb-3">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem; filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.3));"></i>
+                </div>
+                <h5 class="fw-bold text-white mb-2">Hapus Tenant Settings?</h5>
+                <p class="text-muted small mb-4">Tindakan ini akan menghapus data tenant settings <span id="delete_tenant_name" class="text-white fw-semibold"></span>. Data yang dihapus tidak dapat dikembalikan.</p>
+                <div class="d-flex gap-2 justify-content-center">
+                    <button type="button" class="btn btn-sm btn-secondary rounded-3 px-3 py-2" data-bs-dismiss="modal" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8;">Batal</button>
+                    <a id="btn_confirm_delete" href="#" class="btn btn-sm btn-danger rounded-3 px-3 py-2 fw-medium">Ya, Hapus</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+let deleteTenantUrlTarget = '';
+let bootstrapDeleteTenantModalInstance = null;
+
 document.addEventListener('DOMContentLoaded', function() {
     const prodSlider = document.getElementById('dragScrollProductContainer');
     if (prodSlider) {
@@ -363,6 +387,17 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Handler klik konfirmasi hapus tenant settings
+    const btnConfirmDelete = document.getElementById('btn_confirm_delete');
+    if (btnConfirmDelete) {
+        btnConfirmDelete.addEventListener('click', function(e) {
+            if (deleteTenantUrlTarget) {
+                e.preventDefault();
+                window.location.href = deleteTenantUrlTarget;
+            }
+        });
+    }
 });
 
 function openTambahTenantSetting() {
@@ -371,9 +406,12 @@ function openTambahTenantSetting() {
     document.getElementById('setting_id').value = '';
     
     const tenantSelect = document.getElementById('setting_tenant_id');
-    tenantSelect.disabled = false;
-    tenantSelect.style.pointerEvents = 'auto';
-    tenantSelect.style.backgroundColor = 'rgba(2, 6, 23, 0.4)';
+    if (tenantSelect) {
+        tenantSelect.removeAttribute('disabled');
+        tenantSelect.disabled = false;
+        tenantSelect.style.pointerEvents = 'auto';
+        tenantSelect.style.backgroundColor = 'rgba(2, 6, 23, 0.4)';
+    }
     
     document.getElementById('setting_auto_accept').value = '0';
     document.getElementById('setting_accept_order').value = '1';
@@ -391,10 +429,13 @@ function openEditTenantSetting(data) {
     document.getElementById('setting_id').value = data.id;
     
     const tenantSelect = document.getElementById('setting_tenant_id');
-    tenantSelect.disabled = false;
-    tenantSelect.value = data.tenant_id;
-    tenantSelect.style.pointerEvents = 'none';
-    tenantSelect.style.backgroundColor = 'rgba(15, 23, 42, 0.6)';
+    if (tenantSelect) {
+        tenantSelect.removeAttribute('disabled');
+        tenantSelect.disabled = false;
+        tenantSelect.value = data.tenant_id;
+        tenantSelect.style.pointerEvents = 'none';
+        tenantSelect.style.backgroundColor = 'rgba(15, 23, 42, 0.6)';
+    }
     
     document.getElementById('setting_auto_accept').value = data.auto_accept;
     document.getElementById('setting_accept_order').value = data.accept_order;
@@ -408,6 +449,25 @@ function openEditTenantSetting(data) {
     var myModal = new bootstrap.Modal(document.getElementById('modalTenantSetting'));
     myModal.show();
 }
+
+// Fungsi pemicu untuk membuka modal konfirmasi hapus tenant settings
+function triggerDeleteTenantSetting(url, tenantName) {
+    deleteTenantUrlTarget = url;
+    
+    const namePlaceholder = document.getElementById('delete_tenant_name');
+    if (namePlaceholder) {
+        namePlaceholder.innerText = tenantName;
+    }
+    
+    const modalElement = document.getElementById('modalDeleteTenant');
+    if (modalElement) {
+        if (!bootstrapDeleteTenantModalInstance) {
+            bootstrapDeleteTenantModalInstance = new bootstrap.Modal(modalElement);
+        }
+        bootstrapDeleteTenantModalInstance.show();
+    }
+}
+
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
