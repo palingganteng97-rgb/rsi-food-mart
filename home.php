@@ -34,7 +34,7 @@ if ($fetchQuery) {
 }
 ?>
 
-<!Doctype html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="utf-8" />
@@ -187,10 +187,9 @@ if ($fetchQuery) {
 <?php include 'detail_product_modal.php'; ?>
 
   <?php include "bottom_nav.php"; ?>
- 
+
 <!-- Hubungkan ke file eksternal JavaScript catalog handler -->
 <script src="catalog_handler.js"></script>
- 
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

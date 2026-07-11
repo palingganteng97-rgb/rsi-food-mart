@@ -84,7 +84,7 @@ $product_result = mysqli_query($conn, $product_query);
 $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : [];
 ?>
 
-<!Doctype html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="utf-8" />

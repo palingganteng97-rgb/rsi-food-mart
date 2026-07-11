@@ -28,7 +28,7 @@ $msg = isset($_GET['msg']) ? $_GET['msg'] : "";
 $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
 ?>
 
-<!Doctype html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="utf-8" />

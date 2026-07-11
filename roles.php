@@ -109,7 +109,7 @@ if (isset($_GET['action_delete'])) {
 }
 ?>
 
-<!Doctype html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="utf-8" />
