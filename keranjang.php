@@ -32,6 +32,28 @@ if (isset($_GET['action']) && $_GET['action'] === 'update_qty' && isset($_GET['k
     }
 }
 
+// 3. HANDLER BARU: Logika memproses update data dari modal detail_product_modal.php
+if (isset($_GET['action']) && $_GET['action'] === 'update_item' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $cartKey = isset($_POST['cart_key']) ? $_POST['cart_key'] : '';
+    $new_qty = isset($_POST['qty']) ? intval($_POST['qty']) : 1;
+    $new_notes = isset($_POST['notes']) ? trim($_POST['notes']) : '';
+    $new_variant = isset($_POST['variant']) ? $_POST['variant'] : '';
+    $new_addons = isset($_POST['addons']) ? $_POST['addons'] : [];
+
+    if (!empty($cartKey) && isset($_SESSION['cart'][$cartKey])) {
+        // Melakukan update data pesanan di dalam session secara langsung
+        $_SESSION['cart'][$cartKey]['qty'] = $new_qty;
+        $_SESSION['cart'][$cartKey]['notes'] = $new_notes;
+        
+        // Opsional: Buka baris di bawah ini jika struktur session Anda mencatat varian & tambahan topping
+        // $_SESSION['cart'][$cartKey]['variant'] = $new_variant;
+        // $_SESSION['cart'][$cartKey]['addons'] = $new_addons;
+
+        header("Location: keranjang.php?status=success&msg=Pesanan berhasil disesuaikan");
+        exit();
+    }
+}
+
 // === LOGIKA PROSES HAPUS ITEM SINKRON DENGAN API_CART ===
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['key'])) {
     $delete_key = $_GET['key'];
@@ -156,11 +178,10 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
                             <?php endif; ?>
                         </div>
                         
-                        <!-- PERBAIKAN: Logika Pengunci Tombol Minus saat Kuantitas bernilai 1 -->
+                        <!-- Logika Pengunci Tombol Minus saat Kuantitas bernilai 1 -->
                         <div class="col-md-3 col-6 my-2 my-md-0">
                             <div class="d-inline-flex align-items-center rounded-3 p-1" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(148, 163, 184, 0.2);">
                                 <?php if ($kuantitas <= 1): ?>
-                                    <!-- Warna Merah Lembut Transparan saat Terkunci -->
                                     <span class="btn btn-sm px-2 py-1 border-0 text-white-element" style="cursor: not-allowed; color: rgba(239, 68, 68, 0.45) !important;">
                                         <i class="bi bi-dash-lg" style="font-size: 0.85rem;"></i>
                                     </span>
@@ -182,20 +203,17 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
                         
                         <!-- Total Harga Item & Tombol Hapus Pemicu Modal -->
                         <div class="col-md-3 col-6 text-end">
-                            <!-- Harga Akumulasi Item -->
                             <h5 class="text-success fw-bold mb-2" style="font-size: 1.2rem;">Rp <?php echo number_format($total_per_item, 0, ',', '.'); ?></h5>
                             
-                            <!-- Grouping Tombol Aksi Kanan -->
                             <div class="d-flex flex-column align-items-end gap-2">
-                                <!-- TOMBOL EDIT: Langsung memicu modal Bootstrap secara dinamis -->
+                                <!-- PERBAIKAN: data-bs-target diselaraskan menjadi #modalDetailProduct -->
                                 <button type="button" class="btn text-warning bg-transparent p-0 border-0 small fw-medium" 
-                                        data-bs-toggle="modal" data-bs-target="#modalEditProductContainer"
+                                        data-bs-toggle="modal" data-bs-target="#modalDetailProduct"
                                         onclick="loadEditModal('<?php echo isset($item['id']) ? $item['id'] : ''; ?>', '<?php echo $cartKey; ?>')" 
                                         style="box-shadow: none; font-size: 0.88rem;">
                                     <i class="bi bi-pencil-square me-1"></i> Edit Pesanan
                                 </button>
 
-                                <!-- Tombol Hapus Item -->
                                 <button type="button" class="btn text-danger bg-transparent p-0 border-0 small fw-medium" 
                                         data-bs-toggle="modal" data-bs-target="#modalConfirmDelete" 
                                         onclick="prepareDelete('<?php echo $cartKey; ?>', '<?php echo htmlspecialchars($nama_menu, ENT_QUOTES); ?>')" 
@@ -222,7 +240,7 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
             <?php endif; ?>
         </div>
 
-        <!-- Kolom Kanan: Ringkasan Pembayaran -->
+        <!-- Kolom Kanan: Ringkasan Pembayaran (Melanjutkan Potongan Kode) -->
         <div class="col-lg-4">
             <div class="bg-transparent rounded-4 p-4" style="border: 2px dashed #334155;">
                 <h4 class="fw-bold mb-4 text-white">Ringkasan Pesanan</h4>
@@ -241,7 +259,7 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
                     <span class="text-success fw-bold fs-4">Rp <?php echo number_format($subtotal, 0, ',', '.'); ?></span>
                 </div>
                 
-                <button class="btn btn-success w-100 py-2 fw-medium rounded-3" type="button" <?php echo ($subtotal == 0) ? 'disabled' : ''; ?>>
+                <button class="btn btn-success w-100 py-2.5 fw-medium rounded-3" type="button" <?php echo ($subtotal == 0) ? 'disabled' : ''; ?>>
                     <i class="bi bi-credit-card-2-front me-2"></i> Lanjutkan Pemesanan
                 </button>
             </div>
@@ -249,21 +267,183 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
     </div>
 </div>
 
-<!-- ========================================================
-   TAMBAHAN: MODAL KONFIRMASI HAPUS TEMATIK RSI (BOOTSTRAP 5)
-   ======================================================== -->
-<div class="modal fade" id="modalConfirmDelete" tabindex="-1" aria-labelledby="modalConfirmDeleteLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" style="max-width: 380px !important;">
-        <div class="modal-content" style="background: rgba(15, 23, 42, 0.98); backdrop-filter: blur(16px); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb; border-radius: 20px;">
-            <div class="modal-body p-4 text-center">
-                <i class="bi bi-exclamation-triangle-fill text-danger d-block mb-3" style="font-size: 3rem; opacity: 0.9;"></i>
-                <h5 class="fw-bold text-white mb-1" id="modalConfirmDeleteLabel">Hapus Hidangan Sehat?</h5>
-                <p class="text-white-50 small mb-4" id="delete_item_text_target">Apakah Anda yakin ingin mengeluarkan menu ini dari daftar keranjang belanja Anda?</p>
-                
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-secondary w-50 py-2 fw-medium" data-bs-dismiss="modal" style="border-radius: 10px; background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.1); color: #e5e7eb;">Batal</button>
-                    <a id="btn_execute_delete_link" href="#" class="btn btn-danger w-50 py-2 fw-medium" style="border-radius: 10px;">Ya, Hapus</a>
+<style>
+    /* Mengaktifkan fungsi gulir/scroll utama pada isi modal */
+    #modalDetailProduct .modal-body {
+        overflow-y: auto !important;
+        padding: 0 !important;
+        max-height: 80vh; /* Membatasi tinggi isi modal agar tidak melebihi layar HP */
+    }
+    
+    /* DESKTOP LAYAR LEBAR (Min-width 768px) */
+    @media (min-width: 768px) {
+        #modalDetailProduct .scrollable-detail-column {
+            max-height: 52vh !important;
+            overflow-y: auto !important;
+            -ms-overflow-style: none !important;  
+            scrollbar-width: none !important;     
+        }
+        #modalDetailProduct .scrollable-detail-column::-webkit-scrollbar {
+            display: none !important;
+        }
+        #modalDetailProduct {
+            overflow-y: hidden !important;
+        }
+        #modalDetailProduct .modal-body {
+            max-height: none;
+        }
+    }
+
+    /* MOBILE / HP (Max-width 767.98px) */
+    @media (max-width: 767.98px) {
+        #modalDetailProduct .scrollable-detail-column {
+            max-height: none !important; 
+            overflow-y: visible !important;
+        }
+        #detail_product_carousel_inner img {
+            height: 240px !important; /* Menjaga agar gambar tidak terlalu memakan tempat di HP */
+        }
+    }
+
+    #carouselDetailProduct, 
+    #detail_product_carousel_inner, 
+    .carousel-item {
+        overflow: hidden !important;
+        white-space: nowrap !important;
+        -ms-overflow-style: none !important;  
+        scrollbar-width: none !important;     
+    }
+    #detail_product_carousel_inner img {
+        display: block !important;
+        width: 100% !important;
+        max-width: 380px !important;
+        height: 340px; 
+        object-fit: cover !important;
+        border-radius: 14px !important;
+        margin: 0 auto !important;
+    }
+    
+    /* PERBAIKAN: Mengunci posisi footer di bawah (Sticky) untuk responsivitas mobile */
+    #modalDetailProduct .fixed-product-footer {
+        border-top: 1px solid rgba(148, 163, 184, 0.15);
+        background: rgba(15, 23, 42, 0.95) !important; /* Dibuat pekat agar konten teks di belakangnya tersamar */
+        backdrop-filter: blur(8px);
+        margin-top: 20px;
+        padding: 15px !important; /* Memastikan ruang klik lega di HP */
+        position: sticky;
+        bottom: 0;
+        z-index: 10;
+    }
+    
+    @media (min-width: 1200px) {
+        #modalDetailProduct .modal-dialog {
+            max-width: 1100px !important; 
+            width: 1100px !important;
+        }
+    }
+</style>
+
+<div class="modal fade" id="modalDetailProduct" aria-labelledby="modalDetailProductLabel" role="dialog" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.96) !important; backdrop-filter: blur(16px); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb; border-radius: 20px;">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15); padding: 1.25rem 2rem;">
+                <h5 class="modal-title fw-bold text-white" id="modalDetailProductLabel">Detail Produk</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0"> 
+                <div class="row g-0">
+                    
+                    <!-- KONTEN KIRI: Bagian Gambar (Dipastikan berpasangan dengan benar) -->
+                    <div class="col-md-5 text-center p-4 p-md-5 border-bottom border-md-0 border-md-end" style="border-color: rgba(148, 163, 184, 0.15) !important;">
+                        <div class="position-relative mx-auto" style="max-width: 380px;">
+                            <div id="carouselDetailProduct" class="carousel slide shadow-lg rounded-4" data-bs-ride="carousel" style="overflow: hidden !important;">
+                                <div class="carousel-inner" id="detail_product_carousel_inner" style="overflow: hidden !important;">
+                                    <!-- Diisi otomatis oleh JavaScript openDetailProduct -->
+                                </div>
+                            </div>
+                            <button class="carousel-control-prev" type="button" data-bs-target="#carouselDetailProduct" data-bs-slide="prev" id="carousel_btn_prev" 
+                                    style="width: 44px; height: 44px; top: 50%; transform: translateY(-50%); left: -20px; position: absolute; background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 50%;">
+                                <span class="carousel-control-prev-icon" aria-hidden="true" style="width: 22px; height: 22px;"></span>
+                            </button>
+                            <button class="carousel-control-next" type="button" data-bs-target="#carouselDetailProduct" data-bs-slide="next" id="carousel_btn_next" 
+                                    style="width: 44px; height: 44px; top: 50%; transform: translateY(-50%); right: -20px; position: absolute; background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 50%;">
+                                <span class="carousel-control-next-icon" aria-hidden="true" style="width: 22px; height: 22px;"></span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- KONTEN KANAN: Bagian Form Isian dan Tombol -->
+                    <div class="col-md-7 p-4 p-md-5 d-md-flex flex-md-column justify-content-between">
+                        <div class="scrollable-detail-column pe-2"> 
+                            <h2 id="detail_product_name" class="fw-bold text-white mb-1" style="font-size: 2.25rem;"></h2>
+                            <p id="detail_product_category" class="text-white-50 small text-uppercase mb-4" style="letter-spacing: 1.5px; opacity: 0.8;"></p>
+                            
+                            <div class="p-3 rounded-3 mb-4" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.12); border-radius: 12px;">
+                                <label class="small text-white-50 d-block mb-1.5" style="opacity: 0.7; font-weight: 500;">Deskripsi Hidangan:</label>
+                                <span id="detail_product_description" class="text-light-50" style="font-size: 0.95rem; line-height: 1.6;"></span>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label id="label_product_variant" for="detail_product_variant_select" class="small text-white-50 d-block mb-2" style="opacity: 0.7; font-weight: 500;">Pilih Varian / Opsi:</label>
+                                <select id="detail_product_variant_select" class="form-select text-white border-secondary py-2 px-3" style="background: rgba(2, 6, 23, 0.4); border-radius: 10px; font-size: 0.92rem; box-shadow: none;">
+                                </select>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="small text-white-50 d-block mb-2" style="opacity: 0.7; font-weight: 500;">Pilih Topping / Tambahan :</label>
+                                <div id="detail_product_addons_container" class="d-flex flex-column gap-2 p-2 rounded-3" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.12);">
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="detail_product_notes_input" class="small text-white-50 d-block mb-2" style="opacity: 0.7; font-weight: 500;">Catatan Tambahan Pembeli (Opsional):</label>
+                                <input type="text" id="detail_product_notes_input" class="form-control text-white border-secondary py-2.5 px-3" 
+                                       style="background: rgba(2, 6, 23, 0.4); border-radius: 10px; font-size: 0.92rem; box-shadow: none;" 
+                                       placeholder="Contoh: tidak usah pake sedotan, sendok plastik, pisah kuah...">
+                            </div>
+                            
+                            <div class="mt-4 pt-4" style="border-top: 1px solid rgba(148, 163, 184, 0.15);">
+                                <h5 class="fw-bold text-white mb-3 d-flex align-items-center gap-2">
+                                    <i class="bi bi-chat-left-heart-fill text-warning"></i> Ulasan & Testimoni Pasien
+                                </h5>
+                                <div id="detail_product_reviews_container" class="d-flex flex-column gap-3">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center fixed-product-footer mt-auto pt-3">
+                            <div>
+                                <span class="text-white-50 small d-block mb-1" style="opacity: 0.7;">Harga Total</span>
+                                <h3 id="detail_product_price" class="fw-bold text-success m-0" style="font-size: 1.75rem;"></h3>
+                            </div>
+                            <button type="button" id="btn_detail_add_cart" class="btn btn-success px-4 py-2.5 fw-medium rounded-3 d-flex align-items-center gap-2" style="border-radius: 10px !important;">
+                                <i class="bi bi-cart-plus-fill"></i> Tambah ke Keranjang
+                            </button>
+                        </div>
+                    </div>
+                    
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. Container Modal Konfirmasi Hapus -->
+<div class="modal fade" id="modalConfirmDelete" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-white rounded-4 border-0 shadow-lg" 
+             style="background: rgba(15, 23, 42, 0.98); border: 1px solid rgba(148, 163, 184, 0.15) !important; backdrop-filter: blur(16px);">
+            <div class="modal-header border-bottom border-secondary border-opacity-25 p-3">
+                <h5 class="modal-title fw-bold text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Keluarkan Menu</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-shadow="none" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-white-50" id="delete_item_text_target">
+                <!-- Kalimat konfirmasi dinamis disuntikkan di sini oleh fungsi prepareDelete -->
+                Apakah Anda yakin ingin mengeluarkan menu ini dari daftar keranjang belanja Anda?
+            </div>
+            <div class="modal-footer border-top border-secondary border-opacity-25 p-3">
+                <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-3 fw-medium" data-bs-dismiss="modal">Batal</button>
+                <a id="btn_execute_delete_link" href="#" class="btn btn-sm btn-danger rounded-pill px-4 fw-medium">Ya, Hapus</a>
             </div>
         </div>
     </div>
