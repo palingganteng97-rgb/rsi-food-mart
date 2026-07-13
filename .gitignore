@@ -1,0 +1,4 @@
+# Mengabaikan folder upload gambar/file dari user
+/uploads/
+/img/uploads/
+/assets/uploads/
