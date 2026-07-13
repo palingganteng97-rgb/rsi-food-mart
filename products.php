@@ -187,42 +187,30 @@ if ($fetchQuery) {
 <style>
     :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
     body { background:var(--bg) !important; color:var(--text); }
-    body.modal-open { overflow:hidden !important; }
-    .content-bg { background:transparent; }
-    .text-white-element { -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; user-select:none; }
-    .search-box { background:rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.25); border-radius:18px; }
-    .diet-pill { border:1px solid rgba(34,197,94,.35); background:rgba(34,197,94,.08); color:#86efac; }
-    .diet-pill[data-active="true"] { background:rgba(34,197,94,.92); color:#06210f; border-color:rgba(34,197,94,.65); }
-    .price-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.35rem .7rem; background:rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.25); border-radius:999px; color:var(--text); }
-    .card-food { background:rgba(2,6,23,.40); border:1px solid rgba(148,163,184,.22); border-radius:18px; overflow:hidden; transition:transform .15s ease, border-color .15s ease; }
-    .card-food:hover { transform:translateY(-2px); border-color:rgba(34,197,94,.35); }
-    .food-img { height:150px; background:linear-gradient(180deg, rgba(34,197,94,.10), rgba(2,6,23,.0)); display:flex; align-items:center; justify-content:center; color:rgba(148,163,184,.8); position:relative; }
-    .food-img img { width:100%; height:100%; object-fit:cover; }
-    
-    /* MODIFIKASI: Memaksa container mengunci sistem overflow */
-    #dragScrollUserContainer, #dragScrollContainer, .drag-scroll-container { -ms-overflow-style:none !important; scrollbar-width:none !important; overflow-x:auto !important; display: block !important; width: 100% !important; cursor:grab !important; border:none !important; box-shadow:none !important; -webkit-box-shadow:none !important; }
-    #dragScrollUserContainer::-webkit-scrollbar, #dragScrollContainer::-webkit-scrollbar, .drag-scroll-container::-webkit-scrollbar { display:none !important; width:0 !important; height:0 !important; }
-    #dragScrollUserContainer:active, #dragScrollContainer:active, .drag-scroll-container:active { cursor:grabbing !important; }
-    #dragScrollUserContainer table, #dragScrollContainer table, .drag-scroll-container table { border-collapse:collapse !important; border:none !important; }
-    
-    /* TAMBAHAN UTAMA: Memaksa elemen tabel permissions dan sejenisnya melebar keluar batas agar bisa di-drag */
-    #dragScrollPermissionContainer table, .drag-scroll-container table {
-        min-width: 1300px !important; /* Nilai piksel ini wajib berada di atas resolusi monitor Anda */
-        width: 100% !important;
-        table-layout: fixed !important;
-    }
-
-    #dragScrollUserContainer table th, #dragScrollUserContainer table td, #dragScrollContainer table th, #dragScrollContainer table td, .drag-scroll-container table th, .drag-scroll-container table td { border-left:none !important; border-right:none !important; border-bottom:1px solid rgba(148, 163, 184, 0.12) !important; }
-    .modal-dialog { max-width:800px !important; }
-    .modal-body { -ms-overflow-style:none !important; scrollbar-width:none !important; overflow-y:auto !important; max-height:calc(100vh - 200px); }
-    .modal-body::-webkit-scrollbar { display:none !important; width:0 !important; }
-    .modal-body::-webkit-scrollbar-track { background:rgba(15,23,42,0.2); }
-    .modal-body::-webkit-scrollbar-thumb { background:rgba(148,163,184,0.3); border-radius:4px; }
-    .modal-body::-webkit-scrollbar-thumb:hover { background:rgba(148,163,184,0.5); }
-    .bi-clock-history, .text-white-icon { color:#ffffff !important; opacity:1 !important; filter:drop-shadow(0 0 1px rgba(255,255,255,0.2)); }
-    input[type="time"]::-webkit-calendar-picker-indicator, input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(1) brightness(100%) contrast(100%) !important; cursor:pointer; }
-    .bottom-nav { position:fixed; left:0; right:0; bottom:0; z-index:1035; background:rgba(15,23,42,.88); backdrop-filter:blur(10px); border-top:1px solid rgba(148,163,184,.25); display:block; }
-    @media (min-width: 992px) { main.content-shift { margin-left:280px; } .bottom-nav { display:none; } }
+    .content-bg { background: transparent; }
+    .search-box { background: rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.25); border-radius: 18px; }
+    .diet-pill { border:1px solid rgba(34,197,94,.35); background: rgba(34,197,94,.08); color:#86efac; }
+    .diet-pill[data-active="true"] { background: rgba(34,197,94,.92); color:#06210f; border-color: rgba(34,197,94,.65); }
+    .card-food { background: rgba(2,6,23,.40); border:1px solid rgba(148,163,184,.22); border-radius: 18px; overflow:hidden; transition: transform .15s ease, border-color .15s ease; }
+    .card-food:hover { transform: translateY(-2px); border-color: rgba(34,197,94,.35); }
+    .food-img { height: 150px; background: linear-gradient(180deg, rgba(34,197,94,.10), rgba(2,6,23,.0)); display:flex; align-items:center; justify-content:center; color: rgba(148,163,184,.8); position: relative; }
+    .food-img img { width:100%; height:100%; object-fit: cover; }
+    .price-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.35rem .7rem; background: rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.25); border-radius: 999px; color: var(--text); }
+    .bottom-nav { position: fixed; left:0; right:0; bottom:0; z-index: 1035; background: rgba(15,23,42,.88); backdrop-filter: blur(10px); border-top: 1px solid rgba(148,163,184,.25); display:block; }
+    #dragScrollUserContainer::-webkit-scrollbar, #dragScrollContainer::-webkit-scrollbar, .drag-scroll-container::-webkit-scrollbar { display: none !important; }
+    #dragScrollUserContainer, #dragScrollContainer, .drag-scroll-container { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow-x: auto !important; cursor: grab !important; border: none !important; box-shadow: none !important; -webkit-box-shadow: none !important; }
+    #dragScrollUserContainer:active, #dragScrollContainer:active, .drag-scroll-container:active { cursor: grabbing !important; }
+    #dragScrollUserContainer table, #dragScrollContainer table, .drag-scroll-container table { border-collapse: collapse !important; border: none !important; }
+    #dragScrollUserContainer table th, #dragScrollUserContainer table td, #dragScrollContainer table th, #dragScrollContainer table td, .drag-scroll-container table th, .drag-scroll-container table td { border-left: none !important; border-right: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; }
+    .text-white-element { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+    .text-white-element { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+    .modal-lg-custom { max-width: 800px !important; }
+    .modal-body::-webkit-scrollbar { display: none !important; }
+    .modal-body { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow: visible !important; }
+    .bi-clock-history, .text-white-icon { color: #ffffff !important; opacity: 1 !important; filter: drop-shadow(0 0 1px rgba(255,255,255,0.2)); }
+    input[type="time"]::-webkit-calendar-picker-indicator,
+    input[type="date"]::-webkit-calendar-picker-indicator {filter: invert(1) brightness(100%) contrast(100%) !important;cursor: pointer;}
+    @media (min-width: 992px) { main.content-shift { margin-left: 280px; } .bottom-nav { display:none; } }
 </style>
 
 </head>
