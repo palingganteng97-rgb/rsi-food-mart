@@ -50,9 +50,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body class="d-flex align-items-center justify-content-center min-vh-100" style="background: #0f172a;">
 
-    <div class="card border-0 rounded-4 text-white shadow-lg p-4" style="background: #1e293b; width: 100%; max-width: 420px; border: 1px solid rgba(148,163,184,.15) !important;">
+<div class="card border-0 rounded-4 text-white shadow-lg p-4" style="background: #1e293b; width: 100%; max-width: 420px; border: 1px solid rgba(148,163,184,.15) !important;">
         <div class="text-center mb-3">
-            <h4 class="fw-bold text-white mb-1"><i class="bi bi-shield-lock-fill text-success me-2"></i> RSI FOOD & MART</h4>
+            <!-- Ikon tameng diganti dengan gambar PNG gembok hijau -->
+            <img src="uploads/lupa password.png" alt="Lupa Password" style="height: 60px; object-fit: contain;" class="mb-2">
+            <h4 class="fw-bold text-white mb-1">RSI FOOD &amp; MART</h4>
             <span class="text-white-50 small">Masukkan username untuk membuat password baru</span>
         </div>
 
@@ -85,8 +87,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-success rounded-3 py-2 fw-medium mt-1">
-                <i class="bi bi-shield-lock me-2"></i> Reset Password
+            <button type="submit" class="btn btn-success rounded-3 py-2 fw-medium mt-1 d-flex align-items-center justify-content-center gap-2 w-100">
+                <img src="uploads/reset password.png" alt="Reset" style="height: 20px; width: 20px; object-fit: contain;"> Reset Password
             </button>
 
             <div class="text-center mt-2" style="font-size: 0.88rem;">

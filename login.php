@@ -43,7 +43,9 @@ if (isset($_SESSION['id'])) {
     <div class="container d-flex justify-content-center align-items-center">
         <div class="card border-0 rounded-4 text-white shadow-lg p-4 w-100" style="background: #1e293b; max-width: 420px; border: 1px solid rgba(148,163,184,.15) !important;">
             <div class="text-center mb-3">
-                <h4 class="fw-bold text-white mb-1"><i class="bi bi-shield-lock-fill text-success me-2"></i> RSI FOOD &amp; MART</h4>
+                <!-- Menampilkan logo PNG di atas judul dengan ukuran proposional -->
+                <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 60px; object-fit: contain;" class="mb-2">
+                <h4 class="fw-bold text-white mb-1">RSI FOOD &amp; MART</h4>
                 <span class="text-white-50 small">Silakan login untuk melanjutkan</span>
             </div>
 

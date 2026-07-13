@@ -109,8 +109,9 @@ function activeClass(string $file, string $currentFile): string {
       <i class="bi bi-list fs-3"></i>
     </button>
     <div class="d-flex align-items-center gap-2">
-      <div class="logo-badge" aria-hidden="true">
-        <i class="bi bi-hospital fs-5"></i>
+      <!-- Mengganti ikon bi-hospital dengan logo rsi.png dari folder uploads -->
+      <div class="logo-badge d-flex align-items-center justify-content-center" aria-hidden="true" style="width: 32px; height: 32px;">
+        <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
       </div>
       <div class="lh-tight">
         <div class="fw-bold text-white" style="font-size:.95rem;">RSI FOOD &amp; MART</div>
@@ -127,7 +128,10 @@ function activeClass(string $file, string $currentFile): string {
 <aside class="desktop-sidebar sidebar-fixed d-none d-lg-block">
   <div class="d-flex flex-column flex-grow-1 overflow-hidden">
     <div class="app-brand">
-      <div class="logo-badge" aria-hidden="true"><i class="bi bi-hospital"></i></div>
+      <!-- Mengganti ikon bi-hospital dengan logo rsi.png dari folder uploads -->
+      <div class="logo-badge d-flex align-items-center justify-content-center" aria-hidden="true" style="width: 32px; height: 32px;">
+        <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
+      </div>
       <div>
         <div class="fw-bold" style="letter-spacing:.2px;">RSI FOOD &amp; MART</div>
         <div class="text-white-50" style="font-size:.82rem;">Pemesanan Makanan Sehat</div>
@@ -156,7 +160,6 @@ function activeClass(string $file, string $currentFile): string {
             </div>
           <?php else: ?>
             <!-- Menu Utama Biasa (Etalase, User, Roles, dll) -->
-            <!-- SOLUSI UTAMA: Menambahkan kembali class 'nav-link' yang terhapus agar d-flex & gap-3 berfungsi sempurna -->
             <a class="nav-link d-flex align-items-center gap-3 <?= ($currentFile === ($item['href'] ?? '')) ? 'active' : ''; ?> <?= $item['class'] ?? ''; ?>" href="<?= htmlspecialchars($item['href'] ?? '#'); ?>" style="padding: 0.6rem 1rem;">
               <i class="bi <?= htmlspecialchars($item['icon']); ?> d-inline-block text-center" style="width: 20px;"></i>
               <span><?= htmlspecialchars($item['label']); ?></span>
@@ -167,10 +170,11 @@ function activeClass(string $file, string $currentFile): string {
     </div>
   </div>
   <div class="sidebar-footer w-100">
-      <a href="logout.php" class="btn-logout d-flex align-items-center gap-3" onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem?')" style="padding: 0.6rem 1rem;">
+      <!-- PERBAIKAN DESKTOP: Mengubah warna background transparan, teks, dan ikon menjadi merah solid (#ef4444) -->
+      <button type="button" class="btn-logout d-flex align-items-center gap-3 w-100 border-0 text-start" data-bs-toggle="modal" data-bs-target="#logoutModal" style="padding: 0.6rem 1rem; background: transparent; color: #ef4444; font-weight: 600;">
           <i class="bi bi-box-arrow-left d-inline-block text-center" style="width: 20px;"></i>
           <span>Logout</span>
-      </a>
+      </button>
   </div>
 </aside>
 
@@ -178,7 +182,10 @@ function activeClass(string $file, string $currentFile): string {
 <div class="offcanvas offcanvas-start text-white" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel" style="background:#0b1223; border-right:1px solid rgba(148,163,184,.25);">
   <div class="offcanvas-header">
     <div class="d-flex align-items-center gap-2">
-      <div class="logo-badge" aria-hidden="true"><i class="bi bi-hospital fs-5"></i></div>
+      <!-- Mengganti ikon bi-hospital dengan logo rsi.png dari folder uploads -->
+      <div class="logo-badge d-flex align-items-center justify-content-center" aria-hidden="true" style="width: 32px; height: 32px;">
+        <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
+      </div>
       <div>
         <div class="fw-bold">RSI FOOD &amp; MART</div>
         <div class="text-white-50" style="font-size:.82rem;">Menu Pasien</div>
@@ -216,11 +223,48 @@ function activeClass(string $file, string $currentFile): string {
       </div>
     </div>
     <div class="sidebar-footer w-100">
-        <a href="logout.php" class="btn-logout" onclick="return confirm('Apakah Anda yakin ingin keluar?')">
+        <!-- PERBAIKAN MOBILE: Mengubah warna background transparan, teks, dan ikon menjadi merah solid (#ef4444) -->
+        <button type="button" class="btn-logout d-flex align-items-center gap-3 w-100 border-0 text-start" data-bs-toggle="modal" data-bs-target="#logoutModal" style="padding: 0.6rem 1rem; background: transparent; color: #ef4444; font-weight: 600;">
             <i class="bi bi-box-arrow-left"></i><span>Logout</span>
-        </a>
+        </button>
     </div>
   </div>
+</div>
+
+<!-- ========================================== -->
+<!-- STRUKTUR FIX MODAL LOGOUT NEO-BRUTALISM    -->
+<!-- ========================================== -->
+<div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true" style="z-index: 1055;">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 380px; margin-right: auto; margin-left: auto;">
+        <div class="modal-content border-2 border-dark rounded-3 shadow-lg" style="background: #1e293b; color: #fff; box-shadow: 4px 4px #000 !important;">
+            
+            <div class="modal-header border-0 pb-0 justify-content-end">
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body text-center pt-0 px-4">
+                <div class="mb-3">
+                    <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 65px; object-fit: contain;">
+                </div>
+                <h5 class="modal-title fw-bold mb-2" id="logoutModalLabel">Konfirmasi Keluar</h5>
+                <p class="text-white-50 small mb-4">Apakah Anda yakin ingin keluar dari sistem keamanan aplikasi RSI FOOD &amp; MART?</p>
+                
+                <div class="row g-2 justify-content-center mt-3">
+                    <div class="col-12">
+                        <a href="logout.php" class="btn btn-danger fw-bold py-2.5 rounded-3 border-2 border-dark shadow-sm text-white w-100" style="box-shadow: 3px 3px #000 !important; background-color: #dc2626 !important; border-color: #323232 !important;">
+                            <i class="bi bi-box-arrow-left me-2"></i> Ya, Keluar Sekarang
+                        </a>
+                    </div>
+                    <div class="col-12">
+                        <button type="button" class="btn btn-light fw-semibold py-2 rounded-3 border-2 border-dark w-100" data-bs-dismiss="modal" style="color: #323232;">
+                            Batal
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
 </div>
 
 <script>
