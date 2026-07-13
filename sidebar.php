@@ -8,8 +8,18 @@ $currentFile = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
 
 $menu = [
     'home.php'      => [ 'href' => 'home.php', 'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
-    
-    'master_group'  => [
+
+      'tenants_group' => [
+          'label' => 'Tenants', 'icon' => 'bi-house-lock-fill', 'class' => 'd-mobile-none',
+          'sub'   => [
+              'tenants.php'                => [ 'href' => 'tenants.php',                'label' => 'Data Tenant',            'icon' => 'bi-house-lock-fill' ],
+              'tenant_operating_hours.php' => [ 'href' => 'tenant_operating_hours.php', 'label' => 'Tenant Operating Hours', 'icon' => 'bi-clock-history' ],
+              'tenant_holidays.php'        => [ 'href' => 'tenant_holidays.php',        'label' => 'Tenant Holidays',        'icon' => 'bi-calendar-x' ],
+              'tenant_settings.php'        => [ 'href' => 'tenant_settings.php',        'label' => 'Tenant Settings',        'icon' => 'bi-gear-fill' ],
+          ]
+      ],
+      
+        'master_group'  => [
         'label' => 'Master Data', 'icon' => 'bi-layers-half', 'class' => '',
         'sub'   => [
             'categories.php'     => [ 'href' => 'categories.php',     'label' => 'Kategori Produk', 'icon' => 'bi-tags-fill' ],
@@ -17,7 +27,7 @@ $menu = [
             'units.php'          => [ 'href' => 'units.php',          'label' => 'Satuan / Units',  'icon' => 'bi-calculator-fill' ],
         ]
     ],
-    
+
     'produk_group'  => [
         'label' => 'Produk', 'icon' => 'bi-bag-dash-fill', 'class' => '',
         'sub'   => [
@@ -30,16 +40,6 @@ $menu = [
         ]
     ],
 
-    'tenants_group' => [
-        'label' => 'Tenants', 'icon' => 'bi-house-lock-fill', 'class' => 'd-mobile-none',
-        'sub'   => [
-            'tenants.php'                => [ 'href' => 'tenants.php',                'label' => 'Data Tenant',            'icon' => 'bi-house-lock-fill' ],
-            'tenant_operating_hours.php' => [ 'href' => 'tenant_operating_hours.php', 'label' => 'Tenant Operating Hours', 'icon' => 'bi-clock-history' ],
-            'tenant_holidays.php'        => [ 'href' => 'tenant_holidays.php',        'label' => 'Tenant Holidays',        'icon' => 'bi-calendar-x' ],
-            'tenant_settings.php'        => [ 'href' => 'tenant_settings.php',        'label' => 'Tenant Settings',        'icon' => 'bi-gear-fill' ],
-        ]
-    ],
-    
     'user.php'     => [ 'href' => 'user.php',    'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-none d-lg-block' ], 
     'profile.php'  => [ 'href' => 'profile.php', 'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-block d-lg-none' ], 
     
