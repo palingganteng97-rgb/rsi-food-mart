@@ -189,7 +189,7 @@ if ($fetchQuery) {
   <?php include "bottom_nav.php"; ?>
 
 <!-- Hubungkan ke file eksternal JavaScript catalog handler -->
-<script src="catalog_handler.js"></script>
+<script src="catalog_handler.js?v=1.1"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

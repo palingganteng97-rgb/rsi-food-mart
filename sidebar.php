@@ -17,13 +17,15 @@ $menu = [
             'units.php'          => [ 'href' => 'units.php',          'label' => 'Satuan / Units',  'icon' => 'bi-calculator-fill' ],
         ]
     ],
+    
     'produk_group'  => [
         'label' => 'Produk', 'icon' => 'bi-bag-dash-fill', 'class' => '',
         'sub'   => [
-            'products.php'       => [ 'href' => 'products.php',       'label' => 'Data Produk',     'icon' => 'bi-box-seam-fill' ],
-            'product_images.php' => [ 'href' => 'product_images.php', 'label' => 'Gambar Produk',   'icon' => 'bi-images' ],
+            'products.php'         => [ 'href' => 'products.php',         'label' => 'Data Produk',     'icon' => 'bi-box-seam-fill' ],
+            'product_images.php'   => [ 'href' => 'product_images.php',   'label' => 'Gambar Produk',   'icon' => 'bi-images' ],
             'product_variants.php' => [ 'href' => 'product_variants.php', 'label' => 'Varian Produk',   'icon' => 'bi-grid-3x3-gap-fill' ],
             'product_addons.php'   => [ 'href' => 'product_addons.php',   'label' => 'Topping Produk',  'icon' => 'bi-egg-fried' ],
+            'addon_items.php'      => [ 'href' => 'addon_items.php',      'label' => 'Item Topping',    'icon' => 'bi-list-ul' ],
             'product_reviews.php'  => [ 'href' => 'product_reviews.php',  'label' => 'Ulasan Produk',   'icon' => 'bi-star-fill' ],
         ]
     ],

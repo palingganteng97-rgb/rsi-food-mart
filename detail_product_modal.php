@@ -119,13 +119,13 @@
                                 <select id="detail_product_variant_select" class="form-select text-white border-secondary py-2 px-3" style="background: rgba(2, 6, 23, 0.4); border-radius: 10px; font-size: 0.92rem; box-shadow: none;">
                                 </select>
                             </div>
-                            
+
                             <div class="mb-4">
-                                <label for="detail_product_addons_select" class="small text-white-50 d-block mb-2" style="opacity: 0.7; font-weight: 500;">Pilih Topping / Tambahan:</label>
-                                <select id="detail_product_addons_select" class="form-select bg-dark text-white border-secondary py-2 px-3" style="border-radius: 10px; font-size: 0.92rem; box-shadow: none;">
-                                </select>
+                                <label class="small text-white-50 d-block mb-2" style="opacity: 0.7; font-weight: 500;">Pilih Topping / Tambahan :</label>
+                                <div id="detail_product_addons_container" class="d-flex flex-column gap-2 p-2 rounded-3" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.12);">
+                                </div>
                             </div>
-                            
+
                             <div class="mb-4">
                                 <label for="detail_product_notes_input" class="small text-white-50 d-block mb-2" style="opacity: 0.7; font-weight: 500;">Catatan Tambahan Pembeli (Opsional):</label>
                                 <input type="text" id="detail_product_notes_input" class="form-control text-white border-secondary py-2.5 px-3" 

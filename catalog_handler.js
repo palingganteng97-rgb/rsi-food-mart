@@ -77,42 +77,74 @@ function openDetailProduct(data) {
             });
     }
 
-    const addonsSelect = document.getElementById('detail_product_addons_select');
-    if (addonsSelect) {
-        addonsSelect.innerHTML = '<option value="" class="bg-dark text-white">Memuat topping...</option>';
+    const addonsContainer = document.getElementById('detail_product_addons_container');
+    if (addonsContainer) {
+        addonsContainer.innerHTML = '<div class="text-white-50 small"><div class="spinner-border spinner-border-sm text-success me-2"></div>Memuat topping...</div>';
         
-        fetch(`get_addons.php?product_id=${data.id}`)
+        fetch(`get_addon_items.php?product_id=${data.id}`)
             .then(response => response.json())
             .then(addons => {
-                addonsSelect.innerHTML = ''; // Bersihkan loading
+                addonsContainer.innerHTML = ''; // Bersihkan tulisan loading
                 
-                // Tambahkan opsi default teratas jika sifatnya opsional
-                const defaultOption = document.createElement('option');
-                defaultOption.value = "";
-                defaultOption.className = "bg-dark text-white";
-                defaultOption.innerText = "-- Tanpa Topping Tambahan --";
-                addonsSelect.appendChild(defaultOption);
-
                 if (Array.isArray(addons) && addons.length > 0) {
-                    addons.forEach(addon => {
-                        const option = document.createElement('option');
-                        option.value = addon.addon_name;
-                        option.className = 'bg-dark text-white';
+                    addons.forEach(item => {
+                        const formattedPrice = new Intl.NumberFormat('id-ID').format(item.price);
                         
-                        // Tandai label teks jika diatur sebagai topping wajib beli di database
-                        const badgeRequired = parseInt(addon.required) === 1 ? ' (Wajib)' : '';
-                        option.innerText = addon.addon_name + badgeRequired;
+                        // Membuat elemen bungkus untuk checkbox bergaya modern premium
+                        const checkWrapper = document.createElement('div');
+                        checkWrapper.className = 'form-check d-flex align-items-center justify-content-between p-2 rounded-2';
+                        checkWrapper.style.border = '1px solid rgba(148, 163, 184, 0.08)';
+                        checkWrapper.style.background = 'rgba(15, 23, 42, 0.3)';
                         
-                        addonsSelect.appendChild(option);
+                        // Struktur Checkbox HTML
+                        checkWrapper.innerHTML = `
+                            <div class="d-flex align-items-center gap-2">
+                                <input class="form-check-input addon-checkbox" type="checkbox" value="${item.id}" id="addon_${item.id}" data-price="${item.price}" style="cursor: pointer; background-color: rgba(2, 6, 23, 0.5); border-color: rgba(148, 163, 184, 0.3);">
+                                <label class="form-check-label text-white small" for="addon_${item.id}" style="cursor: pointer; user-select: none;">
+                                    ${item.item_name}
+                                </label>
+                            </div>
+                            <span class="text-success small fw-medium">+ Rp ${formattedPrice}</span>
+                        `;
+                        
+                        addonsContainer.appendChild(checkWrapper);
                     });
+
+                    // Pasang event listener ke setiap checkbox baru untuk hitung harga realtime
+                    const checkboxes = addonsContainer.querySelectorAll('.addon-checkbox');
+                    checkboxes.forEach(cb => {
+                        cb.onchange = function() {
+                            updateTotalPrice(data.base_price);
+                        };
+                    });
+
+                } else {
+                    addonsContainer.innerHTML = '<div class="text-white-50 small opacity-50 text-center py-1">Tidak ada topping tambahan.</div>';
                 }
             })
-            .catch(err => { 
+            .catch(err => {
                 console.error(err);
-                addonsSelect.innerHTML = '<option value="" class="bg-dark text-white">Gagal memuat topping</option>'; 
+                addonsContainer.innerHTML = '<div class="text-danger small">Gagal memuat topping</div>';
             });
     }
 
+    // Fungsi pembantu baru untuk menjumlahkan semua topping yang dicentang secara realtime
+    function updateTotalPrice(baseProductPrice) {
+        let total = parseFloat(baseProductPrice) || 0;
+        
+        // Ambil semua checkbox yang berstatus dicentang (:checked)
+        const checkedAddons = document.querySelectorAll('.addon-checkbox:checked');
+        checkedAddons.forEach(cb => {
+            total += parseFloat(cb.dataset.price) || 0;
+        });
+        
+        // Update teks harga total di footer modal
+        const formattedTotal = 'Rp ' + new Intl.NumberFormat('id-ID').format(total);
+        const priceContainer = document.getElementById('detail_product_price');
+        if (priceContainer) {
+            priceContainer.innerText = formattedTotal;
+        }
+    }
 
     const notesInput = document.getElementById('detail_product_notes_input');
     if (notesInput) { notesInput.value = ""; }
