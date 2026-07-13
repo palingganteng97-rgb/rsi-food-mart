@@ -63,17 +63,30 @@ if ($fetchQuery) {
     #dragScrollUserContainer table th, #dragScrollUserContainer table td, #dragScrollContainer table th, #dragScrollContainer table td, .drag-scroll-container table th, .drag-scroll-container table td { border-left: none !important; border-right: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; }
     .text-white-element { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
     
-    /* MODIFIKASI: Memperkecil lebar maksimal dialog agar proposional dengan detail hidangan */
     .modal-dialog { max-width: 450px !important; }
     .modal-body::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
-    
-    /* PERBAIKAN UTAMA: Mengubah overflow: visible menjadi hidden agar mengunci paksa batang scroll tipis bawah gambar */
     .modal-body { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow: hidden !important; }
     
     .bi-clock-history, .text-white-icon { color: #ffffff !important; opacity: 1 !important; filter: drop-shadow(0 0 1px rgba(255,255,255,0.2)); }
     input[type="time"]::-webkit-calendar-picker-indicator,
     input[type="date"]::-webkit-calendar-picker-indicator {filter: invert(1) brightness(100%) contrast(100%) !important;cursor: pointer;}
     @media (min-width: 992px) { main.content-shift { margin-left: 280px; } .bottom-nav { display:none; } }
+
+    /* ========================================================
+       TAMBAHAN BARU: ANIMASI KARTU MELUNCUR TERBANG KE KERANJANG
+       ======================================================== */
+    .flying-cart-item {
+        position: fixed;
+        z-index: 9999;
+        top: 0;
+        left: 0;
+        pointer-events: none; /* Mencegah elemen mengganggu interaksi klik user */
+        object-fit: cover;
+        border-radius: 14px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+        transition: all 0.75s cubic-bezier(0.25, 1, 0.5, 1);
+        opacity: 1;
+    }
 </style>
 
 </head>

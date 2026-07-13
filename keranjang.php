@@ -2,20 +2,43 @@
 // keranjang.php
 include 'db.php'; 
 
+// 1. PERBAIKAN UTAMA: Wajib jalankan session_start() di baris pertama agar array cart terbaca
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: index.php");
     exit();
+}
+
+// 2. HANDLER BARU: Logika proses tambah (+) dan kurang (-) kuantitas item keranjang
+if (isset($_GET['action']) && $_GET['action'] === 'update_qty' && isset($_GET['key']) && isset($_GET['type'])) {
+    $cartKey = $_GET['key'];
+    $type = $_GET['type'];
+    
+    if (isset($_SESSION['cart'][$cartKey])) {
+        if ($type === 'plus') {
+            $_SESSION['cart'][$cartKey]['qty'] += 1;
+        } elseif ($type === 'minus') {
+            $_SESSION['cart'][$cartKey]['qty'] -= 1;
+            // Jika kuantitas kurang dari 1, otomatis keluarkan hidangan dari keranjang
+            if ($_SESSION['cart'][$cartKey]['qty'] < 1) {
+                unset($_SESSION['cart'][$cartKey]);
+            }
+        }
+        header("Location: keranjang.php");
+        exit();
+    }
 }
 
 // === LOGIKA PROSES HAPUS ITEM SINKRON DENGAN API_CART ===
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['key'])) {
     $delete_key = $_GET['key'];
     
-    // Hapus data item berdasarkan key unik dari session array
     if (isset($_SESSION['cart'][$delete_key])) {
         unset($_SESSION['cart'][$delete_key]);
         
-        // Redirect kembali ke keranjang.php agar URL bersih dan halaman ter-refresh
         header("Location: keranjang.php?status=success&msg=Item berhasil dihapus");
         exit();
     }
@@ -88,7 +111,6 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
 
             if (!empty($cart_items)): 
                 foreach ($cart_items as $cartKey => $item): 
-                    // Proteksi jika data session bukan array produk
                     if (!is_array($item)) {
                         continue;
                     }
@@ -102,53 +124,85 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
                     $total_per_item = $harga_satuan * $kuantitas;
                     $subtotal += $total_per_item;
 
-                    // SINKRONISASI JALUR GAMBAR: Mengarah langsung ke folder uploads/products/ sesuai struktur VS Code Anda
                     $path_gambar = "uploads/products/" . $gambar_menu;
 
-                    // Cadangan 1: Cek di sub-folder gallery jika tidak ada di folder produk utama
                     if (empty($gambar_menu) || !file_exists($path_gambar)) {
                         $path_gambar = "uploads/products/gallery/" . $gambar_menu;
                     }
 
-                    // Cadangan 2: Jika file gambar di server tidak ada/kosong, panggil gambar ilustrasi default online
                     if (empty($gambar_menu) || !file_exists($path_gambar)) {
-                        $path_gambar = "https://flaticon.com"; 
+                        $path_gambar = "uploads/products/default.png"; 
                     }
             ?>
-                <!-- Item Card Produk -->
-                <div class="card card-custom mb-3 rounded-3 p-3">
+                <!-- Item Card Bertema Premium Gelap Transparan Sesuai Etalase -->
+                <div class="card mb-3 rounded-4 p-3 text-white" 
+                     style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.15); backdrop-filter: blur(8px);">
                     <div class="row align-items-center">
                         <!-- Gambar Produk -->
                         <div class="col-md-2 col-3">
-                            <img src="<?php echo $path_gambar; ?>" class="img-fluid rounded-3" alt="Produk" style="object-fit: cover; height: 80px; width: 80px;">
+                            <div style="width: 80px; height: 80px; overflow: hidden; border-radius: 12px; border: 1px solid rgba(148, 163, 184, 0.1);">
+                                <img src="<?php echo $path_gambar; ?>" class="w-100 h-100" style="object-fit: cover;" onerror="this.src='uploads/products/default.png'">
+                            </div>
                         </div>
                         
                         <!-- Detail Produk -->
                         <div class="col-md-4 col-9">
-                            <h5 class="mb-1 fw-semibold text-white"><?php echo htmlspecialchars($nama_menu); ?></h5>
-                            <p class="text-success small mb-1 fw-medium">Rp <?php echo number_format($harga_satuan, 0, ',', '.'); ?></p>
+                            <h5 class="mb-1 fw-bold text-white" style="font-size: 1.1rem;"><?php echo htmlspecialchars($nama_menu); ?></h5>
+                            <p class="text-success small mb-1 fw-semibold">Rp <?php echo number_format($harga_satuan, 0, ',', '.'); ?></p>
                             <?php if(!empty($item['notes'])): ?>
-                                <span class="badge bg-secondary text-warning fw-normal small">
+                                <span class="badge bg-secondary text-warning fw-normal small" style="background: rgba(30, 41, 59, 0.7) !important; border: 1px solid rgba(148,163,184,0.1);">
                                     <i class="bi bi-pencil-square me-1"></i> Catatan: <?php echo htmlspecialchars($item['notes']); ?>
                                 </span>
                             <?php endif; ?>
                         </div>
                         
-                        <!-- Pengatur Kuantitas -->
+                        <!-- PERBAIKAN: Logika Pengunci Tombol Minus saat Kuantitas bernilai 1 -->
                         <div class="col-md-3 col-6 my-2 my-md-0">
-                            <div class="input-group input-group-sm" style="max-width: 130px;">
-                                <button class="btn btn-outline-light" type="button">-</button>
-                                <input type="number" class="form-control text-center bg-transparent text-white border-light" value="<?php echo $kuantitas; ?>" readonly>
-                                <button class="btn btn-outline-light" type="button">+</button>
+                            <div class="d-inline-flex align-items-center rounded-3 p-1" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(148, 163, 184, 0.2);">
+                                <?php if ($kuantitas <= 1): ?>
+                                    <!-- Warna Merah Lembut Transparan saat Terkunci -->
+                                    <span class="btn btn-sm px-2 py-1 border-0 text-white-element" style="cursor: not-allowed; color: rgba(239, 68, 68, 0.45) !important;">
+                                        <i class="bi bi-dash-lg" style="font-size: 0.85rem;"></i>
+                                    </span>
+                                <?php else: ?>
+                                    <a href="keranjang.php?action=update_qty&key=<?php echo $cartKey; ?>&type=minus" class="btn btn-sm text-white px-2 py-1 border-0" style="box-shadow: none;">
+                                        <i class="bi bi-dash-lg" style="font-size: 0.85rem;"></i>
+                                    </a>
+                                <?php endif; ?>
+
+                                <span class="text-white fw-bold px-3 text-center" style="min-width: 35px; font-size: 0.95rem;">
+                                    <?php echo $kuantitas; ?>
+                                </span>
+                                
+                                <a href="keranjang.php?action=update_qty&key=<?php echo $cartKey; ?>&type=plus" class="btn btn-sm text-white px-2 py-1 border-0" style="box-shadow: none;">
+                                    <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
+                                </a>
                             </div>
                         </div>
                         
-                        <!-- Total Harga Item & Tombol Hapus -->
+                        <!-- Total Harga Item & Tombol Hapus Pemicu Modal -->
                         <div class="col-md-3 col-6 text-end">
-                            <h5 class="text-success fw-bold mb-1">Rp <?php echo number_format($total_per_item, 0, ',', '.'); ?></h5>
-                        <a href="keranjang.php?action=delete&key=<?php echo $cartKey; ?>" class="text-danger text-decoration-none p-0 small" onclick="return confirm('Apakah Anda yakin ingin menghapus item ini?')">
-                            <i class="bi bi-trash3 me-1"></i> Hapus
-                        </a>
+                            <!-- Harga Akumulasi Item -->
+                            <h5 class="text-success fw-bold mb-2" style="font-size: 1.2rem;">Rp <?php echo number_format($total_per_item, 0, ',', '.'); ?></h5>
+                            
+                            <!-- Grouping Tombol Aksi Kanan -->
+                            <div class="d-flex flex-column align-items-end gap-2">
+                                <!-- TOMBOL EDIT: Langsung memicu modal Bootstrap secara dinamis -->
+                                <button type="button" class="btn text-warning bg-transparent p-0 border-0 small fw-medium" 
+                                        data-bs-toggle="modal" data-bs-target="#modalEditProductContainer"
+                                        onclick="loadEditModal('<?php echo isset($item['id']) ? $item['id'] : ''; ?>', '<?php echo $cartKey; ?>')" 
+                                        style="box-shadow: none; font-size: 0.88rem;">
+                                    <i class="bi bi-pencil-square me-1"></i> Edit Pesanan
+                                </button>
+
+                                <!-- Tombol Hapus Item -->
+                                <button type="button" class="btn text-danger bg-transparent p-0 border-0 small fw-medium" 
+                                        data-bs-toggle="modal" data-bs-target="#modalConfirmDelete" 
+                                        onclick="prepareDelete('<?php echo $cartKey; ?>', '<?php echo htmlspecialchars($nama_menu, ENT_QUOTES); ?>')" 
+                                        style="box-shadow: none; font-size: 0.88rem;">
+                                    <i class="bi bi-trash3-fill me-1"></i> Hapus
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -158,7 +212,6 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
 
             if (!$has_items): 
             ?>
-                <!-- Tampilan keranjang kosong dengan garis batas putus-putus tipis yang elegan -->
                 <div class="bg-transparent text-center rounded-3 p-5" style="border: 2px dashed #334155;">
                     <i class="bi bi-basket2 text-success mb-3" style="font-size: 3rem;"></i>
                     <h5 class="text-white fw-medium mb-3">Keranjang belanja Anda masih kosong</h5>
@@ -171,8 +224,7 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
 
         <!-- Kolom Kanan: Ringkasan Pembayaran -->
         <div class="col-lg-4">
-            <!-- PERBAIKAN: Mengubah card-custom menjadi bg-transparent dengan border putus-putus senada -->
-            <div class="bg-transparent rounded-3 p-4" style="border: 2px dashed #334155;">
+            <div class="bg-transparent rounded-4 p-4" style="border: 2px dashed #334155;">
                 <h4 class="fw-bold mb-4 text-white">Ringkasan Pesanan</h4>
                 
                 <div class="d-flex justify-content-between mb-2">
@@ -189,13 +241,104 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
                     <span class="text-success fw-bold fs-4">Rp <?php echo number_format($subtotal, 0, ',', '.'); ?></span>
                 </div>
                 
-                <button class="btn btn-success w-100 py-2.5 fw-medium rounded-3" type="button" <?php echo ($subtotal == 0) ? 'disabled' : ''; ?>>
+                <button class="btn btn-success w-100 py-2 fw-medium rounded-3" type="button" <?php echo ($subtotal == 0) ? 'disabled' : ''; ?>>
                     <i class="bi bi-credit-card-2-front me-2"></i> Lanjutkan Pemesanan
                 </button>
             </div>
         </div>
     </div>
 </div>
+
+<!-- ========================================================
+   TAMBAHAN: MODAL KONFIRMASI HAPUS TEMATIK RSI (BOOTSTRAP 5)
+   ======================================================== -->
+<div class="modal fade" id="modalConfirmDelete" tabindex="-1" aria-labelledby="modalConfirmDeleteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 380px !important;">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.98); backdrop-filter: blur(16px); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb; border-radius: 20px;">
+            <div class="modal-body p-4 text-center">
+                <i class="bi bi-exclamation-triangle-fill text-danger d-block mb-3" style="font-size: 3rem; opacity: 0.9;"></i>
+                <h5 class="fw-bold text-white mb-1" id="modalConfirmDeleteLabel">Hapus Hidangan Sehat?</h5>
+                <p class="text-white-50 small mb-4" id="delete_item_text_target">Apakah Anda yakin ingin mengeluarkan menu ini dari daftar keranjang belanja Anda?</p>
+                
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-secondary w-50 py-2 fw-medium" data-bs-dismiss="modal" style="border-radius: 10px; background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.1); color: #e5e7eb;">Batal</button>
+                    <a id="btn_execute_delete_link" href="#" class="btn btn-danger w-50 py-2 fw-medium" style="border-radius: 10px;">Ya, Hapus</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================
+   JAVASCRIPT LOGIKA MODAL HAPUS DAN EDIT DENGAN DETAIL MODAL
+   ======================================================== -->
+<script>
+/**
+ * 1. Menangani fungsi modal konfirmasi hapus item
+ */
+function prepareDelete(cartKey, productName) {
+    const textTarget = document.getElementById('delete_item_text_target');
+    if (textTarget) {
+        textTarget.innerHTML = `Apakah Anda yakin ingin mengeluarkan menu <b class="text-white">"${productName}"</b> dari daftar keranjang belanja Anda?`;
+    }
+    
+    const deleteBtn = document.getElementById('btn_execute_delete_link');
+    if (deleteBtn) {
+        deleteBtn.href = `keranjang.php?action=delete&key=${cartKey}`;
+    }
+} 
+
+/**
+ * 2. PERBAIKAN: Memanggil detail_product_modal.php secara asinkronus
+ */
+function loadEditModal(productId, cartKey) {
+    const modalContainer = document.getElementById('modalEditProductContainer');
+    if (!modalContainer) {
+        console.error("Eror: Elemen id 'modalEditProductContainer' tidak ditemukan di HTML.");
+        return;
+    }
+
+    let modalDialog = modalContainer.querySelector('.modal-dialog');
+    if (!modalDialog) {
+        modalDialog = document.createElement('div');
+        modalDialog.className = 'modal-dialog modal-dialog-centered';
+        modalContainer.appendChild(modalDialog);
+    }
+    
+    // State loading premium bertema gelap transparan
+    modalDialog.innerHTML = `
+        <div class="modal-content text-white p-4 text-center rounded-4" 
+             style="background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(148, 163, 184, 0.2); backdrop-filter: blur(12px);">
+            <div class="spinner-border text-success mx-auto my-3" role="status"></div>
+            <p class="mb-0 small text-white-50">Mengambil detail produk...</p>
+        </div>
+    `;
+
+    // Mengambil komponen modal secara dinamis dari detail_product_modal.php
+    // Menyertakan ID produk, Key keranjang, dan anti-cache (Date.now)
+    fetch(`detail_product_modal.php?id=${productId}&key=${cartKey}&_cb=${Date.now()}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Gagal memuat detail_product_modal.php');
+            return response.text();
+        })
+        .then(htmlContent => {
+            // Memasukkan output HTML dari detail_product_modal.php ke dalam modal dialog
+            modalDialog.innerHTML = htmlContent;
+        })
+        .catch(error => {
+            console.error('Fetch Error:', error);
+            modalDialog.innerHTML = `
+                <div class="modal-content text-white p-4 text-center rounded-4" 
+                     style="background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(239, 68, 68, 0.3);">
+                    <i class="bi bi-exclamation-octagon text-danger fs-2 mb-2"></i>
+                    <h6 class="fw-bold mb-1">Gagal Memuat Detail</h6>
+                    <p class="small text-white-50 mb-3">Silakan coba beberapa saat lagi atau cek file detail_product_modal.php Anda.</p>
+                    <button type="button" class="btn btn-sm btn-secondary rounded-pill px-3 mx-auto" data-bs-dismiss="modal">Tutup</button>
+                </div>
+            `;
+        });
+}
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
