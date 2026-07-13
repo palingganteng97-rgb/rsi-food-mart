@@ -18,19 +18,37 @@ if ($action === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $price = isset($_POST['price']) ? floatval($_POST['price']) : 0;
     $image = isset($_POST['image']) ? trim($_POST['image']) : '';
     $notes = isset($_POST['notes']) ? trim($_POST['notes']) : '';
+    // simpan metadata varian & addons untuk mode edit
+    $variant = isset($_POST['variant']) ? trim($_POST['variant']) : '';
+    $addons = isset($_POST['addons']) ? $_POST['addons'] : [];
+    if (!is_array($addons)) { $addons = []; }
+
+    // DEBUG (sementara): cek apakah payload topping benar masuk
+    // Catat isi addons + hitungannya ke error log PHP
+    $dbg_addons_raw = $_POST['addons'] ?? null;
+    error_log('[api_cart.php:add] product_id=' . $id . ' addons_present=' . (isset($_POST['addons']) ? '1' : '0') . ' addons_type=' . gettype($dbg_addons_raw) . ' addons_count=' . (is_array($dbg_addons_raw) ? count($dbg_addons_raw) : 0) . ' addons=' . json_encode($dbg_addons_raw));
+
+
+
 
     if ($id > 0) {
         $cartKey = $id . '_' . md5($name . '_' . $notes);
 
-        if (isset($_SESSION['cart'][$cartKey])) {
+if (isset($_SESSION['cart'][$cartKey])) {
             $_SESSION['cart'][$cartKey]['qty'] += 1;
+            // jaga metadata tetap sesuai; jika berbeda, update
+            $_SESSION['cart'][$cartKey]['variant'] = $variant !== '' ? $variant : ($_SESSION['cart'][$cartKey]['variant'] ?? null);
+            $_SESSION['cart'][$cartKey]['addons'] = !empty($addons) ? $addons : ($_SESSION['cart'][$cartKey]['addons'] ?? []);
         } else {
-            $_SESSION['cart'][$cartKey] = [
+$_SESSION['cart'][$cartKey] = [
                 'id' => $id,
                 'name' => $name,
                 'price' => $price,
                 'image' => $image,
                 'notes' => $notes,
+                // metadata untuk mode edit
+                'variant' => $variant !== '' ? $variant : null,
+                'addons' => $addons,
                 'qty' => 1
             ];
         }
@@ -111,11 +129,14 @@ if ($action === 'update_saved' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Masukkan data baru ke dalam session
         $_SESSION['cart'][$newCartKey] = [
-            'id'    => $id,
+'id'    => $id,
             'name'  => $name,
             'price' => $price,
             'image' => $image,
             'notes' => $notes,
+            // mode edit: simpan metadata varian & topping jika ada
+            'variant' => isset($_POST['variant']) ? $_POST['variant'] : (isset($_SESSION['cart'][$oldKey]['variant']) ? $_SESSION['cart'][$oldKey]['variant'] : null),
+            'addons'  => isset($_POST['addons']) ? $_POST['addons'] : (isset($_SESSION['cart'][$oldKey]['addons']) ? $_SESSION['cart'][$oldKey]['addons'] : []),
             'qty'   => $currentQty
         ];
 

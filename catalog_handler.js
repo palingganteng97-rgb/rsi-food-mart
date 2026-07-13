@@ -8,6 +8,16 @@ let detailProductModalInstance = null;
 const grid = document.getElementById('catalogGrid');
 
 function openDetailProduct(data) {
+    // Mode global untuk membedakan tombol: tambah vs simpan perubahan
+    // default: tambah ke keranjang
+window.__detailMode = window.__detailMode || 'add';
+
+    // default label & mode
+    const cartBtn = document.getElementById('btn_detail_add_cart');
+    if (cartBtn) {
+        cartBtn.innerHTML = '<i class="bi bi-cart-plus-fill"></i> Tambah ke Keranjang';
+        cartBtn.classList.remove('btn-warning');
+    }
     document.getElementById('detail_product_name').innerText = data.name;
     document.getElementById('detail_product_category').innerText = data.category_name || 'General';
     document.getElementById('detail_product_description').innerText = data.description || 'Tidak ada deskripsi untuk menu sehat ini.';
@@ -186,8 +196,49 @@ function openDetailProduct(data) {
             });
     }
     
+
+
     const cartBtn = document.getElementById('btn_detail_add_cart');
     cartBtn.onclick = function() {
+        // Mode edit: simpan perubahan ke item keranjang yang sedang diedit
+        if (window.__detailMode === 'edit' && window.__editCartKey && window.__editProductId) {
+            // kumpulkan varian/topping saat ini
+            const variantSelectLocal = document.getElementById('detail_product_variant_select');
+            const variantId = variantSelectLocal && variantSelectLocal.value ? variantSelectLocal.value : '';
+
+            const addonsIds = [];
+            document.querySelectorAll('.addon-checkbox:checked').forEach(cb => {
+                addonsIds.push(cb.value);
+            });
+
+            const userNotes = notesInput ? notesInput.value.trim() : "";
+
+            const formData = new FormData();
+            formData.append('old_key', window.__editCartKey);
+            formData.append('id', data.id);
+            formData.append('name', finalProductName || data.name);
+            formData.append('price', data.base_price);
+            formData.append('image', data.image);
+            formData.append('notes', userNotes);
+            if (variantId) formData.append('variant', variantId);
+            addonsIds.forEach(aid => formData.append('addons[]', aid));
+
+            fetch('api_cart.php?action=update_saved', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res && res.success) {
+                    const modalEl = document.getElementById('modalDetailProduct');
+                    const instance = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
+                    if (instance) instance.hide();
+                    window.location.href = 'keranjang.php';
+                }
+            })
+            .catch(console.error);
+            return;
+        }
         // 1. Ambil varian terpilh
         const selectedVariantText = variantSelect && variantSelect.options[variantSelect.selectedIndex] ? variantSelect.options[variantSelect.selectedIndex].text : '';
         let variantPart = (selectedVariantText && !selectedVariantText.includes('Original') && !selectedVariantText.includes('Memuat')) ? selectedVariantText : '';
@@ -283,12 +334,24 @@ function resetFilters(){
 function tambahKeKeranjang(id, name, price, image, notes) {
     const userNotes = notes ? notes : '';
     
+    // ambil metadata varian & addons dari UI (agar bisa di-edit kembali)
+    const variantSelectLocal = document.getElementById('detail_product_variant_select');
+    const variantId = variantSelectLocal && variantSelectLocal.value ? variantSelectLocal.value : '';
+
+    const addonsIds = [];
+    document.querySelectorAll('.addon-checkbox:checked').forEach(cb => {
+        addonsIds.push(cb.value);
+    });
+    
     const formData = new FormData();
     formData.append('id', id);
     formData.append('name', name);
     formData.append('price', price);
     formData.append('image', image);
     formData.append('notes', userNotes);
+    if (variantId) formData.append('variant', variantId);
+    // kirim addons sebagai array id
+    addonsIds.forEach(aid => formData.append('addons[]', aid));
 
     fetch('api_cart.php?action=add', {
         method: 'POST',

@@ -1,19 +1,91 @@
 <?php
-// keranjang.php
+// keranjang.php - TAHAP 1: BACKEND CONTROLLER LOGIC
 include 'db.php'; 
 
-// 1. PERBAIKAN UTAMA: Wajib jalankan session_start() di baris pertama agar array cart terbaca
+// Wajib jalankan session_start() di baris pertama agar memori cart terbaca
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Proteksi halaman, wajib login terlebih dahulu
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: index.php");
     exit();
 }
 
-// 2. HANDLER BARU: Logika proses tambah (+) dan kurang (-) kuantitas item keranjang
-if (isset($_GET['action']) && $_GET['action'] === 'update_qty' && isset($_GET['key']) && isset($_GET['type'])) {
+$action = isset($_GET['action']) ? $_GET['action'] : '';
+
+// =========================================================================
+// AKSI A: Proses Tambah Menu Baru Dari home.php (Lengkap Beserta Topping)
+// =========================================================================
+if ($action === 'add_to_cart' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $product_id = isset($_POST['product_id']) ? intval($_POST['product_id']) : 0;
+    $qty        = isset($_POST['qty']) ? intval($_POST['qty']) : 1;
+    $notes      = isset($_POST['notes']) ? trim($_POST['notes']) : '';
+    $variant    = isset($_POST['variant']) ? $_POST['variant'] : 'Original';
+    
+    // Menangkap array ID item topping dari checkbox yang dicentang di modal home.php
+    $addon_item_ids = isset($_POST['addons']) ? $_POST['addons'] : []; 
+
+    if ($product_id > 0) {
+        // Tarik data dasar menu makanan dari database magang_rsi_food_mart
+        $query_prod = "SELECT name, base_price, image FROM products WHERE id = $product_id LIMIT 1";
+        $res_prod = mysqli_query($conn, $query_prod);
+        $prod_data = mysqli_fetch_assoc($res_prod);
+
+        $name = $prod_data['name'] ?? 'Menu';
+        $base_price = floatval($prod_data['base_price'] ?? 0);
+        $image = $prod_data['image'] ?? 'default.png';
+
+        // Olah data Topping (Addons) berdasarkan tabel addon_items di HeidiSQL
+        $addons_list = [];
+        $total_addon_price = 0;
+
+        if (!empty($addon_item_ids)) {
+            $ids_string = implode(',', array_map('intval', $addon_item_ids));
+            $query_addons = "SELECT id, item_name, price FROM addon_items WHERE id IN ($ids_string)";
+            $res_addons = mysqli_query($conn, $query_addons);
+
+            while ($row = mysqli_fetch_assoc($res_addons)) {
+                $addons_list[] = [
+                    'id' => $row['id'],
+                    'name' => $row['item_name'],
+                    'price' => floatval($row['price'])
+                ];
+                $total_addon_price += floatval($row['price']); 
+            }
+        }
+
+        // Akumulasi harga total = harga makanan dasar + total harga semua topping dicentang
+        $final_price = $base_price + $total_addon_price;
+
+        // Membuat unique cart key berbasis md5 agar menu sama dengan topping berbeda tidak saling menimpa
+        $cart_key = md5($product_id . '_' . $variant . '_' . serialize($addon_item_ids));
+
+        if (isset($_SESSION['cart'][$cart_key])) {
+            $_SESSION['cart'][$cart_key]['qty'] += $qty;
+        } else {
+            $_SESSION['cart'][$cart_key] = [
+                'id' => $product_id,
+                'name' => $name,
+                'price' => $final_price, 
+                'base_price' => $base_price, // Disimpan sebagai cadangan saat edit / reset topping
+                'image' => $image,
+                'qty' => $qty,
+                'notes' => $notes,
+                'variant' => $variant,
+                'addons' => $addons_list 
+            ];
+        }
+    }
+    header("Location: keranjang.php?status=success&msg=Menu berhasil dimasukkan ke keranjang");
+    exit();
+}
+
+// =========================================================================
+// AKSI B: Proses Tambah (+) & Kurang (-) Kuantitas Cepat Di List Keranjang
+// =========================================================================
+if ($action === 'update_qty' && isset($_GET['key']) && isset($_GET['type'])) {
     $cartKey = $_GET['key'];
     $type = $_GET['type'];
     
@@ -22,7 +94,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'update_qty' && isset($_GET['k
             $_SESSION['cart'][$cartKey]['qty'] += 1;
         } elseif ($type === 'minus') {
             $_SESSION['cart'][$cartKey]['qty'] -= 1;
-            // Jika kuantitas kurang dari 1, otomatis keluarkan hidangan dari keranjang
             if ($_SESSION['cart'][$cartKey]['qty'] < 1) {
                 unset($_SESSION['cart'][$cartKey]);
             }
@@ -32,35 +103,58 @@ if (isset($_GET['action']) && $_GET['action'] === 'update_qty' && isset($_GET['k
     }
 }
 
-// 3. HANDLER BARU: Logika memproses update data dari modal detail_product_modal.php
-if (isset($_GET['action']) && $_GET['action'] === 'update_item' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+// =========================================================================
+// AKSI C: Simpan Perubahan Hasil Edit Dari Form Modal
+// =========================================================================
+if ($action === 'update_item' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $cartKey = isset($_POST['cart_key']) ? $_POST['cart_key'] : '';
     $new_qty = isset($_POST['qty']) ? intval($_POST['qty']) : 1;
     $new_notes = isset($_POST['notes']) ? trim($_POST['notes']) : '';
-    $new_variant = isset($_POST['variant']) ? $_POST['variant'] : '';
-    $new_addons = isset($_POST['addons']) ? $_POST['addons'] : [];
+    $new_variant = isset($_POST['variant']) ? $_POST['variant'] : 'Original';
+    $new_addon_ids = isset($_POST['addons']) ? $_POST['addons'] : [];
 
     if (!empty($cartKey) && isset($_SESSION['cart'][$cartKey])) {
-        // Melakukan update data pesanan di dalam session secara langsung
+        $product_id = $_SESSION['cart'][$cartKey]['id'];
+        $base_price = isset($_SESSION['cart'][$cartKey]['base_price']) ? $_SESSION['cart'][$cartKey]['base_price'] : $_SESSION['cart'][$cartKey]['price'];
+
+        // Ambil data detail topping baru dari database jika user mengubah centang di modal edit
+        $addons_list = [];
+        $total_addon_price = 0;
+
+        if (!empty($new_addon_ids)) {
+            $ids_string = implode(',', array_map('intval', $new_addon_ids));
+            $query_addons = "SELECT id, item_name, price FROM addon_items WHERE id IN ($ids_string)";
+            $res_addons = mysqli_query($conn, $query_addons);
+
+            while ($row = mysqli_fetch_assoc($res_addons)) {
+                $addons_list[] = [
+                    'id' => $row['id'],
+                    'name' => $row['item_name'],
+                    'price' => floatval($row['price'])
+                ];
+                $total_addon_price += floatval($row['price']);
+            }
+        }
+
+        // Perbarui total komponen array session keranjang secara utuh
         $_SESSION['cart'][$cartKey]['qty'] = $new_qty;
         $_SESSION['cart'][$cartKey]['notes'] = $new_notes;
-        
-        // Opsional: Buka baris di bawah ini jika struktur session Anda mencatat varian & tambahan topping
-        // $_SESSION['cart'][$cartKey]['variant'] = $new_variant;
-        // $_SESSION['cart'][$cartKey]['addons'] = $new_addons;
+        $_SESSION['cart'][$cartKey]['variant'] = $new_variant;
+        $_SESSION['cart'][$cartKey]['addons'] = $addons_list;
+        $_SESSION['cart'][$cartKey]['price'] = $base_price + $total_addon_price;
 
-        header("Location: keranjang.php?status=success&msg=Pesanan berhasil disesuaikan");
+        header("Location: keranjang.php?status=success&msg=Pesanan berhasil diperbarui");
         exit();
     }
 }
 
-// === LOGIKA PROSES HAPUS ITEM SINKRON DENGAN API_CART ===
-if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['key'])) {
+// =========================================================================
+// AKSI D: Mengeluarkan / Menghapus Menu Dari Daftar Belanja
+// =========================================================================
+if ($action === 'delete' && isset($_GET['key'])) {
     $delete_key = $_GET['key'];
-    
     if (isset($_SESSION['cart'][$delete_key])) {
         unset($_SESSION['cart'][$delete_key]);
-        
         header("Location: keranjang.php?status=success&msg=Item berhasil dihapus");
         exit();
     }
@@ -69,7 +163,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['key']
 $status = isset($_GET['status']) ? $_GET['status'] : "";
 $msg = isset($_GET['msg']) ? $_GET['msg'] : "";
 
-// Mengambil data langsung dari session cart sesuai isi api_cart.php
+// Siapkan array data keranjang untuk dilempar ke HTML looping tahap 2
 $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
 ?>
 
@@ -118,13 +212,16 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
 </head>
 <body>
 
+<!-- ========================================================
+   TAHAP 2: VIEW LAYOUT - TAMPILAN KERANJANG DAN RINGKASAN
+   ======================================================== -->
 <div class="container my-5">
     <div class="row">
-        <!-- Kolom Kiri: Daftar Produk -->
+        <!-- Kolom Kiri: Daftar Produk Bertema Transparan Premium -->
         <div class="col-lg-8">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4 class="fw-bold"><i class="bi bi-cart3 me-2 text-success"></i> Keranjang Belanja Anda</h4>
-                <a href="home.php" class="btn btn-outline-light btn-sm rounded-pill px-3">← Kembali Belanja</a>
+                <h4 class="fw-bold text-white"><i class="bi bi-cart3 me-2 text-success"></i> Keranjang Belanja Anda</h4>
+                <a href="home.php" class="btn btn-outline-light btn-sm rounded-pill px-3" style="border: 1px solid rgba(148, 163, 184, 0.3); background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(4px);">← Kembali Belanja</a>
             </div>
 
             <?php 
@@ -138,51 +235,71 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
                     }
                     $has_items = true;
 
-                    $harga_satuan = isset($item['price']) ? floatval($item['price']) : 0;
+                    $harga_total_item = isset($item['price']) ? floatval($item['price']) : 0;
                     $kuantitas = isset($item['qty']) ? intval($item['qty']) : 1;
                     $nama_menu = isset($item['name']) ? $item['name'] : 'Menu';
                     $gambar_menu = isset($item['image']) ? $item['image'] : '';
 
-                    $total_per_item = $harga_satuan * $kuantitas;
+                    // Akumulasi harga item dikali jumlah kuantitas porsi
+                    $total_per_item = $harga_total_item * $kuantitas;
                     $subtotal += $total_per_item;
 
                     $path_gambar = "uploads/products/" . $gambar_menu;
-
                     if (empty($gambar_menu) || !file_exists($path_gambar)) {
                         $path_gambar = "uploads/products/gallery/" . $gambar_menu;
                     }
-
                     if (empty($gambar_menu) || !file_exists($path_gambar)) {
                         $path_gambar = "uploads/products/default.png"; 
                     }
             ?>
-                <!-- Item Card Bertema Premium Gelap Transparan Sesuai Etalase -->
+                <!-- Item Card Bertema Premium Gelap Transparan (Glassmorphism) -->
                 <div class="card mb-3 rounded-4 p-3 text-white" 
-                     style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.15); backdrop-filter: blur(8px);">
+                     style="background: rgba(30, 41, 59, 0.35) !important; border: 1px solid rgba(148, 163, 184, 0.15) !important; backdrop-filter: blur(12px); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);">
                     <div class="row align-items-center">
+                        
                         <!-- Gambar Produk -->
                         <div class="col-md-2 col-3">
-                            <div style="width: 80px; height: 80px; overflow: hidden; border-radius: 12px; border: 1px solid rgba(148, 163, 184, 0.1);">
+                            <div style="width: 80px; height: 80px; overflow: hidden; border-radius: 12px; border: 1px solid rgba(148, 163, 184, 0.15);">
                                 <img src="<?php echo $path_gambar; ?>" class="w-100 h-100" style="object-fit: cover;" onerror="this.src='uploads/products/default.png'">
                             </div>
                         </div>
                         
-                        <!-- Detail Produk -->
+                        <!-- Detail Info Produk (Lengkap dengan Varian, Catatan & List Topping Addons) -->
                         <div class="col-md-4 col-9">
                             <h5 class="mb-1 fw-bold text-white" style="font-size: 1.1rem;"><?php echo htmlspecialchars($nama_menu); ?></h5>
-                            <p class="text-success small mb-1 fw-semibold">Rp <?php echo number_format($harga_satuan, 0, ',', '.'); ?></p>
+                            
+                            <!-- Menampilkan Varian / Tingkat Opsi Hidangan -->
+                            <span class="badge bg-dark text-white-50 border border-secondary border-opacity-20 small p-1 px-2 fw-normal mb-1" style="font-size: 0.75rem;">
+                                Varian: <?php echo htmlspecialchars($item['variant'] ?? 'Original'); ?>
+                            </span>
+
+                            <!-- MENAMPILKAN DAFTAR TOPPING / ADDONS YANG DICENTANG -->
+                            <?php if (!empty($item['addons']) && is_array($item['addons'])): ?>
+                                <div class="d-flex flex-wrap gap-1 my-1">
+                                    <?php foreach ($item['addons'] as $addon): ?>
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-20 fw-normal style-addon-badge" style="font-size: 0.75rem; padding: 3px 8px; border-radius: 6px;">
+                                            <i class="bi bi-egg-fried me-1"></i> +<?php echo htmlspecialchars($addon['name']); ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+
+                            <!-- Menampilkan Catatan Pembeli -->
                             <?php if(!empty($item['notes'])): ?>
-                                <span class="badge bg-secondary text-warning fw-normal small" style="background: rgba(30, 41, 59, 0.7) !important; border: 1px solid rgba(148,163,184,0.1);">
-                                    <i class="bi bi-pencil-square me-1"></i> Catatan: <?php echo htmlspecialchars($item['notes']); ?>
-                                </span>
+                                <div class="mt-1">
+                                    <span class="badge text-warning fw-normal small" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148,163,184,0.15);">
+                                        <i class="bi bi-pencil-square me-1"></i> Catatan: <?php echo htmlspecialchars($item['notes']); ?>
+                                    </span>
+                                </div>
                             <?php endif; ?>
                         </div>
                         
-                        <!-- Logika Pengunci Tombol Minus saat Kuantitas bernilai 1 -->
+                        <!-- Logika Pengunci & Pengatur Kuantitas Cepat List Keranjang -->
                         <div class="col-md-3 col-6 my-2 my-md-0">
-                            <div class="d-inline-flex align-items-center rounded-3 p-1" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(148, 163, 184, 0.2);">
+                            <div class="d-inline-flex align-items-center rounded-3 p-1" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(148, 163, 184, 0.2); height: 38px;">
                                 <?php if ($kuantitas <= 1): ?>
-                                    <span class="btn btn-sm px-2 py-1 border-0 text-white-element" style="cursor: not-allowed; color: rgba(239, 68, 68, 0.45) !important;">
+                                    <!-- Terkunci Merah Lembut saat Qty = 1 -->
+                                    <span class="btn btn-sm px-2 py-1 border-0" style="cursor: not-allowed; color: rgba(239, 68, 68, 0.4) !important;">
                                         <i class="bi bi-dash-lg" style="font-size: 0.85rem;"></i>
                                     </span>
                                 <?php else: ?>
@@ -201,23 +318,24 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
                             </div>
                         </div>
                         
-                        <!-- Total Harga Item & Tombol Hapus Pemicu Modal -->
+                        <!-- Total Harga Item & Aksi Modifikasi Dinamis -->
                         <div class="col-md-3 col-6 text-end">
                             <h5 class="text-success fw-bold mb-2" style="font-size: 1.2rem;">Rp <?php echo number_format($total_per_item, 0, ',', '.'); ?></h5>
                             
-                            <div class="d-flex flex-column align-items-end gap-2">
-                                <!-- PERBAIKAN: data-bs-target diselaraskan menjadi #modalDetailProduct -->
+                            <div class="d-flex flex-column align-items-end gap-1">
+                                <!-- TOMBOL EDIT PESANAN: Mengirimkan objek utuh item PHP ke JavaScript -->
                                 <button type="button" class="btn text-warning bg-transparent p-0 border-0 small fw-medium" 
-                                        data-bs-toggle="modal" data-bs-target="#modalDetailProduct"
-                                        onclick="loadEditModal('<?php echo isset($item['id']) ? $item['id'] : ''; ?>', '<?php echo $cartKey; ?>')" 
-                                        style="box-shadow: none; font-size: 0.88rem;">
+                                        data-bs-toggle="modal" data-bs-target="#modalEditPesanan"
+                                        onclick='openEditPesananFromCart(<?php echo json_encode($item); ?>, "<?php echo $cartKey; ?>")' 
+                                        style="box-shadow: none; font-size: 0.85rem; opacity: 0.85;">
                                     <i class="bi bi-pencil-square me-1"></i> Edit Pesanan
                                 </button>
 
+                                <!-- TOMBOL HAPUS: Memicu konfirmasi modal aman -->
                                 <button type="button" class="btn text-danger bg-transparent p-0 border-0 small fw-medium" 
                                         data-bs-toggle="modal" data-bs-target="#modalConfirmDelete" 
                                         onclick="prepareDelete('<?php echo $cartKey; ?>', '<?php echo htmlspecialchars($nama_menu, ENT_QUOTES); ?>')" 
-                                        style="box-shadow: none; font-size: 0.88rem;">
+                                        style="box-shadow: none; font-size: 0.85rem; opacity: 0.85;">
                                     <i class="bi bi-trash3-fill me-1"></i> Hapus
                                 </button>
                             </div>
@@ -230,19 +348,20 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
 
             if (!$has_items): 
             ?>
-                <div class="bg-transparent text-center rounded-3 p-5" style="border: 2px dashed #334155;">
-                    <i class="bi bi-basket2 text-success mb-3" style="font-size: 3rem;"></i>
-                    <h5 class="text-white fw-medium mb-3">Keranjang belanja Anda masih kosong</h5>
+                <!-- State Tampilan Saat Keranjang Kosong -->
+                <div class="bg-transparent text-center rounded-4 p-5" style="border: 2px dashed rgba(148, 163, 184, 0.25);">
+                    <i class="bi bi-basket2 text-success mb-3" style="font-size: 3rem; opacity: 0.8;"></i>
+                    <h5 class="text-white-50 fw-medium mb-3">Keranjang belanja Anda masih kosong</h5>
                     <div>
-                        <a href="home.php" class="btn btn-success btn-sm rounded-3 px-4 fw-medium">Mulai Belanja</a>
+                        <a href="home.php" class="btn btn-success btn-sm rounded-pill px-4 fw-medium shadow">Mulai Belanja</a>
                     </div>
                 </div>
             <?php endif; ?>
         </div>
 
-        <!-- Kolom Kanan: Ringkasan Pembayaran (Melanjutkan Potongan Kode) -->
+<!-- Kolom Kanan: Ringkasan Pembayaran Pembeli -->
         <div class="col-lg-4">
-            <div class="bg-transparent rounded-4 p-4" style="border: 2px dashed #334155;">
+            <div class="bg-transparent rounded-4 p-4" style="border: 2px dashed rgba(148, 163, 184, 0.25); backdrop-filter: blur(8px);">
                 <h4 class="fw-bold mb-4 text-white">Ringkasan Pesanan</h4>
                 
                 <div class="d-flex justify-content-between mb-2">
@@ -253,7 +372,7 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
                     <span class="text-white-50">Pajak / Layanan</span>
                     <span class="fw-semibold text-white">Rp 0</span>
                 </div>
-                <hr class="border-secondary">
+                <hr class="border-secondary border-opacity-50">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <span class="fw-bold fs-5 text-white">Total Bayar</span>
                     <span class="text-success fw-bold fs-4">Rp <?php echo number_format($subtotal, 0, ',', '.'); ?></span>
@@ -264,259 +383,280 @@ $cart_items = isset($_SESSION['cart']) ? $_SESSION['cart'] : [];
                 </button>
             </div>
         </div>
-    </div>
-</div>
+    </div> <!-- Penutup Row Utama -->
+</div> <!-- Penutup Container my-5 -->
 
-<style>
-    /* Mengaktifkan fungsi gulir/scroll utama pada isi modal */
-    #modalDetailProduct .modal-body {
-        overflow-y: auto !important;
-        padding: 0 !important;
-        max-height: 80vh; /* Membatasi tinggi isi modal agar tidak melebihi layar HP */
-    }
-    
-    /* DESKTOP LAYAR LEBAR (Min-width 768px) */
-    @media (min-width: 768px) {
-        #modalDetailProduct .scrollable-detail-column {
-            max-height: 52vh !important;
-            overflow-y: auto !important;
-            -ms-overflow-style: none !important;  
-            scrollbar-width: none !important;     
-        }
-        #modalDetailProduct .scrollable-detail-column::-webkit-scrollbar {
-            display: none !important;
-        }
-        #modalDetailProduct {
-            overflow-y: hidden !important;
-        }
-        #modalDetailProduct .modal-body {
-            max-height: none;
-        }
-    }
-
-    /* MOBILE / HP (Max-width 767.98px) */
-    @media (max-width: 767.98px) {
-        #modalDetailProduct .scrollable-detail-column {
-            max-height: none !important; 
-            overflow-y: visible !important;
-        }
-        #detail_product_carousel_inner img {
-            height: 240px !important; /* Menjaga agar gambar tidak terlalu memakan tempat di HP */
-        }
-    }
-
-    #carouselDetailProduct, 
-    #detail_product_carousel_inner, 
-    .carousel-item {
-        overflow: hidden !important;
-        white-space: nowrap !important;
-        -ms-overflow-style: none !important;  
-        scrollbar-width: none !important;     
-    }
-    #detail_product_carousel_inner img {
-        display: block !important;
-        width: 100% !important;
-        max-width: 380px !important;
-        height: 340px; 
-        object-fit: cover !important;
-        border-radius: 14px !important;
-        margin: 0 auto !important;
-    }
-    
-    /* PERBAIKAN: Mengunci posisi footer di bawah (Sticky) untuk responsivitas mobile */
-    #modalDetailProduct .fixed-product-footer {
-        border-top: 1px solid rgba(148, 163, 184, 0.15);
-        background: rgba(15, 23, 42, 0.95) !important; /* Dibuat pekat agar konten teks di belakangnya tersamar */
-        backdrop-filter: blur(8px);
-        margin-top: 20px;
-        padding: 15px !important; /* Memastikan ruang klik lega di HP */
-        position: sticky;
-        bottom: 0;
-        z-index: 10;
-    }
-    
-    @media (min-width: 1200px) {
-        #modalDetailProduct .modal-dialog {
-            max-width: 1100px !important; 
-            width: 1100px !important;
-        }
-    }
-</style>
-
-<div class="modal fade" id="modalDetailProduct" aria-labelledby="modalDetailProductLabel" role="dialog" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
-        <div class="modal-content" style="background: rgba(15, 23, 42, 0.96) !important; backdrop-filter: blur(16px); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb; border-radius: 20px;">
-            <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15); padding: 1.25rem 2rem;">
-                <h5 class="modal-title fw-bold text-white" id="modalDetailProductLabel">Detail Produk</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-0"> 
-                <div class="row g-0">
-                    
-                    <!-- KONTEN KIRI: Bagian Gambar (Dipastikan berpasangan dengan benar) -->
-                    <div class="col-md-5 text-center p-4 p-md-5 border-bottom border-md-0 border-md-end" style="border-color: rgba(148, 163, 184, 0.15) !important;">
-                        <div class="position-relative mx-auto" style="max-width: 380px;">
-                            <div id="carouselDetailProduct" class="carousel slide shadow-lg rounded-4" data-bs-ride="carousel" style="overflow: hidden !important;">
-                                <div class="carousel-inner" id="detail_product_carousel_inner" style="overflow: hidden !important;">
-                                    <!-- Diisi otomatis oleh JavaScript openDetailProduct -->
-                                </div>
-                            </div>
-                            <button class="carousel-control-prev" type="button" data-bs-target="#carouselDetailProduct" data-bs-slide="prev" id="carousel_btn_prev" 
-                                    style="width: 44px; height: 44px; top: 50%; transform: translateY(-50%); left: -20px; position: absolute; background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 50%;">
-                                <span class="carousel-control-prev-icon" aria-hidden="true" style="width: 22px; height: 22px;"></span>
-                            </button>
-                            <button class="carousel-control-next" type="button" data-bs-target="#carouselDetailProduct" data-bs-slide="next" id="carousel_btn_next" 
-                                    style="width: 44px; height: 44px; top: 50%; transform: translateY(-50%); right: -20px; position: absolute; background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 50%;">
-                                <span class="carousel-control-next-icon" aria-hidden="true" style="width: 22px; height: 22px;"></span>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- KONTEN KANAN: Bagian Form Isian dan Tombol -->
-                    <div class="col-md-7 p-4 p-md-5 d-md-flex flex-md-column justify-content-between">
-                        <div class="scrollable-detail-column pe-2"> 
-                            <h2 id="detail_product_name" class="fw-bold text-white mb-1" style="font-size: 2.25rem;"></h2>
-                            <p id="detail_product_category" class="text-white-50 small text-uppercase mb-4" style="letter-spacing: 1.5px; opacity: 0.8;"></p>
-                            
-                            <div class="p-3 rounded-3 mb-4" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.12); border-radius: 12px;">
-                                <label class="small text-white-50 d-block mb-1.5" style="opacity: 0.7; font-weight: 500;">Deskripsi Hidangan:</label>
-                                <span id="detail_product_description" class="text-light-50" style="font-size: 0.95rem; line-height: 1.6;"></span>
-                            </div>
-                            
-                            <div class="mb-4">
-                                <label id="label_product_variant" for="detail_product_variant_select" class="small text-white-50 d-block mb-2" style="opacity: 0.7; font-weight: 500;">Pilih Varian / Opsi:</label>
-                                <select id="detail_product_variant_select" class="form-select text-white border-secondary py-2 px-3" style="background: rgba(2, 6, 23, 0.4); border-radius: 10px; font-size: 0.92rem; box-shadow: none;">
-                                </select>
-                            </div>
-
-                            <div class="mb-4">
-                                <label class="small text-white-50 d-block mb-2" style="opacity: 0.7; font-weight: 500;">Pilih Topping / Tambahan :</label>
-                                <div id="detail_product_addons_container" class="d-flex flex-column gap-2 p-2 rounded-3" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.12);">
-                                </div>
-                            </div>
-
-                            <div class="mb-4">
-                                <label for="detail_product_notes_input" class="small text-white-50 d-block mb-2" style="opacity: 0.7; font-weight: 500;">Catatan Tambahan Pembeli (Opsional):</label>
-                                <input type="text" id="detail_product_notes_input" class="form-control text-white border-secondary py-2.5 px-3" 
-                                       style="background: rgba(2, 6, 23, 0.4); border-radius: 10px; font-size: 0.92rem; box-shadow: none;" 
-                                       placeholder="Contoh: tidak usah pake sedotan, sendok plastik, pisah kuah...">
-                            </div>
-                            
-                            <div class="mt-4 pt-4" style="border-top: 1px solid rgba(148, 163, 184, 0.15);">
-                                <h5 class="fw-bold text-white mb-3 d-flex align-items-center gap-2">
-                                    <i class="bi bi-chat-left-heart-fill text-warning"></i> Ulasan & Testimoni Pasien
-                                </h5>
-                                <div id="detail_product_reviews_container" class="d-flex flex-column gap-3">
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="d-flex justify-content-between align-items-center fixed-product-footer mt-auto pt-3">
-                            <div>
-                                <span class="text-white-50 small d-block mb-1" style="opacity: 0.7;">Harga Total</span>
-                                <h3 id="detail_product_price" class="fw-bold text-success m-0" style="font-size: 1.75rem;"></h3>
-                            </div>
-                            <button type="button" id="btn_detail_add_cart" class="btn btn-success px-4 py-2.5 fw-medium rounded-3 d-flex align-items-center gap-2" style="border-radius: 10px !important;">
-                                <i class="bi bi-cart-plus-fill"></i> Tambah ke Keranjang
-                            </button>
-                        </div>
-                    </div>
-                    
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 2. Container Modal Konfirmasi Hapus -->
-<div class="modal fade" id="modalConfirmDelete" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+<!-- ============================================================
+     CONTAINER MODAL 1: KONFIRMASI HAPUS ITEM FROM SESSION
+============================================================ -->
+<div class="modal fade" id="modalConfirmDelete" tabindex="-1" aria-hidden="true" aria-labelledby="modalConfirmDeleteLabel">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 450px;">
         <div class="modal-content text-white rounded-4 border-0 shadow-lg" 
-             style="background: rgba(15, 23, 42, 0.98); border: 1px solid rgba(148, 163, 184, 0.15) !important; backdrop-filter: blur(16px);">
-            <div class="modal-header border-bottom border-secondary border-opacity-25 p-3">
-                <h5 class="modal-title fw-bold text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Keluarkan Menu</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-shadow="none" data-bs-dismiss="modal" aria-label="Close"></button>
+             style="background: rgba(15, 23, 42, 0.96) !important; border: 1px solid rgba(148, 163, 184, 0.18) !important; backdrop-filter: blur(16px);">
+            <div class="modal-header border-bottom border-secondary border-opacity-25 p-3 px-4">
+                <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2" id="modalConfirmDeleteLabel">
+                    <i class="bi bi-exclamation-triangle-fill"></i> Hapus Item
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="box-shadow: none;"></button>
             </div>
-            <div class="modal-body p-4 text-white-50" id="delete_item_text_target">
-                <!-- Kalimat konfirmasi dinamis disuntikkan di sini oleh fungsi prepareDelete -->
+            <div class="modal-body p-4 text-white-50 fs-6" id="delete_item_text_target" style="line-height: 1.5;">
                 Apakah Anda yakin ingin mengeluarkan menu ini dari daftar keranjang belanja Anda?
             </div>
-            <div class="modal-footer border-top border-secondary border-opacity-25 p-3">
-                <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-3 fw-medium" data-bs-dismiss="modal">Batal</button>
-                <a id="btn_execute_delete_link" href="#" class="btn btn-sm btn-danger rounded-pill px-4 fw-medium">Ya, Hapus</a>
+            <div class="modal-footer border-top border-secondary border-opacity-25 p-3 px-4 justify-content-end gap-2">
+                <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-3 fw-medium" data-bs-dismiss="modal" style="font-size: 0.88rem;">Batal</button>
+                <a id="btn_execute_delete_link" href="#" class="btn btn-sm btn-danger rounded-pill px-4 fw-medium shadow-sm" style="font-size: 0.88rem;">Ya, Hapus</a>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ========================================================
-   JAVASCRIPT LOGIKA MODAL HAPUS DAN EDIT DENGAN DETAIL MODAL
-   ======================================================== -->
+<!-- ============================================================
+     CONTAINER MODAL 2: EDIT QUANTITY, VARIANT & ADDONS TOPPING
+============================================================ -->
+<style>
+  #modalEditPesanan .modal-content {
+    background: rgba(15, 23, 42, 0.96) !important;
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    color: #e5e7eb;
+    border-radius: 20px;
+  }
+  #modalEditPesanan .modal-header {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+    padding: 1.0rem 1.25rem;
+  }
+</style>
+
+<div class="modal fade" id="modalEditPesanan" aria-labelledby="modalEditPesananLabel" role="dialog" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <form id="formEditPesanan" method="POST" action="keranjang.php?action=update_item" class="w-100">
+      <input type="hidden" name="cart_key" id="edit_cart_key" value="">
+
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold text-white" id="modalEditPesananLabel">Edit Detail Pesanan</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body p-4">
+            <div class="row align-items-center mb-4">
+                <div class="col-12">
+                    <div class="text-white-50 small mb-1" style="opacity:.8;">Nama Menu Hidangan</div>
+                    <h3 class="fw-bold text-white m-0" id="edit_item_name">-</h3>
+                </div>
+            </div>
+
+            <div class="p-3 rounded-4 mb-4" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.12);">
+                <div class="row text-center text-sm-start">
+                    <div class="col-sm-6 mb-2 mb-sm-0">
+                        <div class="text-white-50 small mb-1" style="opacity:.8;">Harga Satuan Utama</div>
+                        <div class="fw-bold text-success fs-5" id="edit_unit_price">Rp 0</div>
+                    </div>
+                    <div class="col-sm-6 text-sm-end">
+                        <div class="text-white-50 small mb-1" style="opacity:.8;">Total Akumulasi Item</div>
+                        <div class="fw-bold text-success fs-4" id="edit_item_total">Rp 0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Isian Input Pengubah Kuantitas Porsi -->
+            <div class="mb-4">
+              <label for="edit_qty" class="form-label text-white-50 small fw-medium mb-2" style="opacity:.85;">Jumlah Porsi Pesanan</label>
+              <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-dark border border-secondary border-opacity-25" id="btnQtyMinus" style="width:44px; height:40px; border-radius:10px;">
+                  <i class="bi bi-dash-lg text-white"></i>
+                </button>
+                <input type="number" class="form-control text-center fw-bold fs-5 p-0" id="edit_qty" name="qty" min="1" step="1" value="1" readonly style="background: rgba(2, 6, 23, 0.4); border-radius: 10px; border: 1px solid rgba(148,163,184,0.25); color:#e5e7eb; width: 65px; height: 40px; box-shadow: none;">
+                <button type="button" class="btn btn-dark border border-secondary border-opacity-25" id="btnQtyPlus" style="width:44px; height:40px; border-radius:10px;">
+                  <i class="bi bi-plus-lg text-white"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Opsi Pilihan Varian Tingkat Pedas -->
+            <div class="mb-4">
+                <label for="edit_variant" class="form-label text-white-50 small fw-medium mb-2" style="opacity:.85;">Pilih Tingkat Varian / Opsi</label>
+                <select id="edit_variant" name="variant" class="form-select text-white border-secondary py-2 px-3" style="background: rgba(2, 6, 23, 0.4); border-radius: 10px; font-size: 0.92rem; box-shadow: none;">
+                    <!-- Diisi dinamis oleh JavaScript menggunakan data session / query database -->
+                </select>
+            </div>
+
+            <!-- Opsi Checkbox Pilihan Topping Dinamis -->
+            <div class="mb-4">
+                <label class="form-label text-white-50 small fw-medium mb-2" style="opacity:.85;">Pilih Tambahan Topping / Addons</label>
+                <div id="edit_addons_container" class="d-flex flex-column gap-2 p-2 rounded-3" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.12);">
+                    <!-- Checkbox Topping (Sosis Ayam / Telur Ayam) akan di-render otomatis di sini -->
+                </div>
+            </div>
+
+            <!-- Isian Input Catatan Pembeli -->
+            <div class="mb-2">
+              <label for="edit_notes" class="form-label text-white-50 small fw-medium mb-2" style="opacity:.85;">Catatan Tambahan untuk Dapur (opsional)</label>
+              <input type="text" class="form-control py-2.5 px-3" id="edit_notes" name="notes" placeholder="Contoh: tidak usah pake sedotan, sendok plastik, pisah kuah..." style="background: rgba(2, 6, 23, 0.4); border-radius: 12px; border: 1px solid rgba(148,163,184,0.25); color:#e5e7eb; box-shadow: none; font-size: 0.92rem;">
+            </div>
+        </div>
+
+        <!-- Footer Tombol Aksi Simpan Form -->
+        <div class="modal-footer border-top border-secondary border-opacity-25 p-3 px-4">
+          <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-3 fw-medium" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-sm btn-success rounded-pill fw-medium px-4 shadow-sm">Simpan Perubahan</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
-/**
- * 1. Menangani fungsi modal konfirmasi hapus item
- */
+function openEditPesananFromCart(item, cartKey) {
+    if (!item) return;
+
+    const productId = parseInt(item.id) || 0;
+    const basePrice = parseFloat(item.base_price) || parseFloat(item.price) || 0;
+    const currentQty = parseInt(item.qty) || 1;
+
+    document.getElementById('edit_cart_key').value = cartKey;
+    document.getElementById('edit_item_name').innerText = item.name || 'Menu';
+    document.getElementById('edit_qty').value = currentQty;
+    document.getElementById('edit_notes').value = item.notes || '';
+    document.getElementById('edit_unit_price').innerText = 'Rp ' + basePrice.toLocaleString('id-ID');
+
+    const variantSelect = document.getElementById('edit_variant');
+    if (variantSelect && productId > 0) {
+        fetch(`get_variants.php?product_id=${productId}&_cb=${Date.now()}`)
+            .then(res => res.json())
+            .then(variants => {
+                variantSelect.innerHTML = '';
+                if (!variants || variants.length === 0) {
+                    variantSelect.innerHTML = `<option value="Original">Original (Bawaan)</option>`;
+                } else {
+                    variants.forEach(v => {
+                        const isSelected = item.variant === v.name ? 'selected' : '';
+                        variantSelect.innerHTML += `<option value="${v.name}" ${isSelected}>${v.name}</option>`;
+                    });
+                }
+            }).catch(() => {
+                variantSelect.innerHTML = `<option value="Original">Original</option>`;
+            });
+    }
+
+    const addonsContainer = document.getElementById('edit_addons_container');
+    if (addonsContainer && productId > 0) {
+        addonsContainer.innerHTML = `<p class="small text-white-50 text-center m-0 py-2"><span class="spinner-border spinner-border-sm text-success me-2"></span>Memuat topping...</p>`;
+        
+        fetch(`get_addon_items.php?product_id=${productId}&_cb=${Date.now()}`)
+            .then(res => res.json())
+            .then(addons => {
+                addonsContainer.innerHTML = '';
+                if (!addons || addons.length === 0) {
+                    addonsContainer.innerHTML = `<p class="small text-white-50 text-center m-0 py-2">Tidak ada pilihan topping tambahan.</p>`;
+                    hitungTotalItemLive();
+                    return;
+                }
+
+                const selectedAddonIds = item.addons ? item.addons.map(a => parseInt(a.id)) : [];
+
+                addons.forEach(addon => {
+                    const addonId = parseInt(addon.id);
+                    const isChecked = selectedAddonIds.includes(addonId) ? 'checked' : '';
+
+                    addonsContainer.innerHTML += `
+                        <div class="form-check d-flex align-items-center justify-content-between p-2 rounded-2 mx-2">
+                            <div>
+                                <input class="form-check-input me-2 addon-checkbox-input" type="checkbox" name="addons[]" value="${addonId}" id="addon_${addonId}" data-price="${addon.price}" ${isChecked}>
+                                <label class="form-check-label text-white small" for="addon_${addonId}">
+                                    ${addon.item_name}
+                                </label>
+                            </div>
+                            <span class="text-success small fw-semibold">+Rp ${parseInt(addon.price).toLocaleString('id-ID')}</span>
+                        </div>
+                    `;
+                });
+
+                document.querySelectorAll('.addon-checkbox-input').forEach(checkbox => {
+                    checkbox.addEventListener('change', hitungTotalItemLive);
+                });
+
+                hitungTotalItemLive();
+            }).catch(err => {
+                console.error(err);
+                addonsContainer.innerHTML = `<p class="small text-danger text-center m-0 py-2">Gagal memuat daftar topping.</p>`;
+                hitungTotalItemLive();
+            });
+    } else {
+        hitungTotalItemLive();
+    }
+}
+
+function hitungTotalItemLive() {
+    const qtyInput = document.getElementById('edit_qty');
+    const unitPriceText = document.getElementById('edit_unit_price').innerText || 'Rp 0';
+    const totalDisplay = document.getElementById('edit_item_total');
+
+    if (!qtyInput || !totalDisplay) return;
+
+    const qty = parseInt(qtyInput.value) || 1;
+    const basePrice = parseFloat(unitPriceText.replace(/[^0-9]/g, '')) || 0;
+
+    let totalAddonPrice = 0;
+    document.querySelectorAll('.addon-checkbox-input:checked').forEach(checkbox => {
+        totalAddonPrice += parseFloat(checkbox.dataset.price) || 0;
+    });
+
+    const finalTotal = (basePrice + totalAddonPrice) * qty;
+    totalDisplay.innerText = 'Rp ' + finalTotal.toLocaleString('id-ID');
+
+    syncQtyButtons();
+}
+
+function syncQtyButtons() {
+    const qtyInput = document.getElementById('edit_qty');
+    const minusBtn = document.getElementById('btnQtyMinus');
+
+    if (!qtyInput || !minusBtn) return;
+
+    const q = parseInt(qtyInput.value) || 1;
+    if (q <= 1) {
+        minusBtn.style.opacity = '0.35';
+        minusBtn.style.pointerEvents = 'none';
+    } else {
+        minusBtn.style.opacity = '1';
+        minusBtn.style.pointerEvents = 'auto';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const qtyInput = document.getElementById('edit_qty');
+    const minusBtn = document.getElementById('btnQtyMinus');
+    const plusBtn = document.getElementById('btnQtyPlus');
+
+    if (minusBtn && plusBtn && qtyInput) {
+        minusBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            let q = parseInt(qtyInput.value) || 1;
+            if (q > 1) {
+                qtyInput.value = q - 1;
+                hitungTotalItemLive();
+            }
+        });
+
+        plusBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            let q = parseInt(qtyInput.value) || 1;
+            qtyInput.value = q + 1;
+            hitungTotalItemLive();
+        });
+    }
+});
+
 function prepareDelete(cartKey, productName) {
     const textTarget = document.getElementById('delete_item_text_target');
     if (textTarget) {
         textTarget.innerHTML = `Apakah Anda yakin ingin mengeluarkan menu <b class="text-white">"${productName}"</b> dari daftar keranjang belanja Anda?`;
     }
-    
     const deleteBtn = document.getElementById('btn_execute_delete_link');
     if (deleteBtn) {
         deleteBtn.href = `keranjang.php?action=delete&key=${cartKey}`;
     }
-} 
-
-/**
- * 2. PERBAIKAN: Memanggil detail_product_modal.php secara asinkronus
- */
-function loadEditModal(productId, cartKey) {
-    const modalContainer = document.getElementById('modalEditProductContainer');
-    if (!modalContainer) {
-        console.error("Eror: Elemen id 'modalEditProductContainer' tidak ditemukan di HTML.");
-        return;
-    }
-
-    let modalDialog = modalContainer.querySelector('.modal-dialog');
-    if (!modalDialog) {
-        modalDialog = document.createElement('div');
-        modalDialog.className = 'modal-dialog modal-dialog-centered';
-        modalContainer.appendChild(modalDialog);
-    }
-    
-    // State loading premium bertema gelap transparan
-    modalDialog.innerHTML = `
-        <div class="modal-content text-white p-4 text-center rounded-4" 
-             style="background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(148, 163, 184, 0.2); backdrop-filter: blur(12px);">
-            <div class="spinner-border text-success mx-auto my-3" role="status"></div>
-            <p class="mb-0 small text-white-50">Mengambil detail produk...</p>
-        </div>
-    `;
-
-    // Mengambil komponen modal secara dinamis dari detail_product_modal.php
-    // Menyertakan ID produk, Key keranjang, dan anti-cache (Date.now)
-    fetch(`detail_product_modal.php?id=${productId}&key=${cartKey}&_cb=${Date.now()}`)
-        .then(response => {
-            if (!response.ok) throw new Error('Gagal memuat detail_product_modal.php');
-            return response.text();
-        })
-        .then(htmlContent => {
-            // Memasukkan output HTML dari detail_product_modal.php ke dalam modal dialog
-            modalDialog.innerHTML = htmlContent;
-        })
-        .catch(error => {
-            console.error('Fetch Error:', error);
-            modalDialog.innerHTML = `
-                <div class="modal-content text-white p-4 text-center rounded-4" 
-                     style="background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(239, 68, 68, 0.3);">
-                    <i class="bi bi-exclamation-octagon text-danger fs-2 mb-2"></i>
-                    <h6 class="fw-bold mb-1">Gagal Memuat Detail</h6>
-                    <p class="small text-white-50 mb-3">Silakan coba beberapa saat lagi atau cek file detail_product_modal.php Anda.</p>
-                    <button type="button" class="btn btn-sm btn-secondary rounded-pill px-3 mx-auto" data-bs-dismiss="modal">Tutup</button>
-                </div>
-            `;
-        });
 }
 </script>
 
