@@ -10,7 +10,7 @@ const grid = document.getElementById('catalogGrid');
 function openDetailProduct(data) {
     // Mode global untuk membedakan tombol: tambah vs simpan perubahan
     // default: tambah ke keranjang
-window.__detailMode = window.__detailMode || 'add';
+    window.__detailMode = window.__detailMode || 'add';
 
     // default label & mode
     const cartBtn = document.getElementById('btn_detail_add_cart');
@@ -195,11 +195,10 @@ window.__detailMode = window.__detailMode || 'add';
                 if (carouselEl) { bootstrap.Carousel.getOrCreateInstance(carouselEl).to(0); }
             });
     }
-    
 
+        cartBtn = document.getElementById('btn_detail_add_cart');
+        cartBtn.onclick = function() {
 
-    const cartBtn = document.getElementById('btn_detail_add_cart');
-    cartBtn.onclick = function() {
         // Mode edit: simpan perubahan ke item keranjang yang sedang diedit
         if (window.__detailMode === 'edit' && window.__editCartKey && window.__editProductId) {
             // kumpulkan varian/topping saat ini
@@ -331,36 +330,32 @@ function resetFilters(){
   applyFilters();
 }
 
+// Tambahkan fungsi jembatan ini di script home.php Anda agar onclick lama tidak error
 function tambahKeKeranjang(id, name, price, image, notes) {
-    const userNotes = notes ? notes : '';
+    // Membawa logika ke fungsi otomatis baru
+    const tombolPalsu = document.createElement('button');
+    tombolPalsu.setAttribute('data-id', id);
+    tombolPalsu.setAttribute('data-price', price);
     
-    // ambil metadata varian & addons dari UI (agar bisa di-edit kembali)
-    const variantSelectLocal = document.getElementById('detail_product_variant_select');
-    const variantId = variantSelectLocal && variantSelectLocal.value ? variantSelectLocal.value : '';
-
-    const addonsIds = [];
-    document.querySelectorAll('.addon-checkbox:checked').forEach(cb => {
-        addonsIds.push(cb.value);
-    });
-    
-    const formData = new FormData();
-    formData.append('id', id);
-    formData.append('name', name);
-    formData.append('price', price);
-    formData.append('image', image);
-    formData.append('notes', userNotes);
-    if (variantId) formData.append('variant', variantId);
-    // kirim addons sebagai array id
-    addonsIds.forEach(aid => formData.append('addons[]', aid));
+    // Kirim data menggunakan logika dispatch event atau panggil langsung fungsi AJAX Anda
+    const payload = new FormData();
+    payload.append('id', id);
+    payload.append('price', price);
+    payload.append('notes', notes || '');
 
     fetch('api_cart.php?action=add', {
         method: 'POST',
-        body: formData
+        body: payload
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            updateCartBadgeDisplay(data.total_items);
+    .then(res => res.json())
+    .then(resData => {
+        if (resData.success) {
+            const counterBawah = document.getElementById('counter-total-pesanan') || document.querySelector('.fw-bold + div');
+            if (counterBawah) {
+                counterBawah.textContent = resData.total_items + " item";
+            } else {
+                window.location.reload();
+            }
         }
     })
     .catch(err => console.error(err));
