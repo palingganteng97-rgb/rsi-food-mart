@@ -10,7 +10,8 @@ const grid = document.getElementById('catalogGrid');
 function openDetailProduct(data) {
     // Mode global untuk membedakan tombol: tambah vs simpan perubahan
     // default: tambah ke keranjang
-window.__detailMode = window.__detailMode || 'add';
+    window.__detailMode = window.__detailMode || 'add';
+
 
     // default label & mode
     const cartBtn = document.getElementById('btn_detail_add_cart');
@@ -198,20 +199,29 @@ window.__detailMode = window.__detailMode || 'add';
     
 
 
-    const cartBtn = document.getElementById('btn_detail_add_cart');
     cartBtn.onclick = function() {
-        // Mode edit: simpan perubahan ke item keranjang yang sedang diedit
+        // 1. Ambil varian terpilih
+        const selectedVariantText = variantSelect && variantSelect.options[variantSelect.selectedIndex] ? variantSelect.options[variantSelect.selectedIndex].text : '';
+        let variantPart = (selectedVariantText && !selectedVariantText.includes('Original') && !selectedVariantText.includes('Memuat')) ? selectedVariantText : '';
+
+        // 2. Ambil semua topping yang dicentang pembeli
+        let selectedToppings = [];
+        document.querySelectorAll('.addon-checkbox:checked').forEach(cb => {
+            selectedToppings.push(cb.value);
+        });
+
+        let toppingPart = selectedToppings.length > 0 ? 'Topping: ' + selectedToppings.join(', ') : '';
+
+        // 3. Gabungkan varian dan topping ke nama produk akhir (Dipindahkan ke atas agar bisa dibaca oleh Mode Edit)
+        const finalProductName = [variantPart, toppingPart].filter(Boolean).join(' | ') ? `${data.name} (${[variantPart, toppingPart].filter(Boolean).join(' | ')})` : data.name;
+        
+        // 4. Ambil catatan ketikan kustom
+        const userNotes = notesInput ? notesInput.value.trim() : "";
+
+        // MODE EDIT: Simpan perubahan ke item keranjang yang sedang diedit
         if (window.__detailMode === 'edit' && window.__editCartKey && window.__editProductId) {
-            // kumpulkan varian/topping saat ini
             const variantSelectLocal = document.getElementById('detail_product_variant_select');
             const variantId = variantSelectLocal && variantSelectLocal.value ? variantSelectLocal.value : '';
-
-            const addonsIds = [];
-            document.querySelectorAll('.addon-checkbox:checked').forEach(cb => {
-                addonsIds.push(cb.value);
-            });
-
-            const userNotes = notesInput ? notesInput.value.trim() : "";
 
             const formData = new FormData();
             formData.append('old_key', window.__editCartKey);
@@ -221,7 +231,7 @@ window.__detailMode = window.__detailMode || 'add';
             formData.append('image', data.image);
             formData.append('notes', userNotes);
             if (variantId) formData.append('variant', variantId);
-            addonsIds.forEach(aid => formData.append('addons[]', aid));
+            selectedToppings.forEach(aid => formData.append('addons[]', aid));
 
             fetch('api_cart.php?action=update_saved', {
                 method: 'POST',
@@ -239,24 +249,8 @@ window.__detailMode = window.__detailMode || 'add';
             .catch(console.error);
             return;
         }
-        // 1. Ambil varian terpilh
-        const selectedVariantText = variantSelect && variantSelect.options[variantSelect.selectedIndex] ? variantSelect.options[variantSelect.selectedIndex].text : '';
-        let variantPart = (selectedVariantText && !selectedVariantText.includes('Original') && !selectedVariantText.includes('Memuat')) ? selectedVariantText : '';
-
-        // 2. Ambil semua topping yang dicentang pembeli
-        let selectedToppings = [];
-        document.querySelectorAll('.product-addon-checkbox:checked').forEach(cb => {
-            selectedToppings.push(cb.value);
-        });
-        let toppingPart = selectedToppings.length > 0 ? 'Topping: ' + selectedToppings.join(', ') : '';
-
-        // Gabungkan varian dan topping ke nama produk akhir
-        let extraInfo = [variantPart, toppingPart].filter(Boolean).join(' | ');
-        const finalProductName = extraInfo ? `${data.name} (${extraInfo})` : data.name;
         
-        // 3. Ambil catatan ketikan kustom
-        const userNotes = notesInput ? notesInput.value.trim() : "";
-        
+        // MODE BARU: Tambah produk baru ke keranjang
         tambahKeKeranjang(data.id, finalProductName, data.base_price, data.image, userNotes);
         
         const modalEl = document.getElementById('modalDetailProduct');
@@ -266,6 +260,7 @@ window.__detailMode = window.__detailMode || 'add';
         }
     };
 
+    // Tampilkan modal detail produk jika belum ada instansinya
     if (!detailProductModalInstance) {
         detailProductModalInstance = new bootstrap.Modal(document.getElementById('modalDetailProduct'));
     }
@@ -282,6 +277,7 @@ function setDietFilter(diet){
   btnStyleRefresh();
   applyFilters();
 }
+
 
 function btnStyleRefresh(){
   document.querySelectorAll('[data-filter]').forEach(btn=>{
@@ -378,19 +374,12 @@ document.addEventListener("DOMContentLoaded", function() {
         .then(response => response.json())
         .then(data => {
             updateCartBadgeDisplay(data.total_items);
-        })
-        .catch(err => console.error(err));
+            })
+            .catch(err => console.error(err));
 });
 
-function updateCartBadgeDisplay(totalItems) {
-    const badgeEl = document.getElementById('totalCartItemsCount'); 
-    if (badgeEl) {
-        // Mencetak angka item secara dinamis ke boks Total Pesanan
-        badgeEl.innerText = totalItems + " item";
-    }
-}
-
 function openCart() {
+
     const bodyContainer = document.getElementById('cartModalBody');
     const totalContainer = document.getElementById('cartModalTotal');
     const btnCheckout = document.getElementById('btnCheckout');
@@ -422,6 +411,7 @@ function openCart() {
                     bodyContainer.innerHTML += `
                     <div class="d-flex align-items-center mb-3 border-bottom pb-2" style="border-color: rgba(148, 163, 184, 0.12) !important;">
                         <img src="uploads/products/${item.image}" style="width:50px; height:50px; object-fit:cover;" class="rounded me-3" onerror="this.src='uploads/products/default.png'">
+
                         <div class="flex-grow-1">
                             <h6 class="mb-0 text-white small fw-semibold">${item.name}</h6>
                             <small class="text-muted">${formattedPrice} x ${item.qty}</small>
