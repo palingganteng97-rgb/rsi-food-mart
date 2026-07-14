@@ -6,145 +6,188 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($_SESSION['cart'])) {
-    $_SESSION['cart'] = [];
-}
-
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
 if ($action === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
-    $name = isset($_POST['name']) ? trim($_POST['name']) : '';
+    // Input dari UI
+    $id = isset($_POST['id']) ? intval($_POST['id']) : 0; // product_id
     $price = isset($_POST['price']) ? floatval($_POST['price']) : 0;
-    $image = isset($_POST['image']) ? trim($_POST['image']) : '';
     $notes = isset($_POST['notes']) ? trim($_POST['notes']) : '';
-    // simpan metadata varian & addons untuk mode edit
-    $variant = isset($_POST['variant']) ? trim($_POST['variant']) : '';
-    $addons = isset($_POST['addons']) ? $_POST['addons'] : [];
-    if (!is_array($addons)) { $addons = []; }
 
-    // DEBUG (sementara): cek apakah payload topping benar masuk
-    // Catat isi addons + hitungannya ke error log PHP
-    $dbg_addons_raw = $_POST['addons'] ?? null;
-    error_log('[api_cart.php:add] product_id=' . $id . ' addons_present=' . (isset($_POST['addons']) ? '1' : '0') . ' addons_type=' . gettype($dbg_addons_raw) . ' addons_count=' . (is_array($dbg_addons_raw) ? count($dbg_addons_raw) : 0) . ' addons=' . json_encode($dbg_addons_raw));
+    // tenant/patient context
+    $patient_session_id = isset($_SESSION['patient_session_id']) ? (int)$_SESSION['patient_session_id'] : 0;
+    $tenant_id = isset($_SESSION['tenant_id']) ? (int)$_SESSION['tenant_id'] : 1;
 
+    if ($id <= 0 || $patient_session_id <= 0 || $tenant_id <= 0 || $price < 0) {
+        ob_clean();
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Invalid payload/session']);
+        exit;
+    }
 
+    mysqli_begin_transaction($conn);
+    try {
+        // Ambil cart terakhir untuk patient+tenant (tanpa status aktif kolom)
+        $sqlCart = "SELECT id FROM carts WHERE patient_session_id = ? AND tenant_id = ? ORDER BY id DESC LIMIT 1";
+        $stmtCart = $conn->prepare($sqlCart);
+        $stmtCart->bind_param('ii', $patient_session_id, $tenant_id);
+        $stmtCart->execute();
+        $resCart = $stmtCart->get_result();
 
-
-    if ($id > 0) {
-        $cartKey = $id . '_' . md5($name . '_' . $notes);
-
-if (isset($_SESSION['cart'][$cartKey])) {
-            $_SESSION['cart'][$cartKey]['qty'] += 1;
-            // jaga metadata tetap sesuai; jika berbeda, update
-            $_SESSION['cart'][$cartKey]['variant'] = $variant !== '' ? $variant : ($_SESSION['cart'][$cartKey]['variant'] ?? null);
-            $_SESSION['cart'][$cartKey]['addons'] = !empty($addons) ? $addons : ($_SESSION['cart'][$cartKey]['addons'] ?? []);
+        if ($resCart && $resCart->num_rows > 0) {
+            $cart = $resCart->fetch_assoc();
+            $cart_id = (int)$cart['id'];
         } else {
-$_SESSION['cart'][$cartKey] = [
-                'id' => $id,
-                'name' => $name,
-                'price' => $price,
-                'image' => $image,
-                'notes' => $notes,
-                // metadata untuk mode edit
-                'variant' => $variant !== '' ? $variant : null,
-                'addons' => $addons,
-                'qty' => 1
-            ];
+            // Buat cart baru
+            $sqlInsertCart = "INSERT INTO carts (patient_session_id, tenant_id) VALUES (?, ?)";
+            $stmtInsertCart = $conn->prepare($sqlInsertCart);
+            $stmtInsertCart->bind_param('ii', $patient_session_id, $tenant_id);
+            if (!$stmtInsertCart->execute()) {
+                throw new Exception('Gagal INSERT carts: ' . $conn->error);
+            }
+            $cart_id = (int)$conn->insert_id;
         }
 
-        $totalItem = 0;
-        foreach ($_SESSION['cart'] as $item) {
-            $totalItem += $item['qty'];
+        // UPSERT cart_items berdasarkan (cart_id, product_id, notes)
+        $sqlCheckItem = "SELECT id FROM cart_items WHERE cart_id = ? AND product_id = ? AND notes = ? LIMIT 1";
+        $stmtCheck = $conn->prepare($sqlCheckItem);
+        $stmtCheck->bind_param('iis', $cart_id, $id, $notes);
+        $stmtCheck->execute();
+        $resItem = $stmtCheck->get_result();
+
+        if ($resItem && $resItem->num_rows > 0) {
+            $row = $resItem->fetch_assoc();
+            $item_id = (int)$row['id'];
+
+            $sqlUpd = "UPDATE cart_items SET qty = qty + 1, price = ? WHERE id = ?";
+            $stmtUpd = $conn->prepare($sqlUpd);
+            $stmtUpd->bind_param('di', $price, $item_id);
+            if (!$stmtUpd->execute()) {
+                throw new Exception('Gagal UPDATE cart_items: ' . $conn->error);
+            }
+        } else {
+            $sqlIns = "INSERT INTO cart_items (cart_id, product_id, qty, price, notes) VALUES (?, ?, 1, ?, ?)";
+            $stmtIns = $conn->prepare($sqlIns);
+            // cart_id (i), product_id (i), price (d), notes (s)
+            $stmtIns->bind_param('iids', $cart_id, $id, $price, $notes);
+
+            if (!$stmtIns->execute()) {
+                throw new Exception('Gagal INSERT cart_items: ' . $conn->error);
+            }
         }
+
+        mysqli_commit($conn);
+
+        // get total qty
+        $sqlTotal = "SELECT COALESCE(SUM(qty),0) AS total_items
+                    FROM cart_items ci
+                    JOIN carts c ON ci.cart_id = c.id
+                    WHERE c.patient_session_id = ? AND c.tenant_id = ?";
+        $stmtTotal = $conn->prepare($sqlTotal);
+        $stmtTotal->bind_param('ii', $patient_session_id, $tenant_id);
+        $stmtTotal->execute();
+        $resTotal = $stmtTotal->get_result();
+        $totalRow = $resTotal ? $resTotal->fetch_assoc() : ['total_items' => 0];
+        $total_items = (int)($totalRow['total_items'] ?? 0);
 
         ob_clean();
         header('Content-Type: application/json');
-        echo json_encode(['success' => true, 'total_items' => $totalItem]);
+        echo json_encode(['success' => true, 'total_items' => $total_items]);
+        exit;
+    } catch (Throwable $e) {
+        mysqli_rollback($conn);
+        ob_clean();
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         exit;
     }
 }
 
 if ($action === 'get_total') {
-    $totalItem = 0;
-    if (isset($_SESSION['cart'])) {
-        foreach ($_SESSION['cart'] as $item) {
-            $totalItem += $item['qty'];
-        }
+    $patient_session_id = isset($_SESSION['patient_session_id']) ? (int)$_SESSION['patient_session_id'] : 0;
+    $tenant_id = isset($_SESSION['tenant_id']) ? (int)$_SESSION['tenant_id'] : 1;
+
+    if ($patient_session_id <= 0 || $tenant_id <= 0) {
+        ob_clean();
+        header('Content-Type: application/json');
+        echo json_encode(['total_items' => 0]);
+        exit;
     }
+
+    $sqlTotal = "SELECT COALESCE(SUM(qty),0) AS total_items
+                FROM cart_items ci
+                JOIN carts c ON ci.cart_id = c.id
+                WHERE c.patient_session_id = ? AND c.tenant_id = ?";
+    $stmt = $conn->prepare($sqlTotal);
+    $stmt->bind_param('ii', $patient_session_id, $tenant_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $row = $res ? $res->fetch_assoc() : ['total_items' => 0];
+    $total_items = (int)($row['total_items'] ?? 0);
+
     ob_clean();
     header('Content-Type: application/json');
-    echo json_encode(['total_items' => $totalItem]);
+    echo json_encode(['total_items' => $total_items]);
     exit;
 }
 
 if ($action === 'get_cart_items') {
-    $items = [];
-    if (isset($_SESSION['cart'])) {
-        $items = array_values($_SESSION['cart']);
+    $patient_session_id = isset($_SESSION['patient_session_id']) ? (int)$_SESSION['patient_session_id'] : 0;
+    $tenant_id = isset($_SESSION['tenant_id']) ? (int)$_SESSION['tenant_id'] : 1;
+
+    if ($patient_session_id <= 0 || $tenant_id <= 0) {
+        ob_clean();
+        header('Content-Type: application/json');
+        echo json_encode([]);
+        exit;
     }
+
+    // Ambil cart terakhir untuk patient+tenant
+    $sqlCart = "SELECT id FROM carts WHERE patient_session_id = ? AND tenant_id = ? ORDER BY id DESC LIMIT 1";
+    $stmtCart = $conn->prepare($sqlCart);
+    $stmtCart->bind_param('ii', $patient_session_id, $tenant_id);
+    $stmtCart->execute();
+    $resCart = $stmtCart->get_result();
+    $cart = $resCart ? $resCart->fetch_assoc() : null;
+
+    if (!$cart) {
+        ob_clean();
+        header('Content-Type: application/json');
+        echo json_encode([]);
+        exit;
+    }
+
+    $cart_id = (int)$cart['id'];
+
+    // Ambil detail cart_items + produk
+    $sqlItems = "SELECT ci.product_id, ci.qty, ci.price, ci.notes, p.name, p.image
+                  FROM cart_items ci
+                  JOIN products p ON p.id = ci.product_id
+                  WHERE ci.cart_id = ?
+                  ORDER BY ci.id ASC";
+
+    $stmtItems = $conn->prepare($sqlItems);
+    $stmtItems->bind_param('i', $cart_id);
+    $stmtItems->execute();
+    $resItems = $stmtItems->get_result();
+
+    $items = [];
+    if ($resItems) {
+        while ($row = $resItems->fetch_assoc()) {
+            $items[] = [
+                'name' => $row['name'],
+                'image' => $row['image'],
+                'price' => (float)$row['price'],
+                'qty' => (int)$row['qty'],
+                'notes' => $row['notes'] ?? '',
+            ];
+        }
+    }
+
     ob_clean();
     header('Content-Type: application/json');
     echo json_encode($items);
     exit;
-}
-
-// ========================================================
-// AMBIL DATA ITEM LAMA BERDASARKAN KEY (UNTUK MODAL EDIT)
-// ========================================================
-if ($action === 'get_item') {
-    $key = isset($_GET['key']) ? trim($_GET['key']) : '';
-    
-    ob_clean();
-    header('Content-Type: application/json');
-    
-    if (!empty($key) && isset($_SESSION['cart'][$key])) {
-        echo json_encode($_SESSION['cart'][$key]);
-    } else {
-        echo json_encode(null);
-    }
-    exit;
-}
-
-// ========================================================
-// SIMPAN PERUBAHAN EDIT DATA PRODUK KE SESSION KERANJANG
-// ========================================================
-if ($action === 'update_saved' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $oldKey = isset($_POST['old_key']) ? trim($_POST['old_key']) : '';
-    $id     = isset($_POST['id']) ? intval($_POST['id']) : 0;
-    $name   = isset($_POST['name']) ? trim($_POST['name']) : '';
-    $price  = isset($_POST['price']) ? floatval($_POST['price']) : 0;
-    $image  = isset($_POST['image']) ? trim($_POST['image']) : '';
-    $notes  = isset($_POST['notes']) ? trim($_POST['notes']) : '';
-
-    if (!empty($oldKey) && isset($_SESSION['cart'][$oldKey]) && $id > 0) {
-        // Ambil jumlah kuantitas yang lama agar tidak kembali ke angka 1
-        $currentQty = $_SESSION['cart'][$oldKey]['qty'];
-        
-        // Hapus kunci session lama agar tidak terjadi duplikasi menu
-        unset($_SESSION['cart'][$oldKey]);
-
-        // Buat kunci session baru berdasarkan kombinasi nama varian/topping baru
-        $newCartKey = $id . '_' . md5($name . '_' . $notes);
-
-        // Masukkan data baru ke dalam session
-        $_SESSION['cart'][$newCartKey] = [
-'id'    => $id,
-            'name'  => $name,
-            'price' => $price,
-            'image' => $image,
-            'notes' => $notes,
-            // mode edit: simpan metadata varian & topping jika ada
-            'variant' => isset($_POST['variant']) ? $_POST['variant'] : (isset($_SESSION['cart'][$oldKey]['variant']) ? $_SESSION['cart'][$oldKey]['variant'] : null),
-            'addons'  => isset($_POST['addons']) ? $_POST['addons'] : (isset($_SESSION['cart'][$oldKey]['addons']) ? $_SESSION['cart'][$oldKey]['addons'] : []),
-            'qty'   => $currentQty
-        ];
-
-        ob_clean();
-        header('Content-Type: application/json');
-        echo json_encode(['success' => true]);
-        exit;
-    }
 }
 
 ob_clean();

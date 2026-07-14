@@ -98,9 +98,15 @@ foreach ($items as $it) {
                 <div class="fw-bold fs-5">
                     <?php echo $statusEmoji . ' ' . htmlspecialchars($statusText); ?>
                 </div>
-                <?php if (!empty($order['payment_status'])): ?>
+                <?php
+                $paymentStatus = $order['payment_status'] ?? '';
+                // Requirement: Pasien bayar CASH ketika makanan sampai ruangan.
+                // Di sistem ini insert membuat payment_status = 'Unpaid'.
+                $paymentLabel = (strtolower((string)$paymentStatus) === 'unpaid') ? 'CASH (Unpaid)' : (string)$paymentStatus;
+                ?>
+                <?php if (!empty($paymentStatus)): ?>
                     <div class="text-white-50" style="font-size:.82rem; margin-top:6px;">
-                        Payment: <?php echo htmlspecialchars($order['payment_status']); ?>
+                        Pembayaran: <?php echo htmlspecialchars($paymentLabel); ?>
                     </div>
                 <?php endif; ?>
             </div>

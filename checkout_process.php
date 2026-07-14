@@ -15,8 +15,37 @@ if (!isset($_SESSION['patient_session_id']) || empty($_SESSION['patient_session_
 
 $patient_session_id = (int)$_SESSION['patient_session_id'];
 
-// Ambil keranjang dari session
-$cart = isset($_SESSION['cart']) && is_array($_SESSION['cart']) ? $_SESSION['cart'] : [];
+// Ambil keranjang dari database
+$sqlCart = "SELECT id FROM carts WHERE patient_session_id = ? AND tenant_id = ? ORDER BY id DESC LIMIT 1";
+$tenant_id = isset($_SESSION['tenant_id']) ? (int)$_SESSION['tenant_id'] : 1;
+$stmtCart = $conn->prepare($sqlCart);
+$stmtCart->bind_param('ii', $patient_session_id, $tenant_id);
+$stmtCart->execute();
+$resCart = $stmtCart->get_result();
+$cartRow = $resCart ? $resCart->fetch_assoc() : null;
+
+$cart_id = $cartRow && isset($cartRow['id']) ? (int)$cartRow['id'] : 0;
+
+$cart = [];
+if ($cart_id > 0) {
+    $sqlItems = "SELECT ci.product_id, ci.qty, ci.price, ci.notes
+                  FROM cart_items ci
+                  WHERE ci.cart_id = ?
+                  ORDER BY ci.id ASC";
+    $stmtItems = $conn->prepare($sqlItems);
+    $stmtItems->bind_param('i', $cart_id);
+    $stmtItems->execute();
+    $resItems = $stmtItems->get_result();
+    while ($row = $resItems ? $resItems->fetch_assoc() : null) {
+        if (!$row) break;
+        $cart[] = [
+            'id' => (int)$row['product_id'],
+            'qty' => (int)$row['qty'],
+            'price' => (float)$row['price'],
+            'notes' => $row['notes'] ?? ''
+        ];
+    }
+}
 
 if (empty($cart)) {
     header('Location: keranjang.php?status=error&msg=Keranjang kosong, tidak ada pesanan untuk diproses');
@@ -212,8 +241,17 @@ try {
 
     mysqli_commit($conn);
 
-    // Kosongkan session cart
-    $_SESSION['cart'] = [];
+    // Kosongkan cart di database
+    $sqlDel = "DELETE FROM cart_items WHERE cart_id = ?";
+    $stmtDel = $conn->prepare($sqlDel);
+    $stmtDel->bind_param('i', $cart_id);
+    $stmtDel->execute();
+
+    $sqlDelCart = "DELETE FROM carts WHERE id = ?";
+    $stmtDelCart = $conn->prepare($sqlDelCart);
+    $stmtDelCart->bind_param('i', $cart_id);
+    $stmtDelCart->execute();
+
 
     // Redirect sukses -> detail pesanan
     header('Location: order_detail.php?order_id=' . $order_id);
