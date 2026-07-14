@@ -1,18 +1,31 @@
-# TODO - RSI_FOOD&MART (Template Dark Mode)
+# TODO - Samakan Modal Detail Produk (Home vs Keranjang Edit)
 
-- [x] Buat `sidebar.php` (mobile topbar + desktop fixed sidebar + offcanvas + active menu via JS)
-- [x] Buat `index.php` (redirect ke `home.php` jika session user_id aktif)
-- [x] Buat `home.php` (grid katalog dummy + search + filter diet + bottom nav mobile)
-- [x] Buat `profile.php` (fetch data user dari MySQL via mysqli berdasarkan `$_SESSION['user_id']`)
-- [ ] Uji di browser:
-  - [ ] Pastikan redirect di `index.php`
-  - [ ] Pastikan sidebar tidak bertabrakan dengan main pada HP & laptop
-  - [ ] Pastikan class `.active` hijau muncul sesuai halaman
-- [ ] Jika struktur DB/koneksi berbeda, sesuaikan kredensial & nama tabel/kolom di `profile.php`
+## Step 0 - Verifikasi baseline
+- [x] Baca `home.php`, `keranjang.php`, `catalog_handler.js`, `detail_product_modal.php`
+- [x] Pastikan `openDetailProduct(data)` dipakai dari home dan tidak dari keranjang saat ini
 
-# TODO - Auth UI
-- [ ] Perbaiki tampilan `login.php` jadi Bootstrap dark card layout (tanpa ubah logika).
-- [ ] Perbaiki tampilan `register.php` jadi Bootstrap dark card layout (tanpa ubah logika).
-- [ ] Perbaiki tampilan `lupa-password.php` jadi Bootstrap dark card layout (tanpa ubah logika).
-- [ ] Uji di browser: login/register/lupa-password.
+## Step 1 - Rancang plan identik seperti requirement
+- [ ] Ubah `keranjang.php` agar tombol “Edit Pesanan” membuka `#modalDetailProduct`
+- [ ] Pastikan keranjang memanggil `openDetailProduct(data)` dengan object yang identik dengan `$prod` home (field utama sama)
+- [ ] Atur mode edit: footer berubah jadi “Simpan Perubahan” dan submit melakukan `api_cart.php?action=update_saved`
+
+## Step 2 - Implementasi object produk utama untuk keranjang
+- [ ] Kumpulkan field yang diperlukan `openDetailProduct`:
+  - `id, name, category_name, description, base_price, image`
+- [ ] Dari session cart item, ambil `id` lalu query produk+category untuk membentuk object utama
+
+## Step 3 - Reuse `openDetailProduct()` tanpa duplikasi
+- [ ] Pastikan varian/addons/gallery/reviews tetap dimuat oleh `openDetailProduct` yang sama
+- [ ] Hanya set data awal (selected variant & selected addons) agar checkbox/option ter-tick sesuai item cart
+
+## Step 4 - Update backend update_saved
+- [ ] Pastikan `api_cart.php?action=update_saved` membaca payload `old_key, id, name, price, image, notes, variant, addons[]` dan menyimpan struktur session yang kompatibel
+
+## Step 5 - Cleanup UI konflik
+- [ ] Nonaktifkan/ignore modal edit lama `#modalEditPesanan` agar tidak bentrok
+
+## Step 6 - Testing manual
+- [ ] Test dari home: klik produk -> modal tampil benar
+- [ ] Test dari keranjang: klik “Edit Pesanan” -> modal tampil sama
+- [ ] Verifikasi tanda varian & topping terpilih, catatan terisi, dan “Simpan Perubahan” meng-update item (bukan menambah item baru)
 
