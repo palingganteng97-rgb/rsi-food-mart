@@ -1,9 +1,18 @@
-- [ ] Buat audit menyeluruh semua penggunaan `$_SESSION['cart']` di repo (tanpa ripgrep)
-- [ ] Refactor `api_cart.php`: hapus `$_SESSION['cart']` sepenuhnya, migrasikan `get_item` & `update_saved` ke DB (carts/cart_items)
-- [ ] Refactor `carts.php`: ubah seluruh action (add_to_cart, update_qty, update_item, delete) agar CRUD langsung ke DB cart_items/carts; hapus `$_SESSION['cart']`
-- [ ] Refactor `cart_item.php`: tampilkan detail dari DB (cart_items + carts + products/addons bila perlu), bukan dari session
-- [ ] Refactor `checkout_process.php`: ambil cart dari DB (carts/cart_items) bukan session; simpan ke orders/order_items; bersihkan cart di DB (opsional tapi disarankan)
-- [ ] Pastikan JS `openEditPesananFromCart()` dan endpoint yang dipanggil tetap bekerja tanpa ubah tampilan
-- [ ] Update `catalog_handler.js` jika perlu untuk payload notes/variant/addons agar update DB sesuai
-- [ ] Smoke test: tambah produk, edit item, tambah/kurang qty, hapus item, checkout
+# TODO - RSI_FOOD&MART (Template Dark Mode)
+
+- [x] Buat `sidebar.php` (mobile topbar + desktop fixed sidebar + offcanvas + active menu via JS)
+- [x] Buat `index.php` (redirect ke `home.php` jika session user_id aktif)
+- [x] Buat `home.php` (grid katalog dummy + search + filter diet + bottom nav mobile)
+- [x] Buat `profile.php` (fetch data user dari MySQL via mysqli berdasarkan `$_SESSION['user_id']`)
+- [ ] Uji di browser:
+  - [ ] Pastikan redirect di `index.php`
+  - [ ] Pastikan sidebar tidak bertabrakan dengan main pada HP & laptop
+  - [ ] Pastikan class `.active` hijau muncul sesuai halaman
+- [ ] Jika struktur DB/koneksi berbeda, sesuaikan kredensial & nama tabel/kolom di `profile.php`
+
+# TODO - Auth UI
+- [ ] Perbaiki tampilan `login.php` jadi Bootstrap dark card layout (tanpa ubah logika).
+- [ ] Perbaiki tampilan `register.php` jadi Bootstrap dark card layout (tanpa ubah logika).
+- [ ] Perbaiki tampilan `lupa-password.php` jadi Bootstrap dark card layout (tanpa ubah logika).
+- [ ] Uji di browser: login/register/lupa-password.
 

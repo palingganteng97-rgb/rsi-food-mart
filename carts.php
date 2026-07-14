@@ -1,15 +1,12 @@
 <?php
 // carts.php - halaman keranjang sementara (delivery-style)
-// Catatan: ini memindahkan logika dari keranjang.php agar checkout tetap berjalan.
 
 include 'db.php';
 
-// Wajib jalankan session_start() agar patient_session_id tersedia
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Proteksi halaman (pasien): wajib patient_session_id
 if (!isset($_SESSION['patient_session_id']) || empty($_SESSION['patient_session_id'])) {
     header("Location: index.php");
     exit();
@@ -19,32 +16,21 @@ $action = isset($_GET['action']) ? $_GET['action'] : '';
 $patient_session_id = (int)$_SESSION['patient_session_id'];
 $tenant_id = isset($_SESSION['tenant_id']) ? (int)$_SESSION['tenant_id'] : 1;
 
-// =========================================================================
-// AKSI A: Proses Tambah Menu Baru Dari home.php (Lengkap Beserta Topping)
-// =========================================================================
 if ($action === 'add_to_cart' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    // (Legacy) endpoint ini tidak dipakai oleh home.php saat ini,
-// namun tetap dimigrasikan ke database agar konsisten tanpa mekanisme cart session lama.
 
     $product_id = isset($_POST['product_id']) ? intval($_POST['product_id']) : 0;
     $qty        = isset($_POST['qty']) ? intval($_POST['qty']) : 1;
     $notes      = isset($_POST['notes']) ? trim($_POST['notes']) : '';
     $variant    = isset($_POST['variant']) ? $_POST['variant'] : 'Original';
-
-    // Menangkap array ID item topping dari checkbox yang dicentang di modal home.php
     $addon_item_ids = isset($_POST['addons']) ? $_POST['addons'] : [];
 
     if ($product_id > 0) {
-        // Tarik data dasar menu makanan dari database
         $query_prod = "SELECT name, base_price, image FROM products WHERE id = $product_id LIMIT 1";
         $res_prod = mysqli_query($conn, $query_prod);
         $prod_data = mysqli_fetch_assoc($res_prod);
-
         $name = $prod_data['name'] ?? 'Menu';
         $base_price = floatval($prod_data['base_price'] ?? 0);
         $image = $prod_data['image'] ?? 'default.png';
-
-        // Olah data Topping (Addons) berdasarkan tabel addon_items
         $addons_list = [];
         $total_addon_price = 0;
 
@@ -63,11 +49,8 @@ if ($action === 'add_to_cart' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Akumulasi harga total = harga makanan dasar + total harga semua topping dicentang
         $final_price = $base_price + $total_addon_price;
 
-// Simpan ke tabel carts/cart_items (database)
-// Cari/buat cart untuk patient_session_id + tenant_id
 $sqlCart = "SELECT id FROM carts WHERE patient_session_id = ? AND tenant_id = ? ORDER BY id DESC LIMIT 1";
 $stmtCart = $conn->prepare($sqlCart);
 $stmtCart->bind_param('ii', $patient_session_id, $tenant_id);
@@ -85,7 +68,6 @@ if ($resCart && $resCart->num_rows > 0) {
     $cart_id = (int)$conn->insert_id;
 }
 
-// notes digunakan sebagai key item (sesuai aturan asli di api_cart)
 $sqlCheckItem = "SELECT id FROM cart_items WHERE cart_id = ? AND product_id = ? AND notes = ? LIMIT 1";
 $stmtCheck = $conn->prepare($sqlCheckItem);
 $notesKey = $notes;
@@ -114,15 +96,11 @@ $qtyInt = (int)$qty;
     exit();
 }
 
-// =========================================================================
-// AKSI B: Proses Tambah (+) & Kurang (-) Kuantitas Cepat Di List Keranjang
-// =========================================================================
 if ($action === 'update_qty' && isset($_GET['key']) && isset($_GET['type'])) {
     $cartItemId = (int)$_GET['key'];
     $type = $_GET['type'];
 
     if ($cartItemId > 0) {
-        // update qty untuk cart_items milik cart aktif pasien+tenant
         $cart_sql = "SELECT id FROM carts WHERE patient_session_id = ? AND tenant_id = ? ORDER BY id DESC LIMIT 1";
         $stmtCart = $conn->prepare($cart_sql);
         $stmtCart->bind_param('ii', $patient_session_id, $tenant_id);
@@ -141,7 +119,6 @@ if ($action === 'update_qty' && isset($_GET['key']) && isset($_GET['type'])) {
                     $stmt->bind_param('ii', $cartItemId, $cart_id);
                     $stmt->execute();
                 } elseif ($type === 'minus') {
-                    // decrement dan hapus jika menjadi 0
                     $sql = "UPDATE cart_items SET qty = qty - 1 WHERE id = ? AND cart_id = ? AND qty > 1";
                     $stmt = $conn->prepare($sql);
                     $stmt->bind_param('ii', $cartItemId, $cart_id);
@@ -164,17 +141,11 @@ if ($action === 'update_qty' && isset($_GET['key']) && isset($_GET['type'])) {
     exit();
 }
 
-// =========================================================================
-// AKSI C: Simpan Perubahan Hasil Edit Dari Form Modal
-// =========================================================================
 if ($action === 'update_item' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $cartItemId = isset($_POST['cart_key']) ? (int)$_POST['cart_key'] : 0;
     $new_qty = isset($_POST['qty']) ? intval($_POST['qty']) : 1;
     $new_notes = isset($_POST['notes']) ? trim($_POST['notes']) : '';
     $new_variant = isset($_POST['variant']) ? $_POST['variant'] : 'Original';
-
-    // Catatan: addons belum punya kolom/tabel relasi di cart_items.
-    // UI tetap menampilkan addons, namun penyimpanan DB saat ini hanya notes/qty/price & title di product_id.
     $new_addon_ids = isset($_POST['addons']) ? $_POST['addons'] : [];
 
     if ($cartItemId > 0 && $new_qty > 0) {
@@ -188,7 +159,6 @@ if ($action === 'update_item' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($cart_row && isset($cart_row['id'])) {
             $cart_id = (int)$cart_row['id'];
 
-            // Ambil base_price dari cart_items saat ini (diasumsikan cart_items.price adalah harga total per item saat qty=1)
             $sqlCurrent = "SELECT product_id, price FROM cart_items WHERE id = ? AND cart_id = ? LIMIT 1";
             $stmtCurrent = $conn->prepare($sqlCurrent);
             $stmtCurrent->bind_param('ii', $cartItemId, $cart_id);
@@ -199,9 +169,6 @@ if ($action === 'update_item' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($cur) {
                 $product_id = (int)$cur['product_id'];
                 $current_total_price = (float)$cur['price'];
-
-                // Jika variant berbeda, project sebelumnya menggabungkan ke name.
-                // Di DB saat ini hanya menyimpan notes; jadi qty dan notes update dulu.
                 $new_price = $current_total_price;
 
                 mysqli_begin_transaction($conn);
@@ -222,9 +189,6 @@ if ($action === 'update_item' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit();
 }
 
-// =========================================================================
-// AKSI D: Mengeluarkan / Menghapus Menu Dari Daftar Belanja
-// =========================================================================
 if ($action === 'delete' && isset($_GET['key'])) {
     $cartItemId = (int)$_GET['key'];
     if ($cartItemId > 0) {
@@ -250,19 +214,15 @@ if ($action === 'delete' && isset($_GET['key'])) {
 
 $status = isset($_GET['status']) ? $_GET['status'] : "";
 $msg = isset($_GET['msg']) ? $_GET['msg'] : "";
-
-// Ambil cart dari database
 $sqlCart = "SELECT id FROM carts WHERE patient_session_id = ? AND tenant_id = ? ORDER BY id DESC LIMIT 1";
 $stmtCart = $conn->prepare($sqlCart);
 $stmtCart->bind_param('ii', $patient_session_id, $tenant_id);
 $stmtCart->execute();
 $resCart = $stmtCart->get_result();
 $cart = $resCart ? $resCart->fetch_assoc() : null;
-
 $cart_items = [];
 if ($cart && isset($cart['id'])) {
     $cart_id = (int)$cart['id'];
-
     $sqlItems = "SELECT ci.id, ci.product_id, ci.qty, ci.price, ci.notes, p.name, p.image, ci.notes
                   FROM cart_items ci
                   JOIN products p ON p.id = ci.product_id
@@ -275,8 +235,6 @@ if ($cart && isset($cart['id'])) {
 
     if ($resItems) {
         while ($row = $resItems->fetch_assoc()) {
-            // catatan: addons saat ini belum dimigrasikan ke tabel relasi; UI addons masih dari session lama.
-            // Untuk menjaga tampilan, addons diset kosong.
             $cart_items[(string)$row['id']] = [
                 'id' => (int)$row['product_id'],
                 'name' => $row['name'],
@@ -290,7 +248,6 @@ if ($cart && isset($cart['id'])) {
         }
     }
 }
-
 ?>
 
 <!DOCTYPE html>

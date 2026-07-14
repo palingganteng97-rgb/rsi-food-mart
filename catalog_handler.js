@@ -13,7 +13,7 @@ function openDetailProduct(data) {
 window.__detailMode = window.__detailMode || 'add';
 
     // default label & mode
-    let cartBtn = document.getElementById('btn_detail_add_cart');
+    const cartBtn = document.getElementById('btn_detail_add_cart');
     if (cartBtn) {
         cartBtn.innerHTML = '<i class="bi bi-cart-plus-fill"></i> Tambah ke Keranjang';
         cartBtn.classList.remove('btn-warning');
@@ -196,26 +196,10 @@ window.__detailMode = window.__detailMode || 'add';
             });
     }
     
-cartBtn = document.getElementById('btn_detail_add_cart');
+
+
+    const cartBtn = document.getElementById('btn_detail_add_cart');
     cartBtn.onclick = function() {
-        // 1. Ambil varian terpilih
-        const selectedVariantText = variantSelect && variantSelect.options[variantSelect.selectedIndex] ? variantSelect.options[variantSelect.selectedIndex].text : '';
-        let variantPart = (selectedVariantText && !selectedVariantText.includes('Original') && !selectedVariantText.includes('Memuat')) ? selectedVariantText : '';
-
-        // 2. Ambil semua topping yang dicentang pembeli
-        let selectedToppings = [];
-        document.querySelectorAll('.product-addon-checkbox:checked').forEach(cb => {
-            selectedToppings.push(cb.value);
-        });
-        let toppingPart = selectedToppings.length > 0 ? 'Topping: ' + selectedToppings.join(', ') : '';
-
-        // 3. Gabungkan varian dan topping ke nama produk akhir
-        let extraInfo = [variantPart, toppingPart].filter(Boolean).join(' | ');
-        const finalProductName = extraInfo ? `${data.name} (${extraInfo})` : data.name;
-
-        // 4. Ambil catatan ketikan kustom
-        const userNotes = notesInput ? notesInput.value.trim() : "";
-
         // Mode edit: simpan perubahan ke item keranjang yang sedang diedit
         if (window.__detailMode === 'edit' && window.__editCartKey && window.__editProductId) {
             // kumpulkan varian/topping saat ini
@@ -227,6 +211,8 @@ cartBtn = document.getElementById('btn_detail_add_cart');
                 addonsIds.push(cb.value);
             });
 
+            const userNotes = notesInput ? notesInput.value.trim() : "";
+
             const formData = new FormData();
             formData.append('old_key', window.__editCartKey);
             formData.append('id', data.id);
@@ -236,7 +222,6 @@ cartBtn = document.getElementById('btn_detail_add_cart');
             formData.append('notes', userNotes);
             if (variantId) formData.append('variant', variantId);
             addonsIds.forEach(aid => formData.append('addons[]', aid));
-
 
             fetch('api_cart.php?action=update_saved', {
                 method: 'POST',
@@ -254,8 +239,25 @@ cartBtn = document.getElementById('btn_detail_add_cart');
             .catch(console.error);
             return;
         }
-        tambahKeKeranjang(data.id, finalProductName, data.base_price, data.image, userNotes);
+        // 1. Ambil varian terpilh
+        const selectedVariantText = variantSelect && variantSelect.options[variantSelect.selectedIndex] ? variantSelect.options[variantSelect.selectedIndex].text : '';
+        let variantPart = (selectedVariantText && !selectedVariantText.includes('Original') && !selectedVariantText.includes('Memuat')) ? selectedVariantText : '';
 
+        // 2. Ambil semua topping yang dicentang pembeli
+        let selectedToppings = [];
+        document.querySelectorAll('.product-addon-checkbox:checked').forEach(cb => {
+            selectedToppings.push(cb.value);
+        });
+        let toppingPart = selectedToppings.length > 0 ? 'Topping: ' + selectedToppings.join(', ') : '';
+
+        // Gabungkan varian dan topping ke nama produk akhir
+        let extraInfo = [variantPart, toppingPart].filter(Boolean).join(' | ');
+        const finalProductName = extraInfo ? `${data.name} (${extraInfo})` : data.name;
+        
+        // 3. Ambil catatan ketikan kustom
+        const userNotes = notesInput ? notesInput.value.trim() : "";
+        
+        tambahKeKeranjang(data.id, finalProductName, data.base_price, data.image, userNotes);
         
         const modalEl = document.getElementById('modalDetailProduct');
         if (modalEl) {
