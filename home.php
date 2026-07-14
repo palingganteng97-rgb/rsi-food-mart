@@ -4,10 +4,16 @@ include "db.php";
 
 // session_start sudah dipanggil di db.php
 
+// Admin login flow tetap memakai user_id
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    header("Location: index.php");
-    exit;
+    // Bypass jika pasien sudah membuat session
+    if (!isset($_SESSION['patient_session_id']) || empty($_SESSION['patient_session_id'])) {
+        header("Location: index.php");
+        exit;
+    }
 }
+
+
 
 $userName = $_SESSION['name'] ?? 'Pasien';
 
@@ -90,12 +96,48 @@ if ($fetchQuery) {
 </style>
 
 </head>
-<body>
-  <?php require __DIR__ . '/sidebar.php'; ?>
+<?php
+// MODE PASIEN (HP) : bypass tampilan admin (sidebar/drawer/bottom-nav)
+$isPatientMode = isset($_SESSION['patient_session_id']) && !empty($_SESSION['patient_session_id']);
+?>
 
-<main class="content-shift page-body">
+<body>
+  <?php if (!$isPatientMode) { require __DIR__ . '/sidebar.php'; } ?>
+
+  <?php if ($isPatientMode): ?>
+    <nav class="navbar navbar-dark px-3 d-lg-none" style="background: rgba(15,23,42,.95); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(148,163,184,.25); position: sticky; top:0; z-index:1030;">
+      <div class="container-fluid px-0">
+        <div class="d-flex w-100 align-items-center justify-content-between gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <div class="logo-badge d-flex align-items-center justify-content-center" aria-hidden="true" style="width: 36px; height: 36px;">
+              <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
+            </div>
+            <div class="lh-tight">
+              <div class="fw-bold" style="font-size: 0.98rem;">RSI Food &amp; Mart</div>
+            </div>
+          </div>
+
+          <button class="btn btn-sm btn-outline-light" type="button" onclick="window.location.href='keranjang.php'" aria-label="Keranjang" style="position:relative; z-index:1100;">
+            <i class="bi bi-basket2"></i>
+          </button>
+        </div>
+
+        <div class="mt-2" style="line-height: 1.35;">
+          <div class="text-white-50" style="font-size: 0.82rem;">No. RM: <span class="text-white fw-semibold"><?= htmlspecialchars($_SESSION['medical_record_number'] ?? ''); ?></span></div>
+          <div class="text-white-50" style="font-size: 0.82rem;">Nama: <span class="text-white fw-semibold"><?= htmlspecialchars($_SESSION['patient_name'] ?? ''); ?></span></div>
+          <div class="text-white-50" style="font-size: 0.82rem;">Ruangan: <span class="text-white fw-semibold"><?= htmlspecialchars($_SESSION['room'] ?? ''); ?></span></div>
+          <div class="text-white-50" style="font-size: 0.82rem;">Bed: <span class="text-white fw-semibold"><?= htmlspecialchars($_SESSION['bed'] ?? ''); ?></span></div>
+          <div class="text-white-50" style="font-size: 0.82rem;">Kelas: <span class="text-white fw-semibold"><?= htmlspecialchars($_SESSION['class'] ?? ''); ?></span></div>
+          <div class="text-white-50" style="font-size: 0.82rem;">Dokter: <span class="text-white fw-semibold"><?= htmlspecialchars($_SESSION['doctor'] ?? ''); ?></span></div>
+        </div>
+      </div>
+    </nav>
+  <?php endif; ?>
+
+<main class="page-body <?= $isPatientMode ? 'patient-layout' : 'content-shift' ?>" style="<?= $isPatientMode ? 'padding-top: 68px; padding-bottom: 92px;' : '' ?>; position: relative; z-index: 1">
     <div class="container py-3">
-        <!-- HEADER ETALASE MENU -->
+        <!-- HEADER ETALASE MENU (untuk ADMIN) -->
+        <?php if (!$isPatientMode): ?>
         <div class="d-flex align-items-center justify-content-between mb-3">
             <div>
                 <div class="fw-bold fs-5">Etalase Menu</div>
@@ -107,7 +149,7 @@ if ($fetchQuery) {
             </div>
         </div>
 
-        <!-- FITUR PENCARIAN & TOMBOL FILTER DIET -->
+        <!-- FITUR PENCARIAN & TOMBOL FILTER DIET (untuk ADMIN) -->
         <div class="search-box p-3 mb-3">
             <div class="row g-2 align-items-center">
                 <div class="col-12 col-md-7">
@@ -131,8 +173,14 @@ if ($fetchQuery) {
                 </div>
             </div>
         </div>
+        <?php endif; ?>
 
         <!-- GRID INTEGRASI DAFTAR PRODUK MAKANAN SEHAT -->
+        <?php if ($isPatientMode): ?>
+        <div class="mb-2">
+            <div class="fw-bold fs-5">Katalog Makanan</div>
+        </div>
+        <?php endif; ?>
         <div id="catalogGrid" class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mt-2 mb-5">
             <?php if (!empty($listActiveProducts)): foreach ($listActiveProducts as $prod): ?>
                 <div class="col">
@@ -171,12 +219,10 @@ if ($fetchQuery) {
                                 <div class="fw-bold text-success" style="font-size: 1rem;">
                                     Rp <?= number_format($prod['base_price'], 0, ',', '.') ?>
                                 </div>
-                                
-<button type="button" class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" 
-        onclick="event.stopPropagation(); tambahKeKeranjang(<?= (int)$prod['id'] ?>, '<?= addslashes(htmlspecialchars($prod['name'], ENT_QUOTES, 'UTF-8')) ?>', <?= floatval($prod['base_price']) ?>, '<?= addslashes($prod['image'] ?? '') ?>', '')">
-    <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
-</button>
-
+                                <button type="button" class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" 
+                                        onclick="event.stopPropagation(); tambahKeKeranjang(<?= (int)$prod['id'] ?>, '<?= addslashes(htmlspecialchars($prod['name'], ENT_QUOTES, 'UTF-8')) ?>', <?= floatval($prod['base_price']) ?>, '<?= addslashes($prod['image'] ?? '') ?>', '')">
+                                    <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -200,6 +246,7 @@ if ($fetchQuery) {
 <?php include 'detail_product_modal.php'; ?>
 
   <?php include "bottom_nav.php"; ?>
+
 
 <script src="catalog_handler.js?v=2.0"></script>
 

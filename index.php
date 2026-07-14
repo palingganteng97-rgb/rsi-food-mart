@@ -5,11 +5,25 @@ include "db.php"; // Memanggil koneksi database ($conn) & session_start()
 $errorMsg = '';
 $isLoginSukses = false;
 
-// 1. Jika sesi user_id sudah aktif, langsung alihkan ke home.php jika diakses secara normal
+// 1. Jika pasien session aktif, langsung alihkan ke home.php
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    if (isset($_SESSION['patient_session_id']) && !empty($_SESSION['patient_session_id'])) {
+        header("Location: home.php");
+        exit;
+    }
+    if (isset($_SESSION['patient_id']) && !empty($_SESSION['patient_id'])) {
+        header("Location: home.php");
+        exit;
+    }
+}
+
+
+// 2. Jika admin session user_id sudah aktif, langsung alihkan ke home.php jika diakses secara normal
 if (isset($_SESSION['user_id']) && !empty($_SESSION['user_id']) && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     header("Location: home.php");
     exit;
 }
+
 
 // 2. Proses penanganan data saat menerima kiriman POST dari login.php
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
