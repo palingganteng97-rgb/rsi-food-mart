@@ -49,6 +49,13 @@ $menu = [
         ]
     ],
 
+    'orders_group' => [
+        'label' => 'Pesanan', 'icon' => 'bi-receipt-cutoff', 'class' => '',
+        'sub' => [
+            'orders.php' => [ 'href' => 'orders.php', 'label' => ' Pesanan Pelanggan', 'icon' => 'bi-cart-check' ],
+        ]
+    ],
+
     'user.php'     => [ 'href' => 'user.php',    'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-none d-lg-block' ], 
     'profile.php'  => [ 'href' => 'profile.php', 'label' => 'User', 'icon' => 'bi-person-bounding-box', 'class' => 'd-block d-lg-none' ], 
     

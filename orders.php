@@ -1,460 +1,314 @@
 <?php
-// orders.php - Admin Pesanan (orders)
 include 'db.php';
+if (session_status() === PHP_SESSION_NONE) session_start();
+if (!isset($_SESSION['user_id'])) { header('Location: login.php'); exit; }
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+$perPage=10;$allowedOrderStatuses=['pending','accepted','preparing','ready','picked_up','delivering','completed','cancelled'];
+
+$action=isset($_GET['action'])?(string)$_GET['action']:'';
+$q=isset($_GET['q'])?trim((string)$_GET['q']):'';
+$status=isset($_GET['status'])?trim((string)$_GET['status']):'';
+$paymentStatus=isset($_GET['payment_status'])?trim((string)$_GET['payment_status']):'';
+$page=isset($_GET['page'])?max(1,(int)$_GET['page']):1;
+$offset=($page-1)*$perPage;
+
+function h($s){return htmlspecialchars((string)$s,ENT_QUOTES,'UTF-8');}
+function money($v){return 'Rp '.number_format((float)$v,0,',','.');}
+function badgePayment($ps){
+  $ps=trim((string)$ps);
+  $map=['paid'=>['bg'=>'success','text'=>'success'],'unpaid'=>['bg'=>'danger','text'=>'danger'],'failed'=>['bg'=>'danger','text'=>'danger']];
+  $k=$map[$ps]??['bg'=>'secondary','text'=>'secondary'];
+  $label=$ps!==''?$ps:'-';
+  return '<span class="badge bg-'.$k['bg'].' bg-opacity-25 text-'.$k['text'].' border border-'.$k['text'].' border-opacity-50 px-3 py-2 rounded-pill" style="font-size:.78rem;">'.h(strtoupper($label)).'</span>';
+}
+function badgeOrder($st){
+  $st=trim((string)$st);
+  $map=['pending'=>['bg'=>'warning','text'=>'warning'],'accepted'=>['bg'=>'primary','text'=>'primary'],'preparing'=>['bg'=>'info','text'=>'info'],'ready'=>['bg'=>'success','text'=>'success'],'picked_up'=>['bg'=>'success','text'=>'success'],'delivering'=>['bg'=>'primary','text'=>'primary'],'completed'=>['bg'=>'success','text'=>'success'],'cancelled'=>['bg'=>'danger','text'=>'danger']];
+  $k=$map[$st]??['bg'=>'secondary','text'=>'secondary'];
+  $label=$st!==''?$st:'-';
+  return '<span class="badge bg-'.$k['bg'].' bg-opacity-25 text-'.$k['text'].' border border-'.$k['text'].' border-opacity-50 px-3 py-2 rounded-pill" style="font-size:.78rem;">'.h($label).'</span>';
 }
 
-if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
-    exit;
+$writeBackParams=function() use($q,$status,$paymentStatus,$page){
+  $qs=http_build_query(['q'=>$q,'status'=>$status,'payment_status'=>$paymentStatus,'page'=>$page]);
+  return $qs!==''?'?'.$qs:'';
+};
+
+if ($action==='update_status' && $_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['id'],$_POST['status'])) {
+  $orderId=(int)$_POST['id'];
+  $newStatus=trim((string)$_POST['status']);
+  $ok=false;
+  if ($orderId>0 && in_array($newStatus,$allowedOrderStatuses,true)) $ok=true;
+  if ($ok){
+    $stmt=$conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
+    $stmt->bind_param('si',$newStatus,$orderId);
+    $stmt->execute();
+  }
+  header('Location: orders.php'.$GLOBALS['writeBackParams']());
+  exit;
 }
 
-$perPage = 10;
-$allowedOrderStatuses = ['pending','accepted','preparing','ready','picked_up','delivering','completed','cancelled'];
+if ($action==='detail' && isset($_GET['id'])) {
+  $orderId=(int)$_GET['id'];
+  if ($orderId<=0){ http_response_code(400); echo 'Invalid order id'; exit; }
+  $stmt=$conn->prepare('SELECT id, order_number, patient_session_id, tenant_id, subtotal, discount, delivery_fee, grand_total, payment_status, status, created_at FROM orders WHERE id = ?');
+  $stmt->bind_param('i',$orderId);
+  $stmt->execute();
+  $res=$stmt->get_result();
+  $order=$res?$res->fetch_assoc():null;
+  if (!$order){ http_response_code(404); echo 'Order not found'; exit; }
 
-$status = isset($_GET['status']) ? trim((string)$_GET['status']) : '';
-$paymentStatus = isset($_GET['payment_status']) ? trim((string)$_GET['payment_status']) : '';
-$q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
+  $stmt2=$conn->prepare('SELECT oi.id, oi.product_id, oi.qty, oi.price, oi.notes, p.name AS product_name, oi.variant AS variant_name FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ? ORDER BY oi.id ASC');
+  $stmt2->bind_param('i',$orderId);
+  $stmt2->execute();
+  $items=[];$r2=$stmt2->get_result();
+  while($row=$r2?$r2->fetch_assoc():null){ $items[]=$row; }
 
-$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-$offset = ($page - 1) * $perPage;
+  $createdAt=$order['created_at']??'';
+  $createdLabel=$createdAt?date('d M Y H:i',strtotime((string)$createdAt)):'-';
+  $subtotal=$order['subtotal']??0;$discount=$order['discount']??0;$deliveryFee=$order['delivery_fee']??0;$grandTotal=$order['grand_total']??0;
 
-$action = isset($_GET['action']) ? (string)$_GET['action'] : '';
-
-// -----------------------------
-// Helpers
-// -----------------------------
-function h($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
-
-function badgePayment(string $ps): string {
-    $ps = trim($ps);
-    $map = [
-        'paid' => ['bg' => 'success', 'text' => 'success'],
-        'unpaid' => ['bg' => 'danger', 'text' => 'danger'],
-        'pending' => ['bg' => 'warning', 'text' => 'warning'],
-        'failed' => ['bg' => 'danger', 'text' => 'danger'],
-        'refunded' => ['bg' => 'info', 'text' => 'info'],
-        'partial' => ['bg' => 'primary', 'text' => 'primary'],
-    ];
-    $k = $map[$ps] ?? ['bg' => 'secondary', 'text' => 'secondary'];
-    $label = $ps !== '' ? $ps : '-';
-    return '<span class="badge bg-'.$k['bg'].' bg-opacity-25 text-'.$k['text'].' border border-'.$k['text'].' border-opacity-50 px-3 py-2 rounded-pill" style="font-size:0.78rem;">'.h(strtoupper($label)).'</span>';
-}
-
-function badgeOrder(string $st): string {
-    $st = trim($st);
-    $map = [
-        'pending' => ['bg'=>'warning','text'=>'warning'],
-        'accepted' => ['bg'=>'primary','text'=>'primary'],
-        'preparing' => ['bg'=>'info','text'=>'info'],
-        'ready' => ['bg'=>'success','text'=>'success'],
-        'picked_up' => ['bg'=>'success','text'=>'success'],
-        'delivering' => ['bg'=>'primary','text'=>'primary'],
-        'completed' => ['bg'=>'success','text'=>'success'],
-        'cancelled' => ['bg'=>'danger','text'=>'danger'],
-    ];
-    $k = $map[$st] ?? ['bg'=>'secondary','text'=>'secondary'];
-    $label = $st !== '' ? $st : '-';
-    return '<span class="badge bg-'.$k['bg'].' bg-opacity-25 text-'.$k['text'].' border border-'.$k['text'].' border-opacity-50 px-3 py-2 rounded-pill" style="font-size:0.78rem;">'.h($label).'</span>';
-}
-
-function formatRp($v): string {
-    return 'Rp ' . number_format((float)$v, 0, ',', '.');
-}
-
-// -----------------------------
-// Detail endpoint (modal)
-// -----------------------------
-if ($action === 'detail' && isset($_GET['id'])) {
-    $orderId = (int)$_GET['id'];
-    if ($orderId <= 0) {
-        http_response_code(400);
-        echo 'Invalid order id';
-        exit;
+  echo '<div class="p-2">';
+  echo '<div class="row g-3">';
+  echo '<div class="col-md-6">';
+  echo '<div class="text-muted small">Nomor Pesanan</div><div class="fw-bold text-white" style="font-family:monospace; letter-spacing:.4px;">#'.h($order['order_number']??$order['id']).'</div>';
+  echo '</div>';
+  echo '<div class="col-md-6">';
+  echo '<div class="text-muted small">Tanggal Dibuat</div><div class="fw-semibold text-white">'.h($createdLabel).'</div>';
+  echo '</div>';
+  echo '<div class="col-md-6">';
+  echo '<div class="text-muted small">Patient Session ID</div><div class="fw-semibold text-white" style="font-family:monospace;">'.h($order['patient_session_id']??'-').'</div>';
+  echo '</div>';
+  echo '<div class="col-md-6">';
+  echo '<div class="text-muted small">Tenant ID</div><div class="fw-semibold text-white" style="font-family:monospace;">'.h($order['tenant_id']??'-').'</div>';
+  echo '</div>';
+  echo '<div class="col-md-6">';
+  echo '<div class="text-muted small">Payment Status</div><div>'.badgePayment((string)($order['payment_status']??'')).'</div>';
+  echo '</div>';
+  echo '<div class="col-md-6">';
+  echo '<div class="text-muted small">Status Pesanan</div><div>'.badgeOrder((string)($order['status']??'')).'</div>';
+  echo '</div>';
+  echo '<div class="col-12"><hr class="text-white" style="opacity:.12;"></div>';
+  echo '<div class="col-md-4"><div class="text-muted small">Subtotal</div><div class="fw-bold text-warning">'.money($subtotal).'</div></div>';
+  echo '<div class="col-md-4"><div class="text-muted small">Diskon</div><div class="fw-bold text-info">'.money($discount).'</div></div>';
+  echo '<div class="col-md-4"><div class="text-muted small">Ongkir</div><div class="fw-bold text-primary">'.money($deliveryFee).'</div></div>';
+  echo '<div class="col-12"><div class="text-muted small">Grand Total</div><div class="fw-bold text-success" style="font-size:1.25rem;">'.money($grandTotal).'</div></div>';
+  echo '<div class="col-12 mt-2">';
+  echo '<div class="text-uppercase text-white-50" style="font-weight:700; font-size:.8rem;">Daftar menu yang dipesan</div>';
+  echo '<div class="table-responsive mt-2">';
+  echo '<table class="table table-hover align-middle mb-0" style="background: transparent !important; color:#e5e7eb !important; border-color: rgba(148,163,184,.2) !important;">';
+  echo '<thead style="background: rgba(15,23,42,.65); border-bottom: 1px solid rgba(148,163,184,.25);">';
+  echo '<tr><th class="text-white py-3 px-2">Menu</th><th class="text-white py-3 px-2">Variant</th><th class="text-white text-center py-3">Qty</th><th class="text-white text-end py-3">Harga</th><th class="text-white text-end py-3">Subtotal Item</th><th class="text-white py-3">Catatan</th></tr>';
+  echo '</thead>';
+  echo '<tbody style="background: transparent !important;">';
+  if (!empty($items)){
+    foreach($items as $it){
+      $qty=(int)($it['qty']??0);
+      $price=(float)($it['price']??0);
+      $subtotalItem=$qty*$price;
+      $productName=(string)($it['product_name']??'-');
+      $variant=(string)($it['variant_name']??($it['variant']??'Original'));
+      $notes=trim((string)($it['notes']??''));
+      echo '<tr style="background: transparent !important; border-bottom: 1px solid rgba(148,163,184,.12) !important;">';
+      echo '<td class="fw-semibold text-white">'.h($productName).'</td>';
+      echo '<td class="text-white">'.h($variant).'</td>';
+      echo '<td class="text-center fw-semibold text-white">'.h($qty).'</td>';
+      echo '<td class="text-end text-white">'.h(money($price)).'</td>';
+      echo '<td class="text-end fw-semibold text-warning">'.h(money($subtotalItem)).'</td>';
+      echo '<td class="text-white-50 small">'.($notes!==''?h($notes):'-').'</td>';
+      echo '</tr>';
     }
-
-    $sqlO = 'SELECT id, order_number, patient_session_id, tenant_id, subtotal, discount, delivery_fee, grand_total, payment_status, status, created_at FROM orders WHERE id = ?';
-    $stmtO = $conn->prepare($sqlO);
-    $stmtO->bind_param('i', $orderId);
-    $stmtO->execute();
-    $resO = $stmtO->get_result();
-    $order = $resO ? $resO->fetch_assoc() : null;
-
-    if (!$order) {
-        http_response_code(404);
-        echo 'Order not found';
-        exit;
-    }
-
-    $sqlItems = 'SELECT oi.id, oi.product_id, oi.qty, oi.price, oi.notes,
-                         p.name AS product_name,
-                         oi.variant AS variant_name
-                  FROM order_items oi
-                  LEFT JOIN products p ON p.id = oi.product_id
-                  WHERE oi.order_id = ?
-                  ORDER BY oi.id ASC';
-    $stmtItems = $conn->prepare($sqlItems);
-    $stmtItems->bind_param('i', $orderId);
-    $stmtItems->execute();
-    $resItems = $stmtItems->get_result();
-
-    $items = [];
-    if ($resItems) {
-        while ($row = $resItems->fetch_assoc()) {
-            $items[] = $row;
-        }
-    }
-
-    $createdAt = $order['created_at'] ?? '';
-    $createdLabel = $createdAt ? date('d M Y H:i', strtotime((string)$createdAt)) : '-';
-
-    $orderNumber = $order['order_number'] ?? $order['id'];
-    $patientSessionId = $order['patient_session_id'] ?? '-';
-    $tenantId = $order['tenant_id'] ?? '-';
-
-    $subtotal = (float)($order['subtotal'] ?? 0);
-    $discount = (float)($order['discount'] ?? 0);
-    $deliveryFee = (float)($order['delivery_fee'] ?? 0);
-    $grandTotal = (float)($order['grand_total'] ?? 0);
-
-    echo '<div class="p-2">';
-    echo '  <div class="row g-3">';
-
-    echo '    <div class="col-md-6">';
-    echo '      <div class="text-muted small">Nomor Pesanan</div>';
-    echo '      <div class="fw-bold text-white" style="font-family:monospace; letter-spacing:0.5px;">#'.h($orderNumber).'</div>';
-    echo '    </div>';
-
-    echo '    <div class="col-md-6">';
-    echo '      <div class="text-muted small">Tanggal Dibuat</div>';
-    echo '      <div class="fw-semibold text-white">'.h($createdLabel).'</div>';
-    echo '    </div>';
-
-    echo '    <div class="col-md-6">';
-    echo '      <div class="text-muted small">Patient Session ID</div>';
-    echo '      <div class="fw-semibold text-white" style="font-family:monospace;">'.h($patientSessionId).'</div>';
-    echo '    </div>';
-
-    echo '    <div class="col-md-6">';
-    echo '      <div class="text-muted small">Tenant ID</div>';
-    echo '      <div class="fw-semibold text-white" style="font-family:monospace;">'.h($tenantId).'</div>';
-    echo '    </div>';
-
-    echo '    <div class="col-md-6">';
-    echo '      <div class="text-muted small">Payment Status</div>';
-    echo '      <div>'.badgePayment((string)($order['payment_status'] ?? '')).'</div>';
-    echo '    </div>';
-
-    echo '    <div class="col-md-6">';
-    echo '      <div class="text-muted small">Status Pesanan</div>';
-    echo '      <div>'.badgeOrder((string)($order['status'] ?? '')).'</div>';
-    echo '    </div>';
-
-    echo '    <div class="col-12"><hr class="text-white" style="opacity:0.12;"></div>';
-
-    echo '    <div class="col-md-4">';
-    echo '      <div class="text-muted small">Subtotal</div>';
-    echo '      <div class="fw-bold text-warning">'.formatRp($subtotal).'</div>';
-    echo '    </div>';
-
-    echo '    <div class="col-md-4">';
-    echo '      <div class="text-muted small">Diskon</div>';
-    echo '      <div class="fw-bold text-info">'.formatRp($discount).'</div>';
-    echo '    </div>';
-
-    echo '    <div class="col-md-4">';
-    echo '      <div class="text-muted small">Ongkir</div>';
-    echo '      <div class="fw-bold text-primary">'.formatRp($deliveryFee).'</div>';
-    echo '    </div>';
-
-    echo '    <div class="col-md-12">';
-    echo '      <div class="text-muted small">Grand Total</div>';
-    echo '      <div class="fw-bold text-success" style="font-size:1.25rem;">'.formatRp($grandTotal).'</div>';
-    echo '    </div>';
-
-    echo '    <div class="col-12 mt-2">';
-    echo '      <div class="text-uppercase text-white-50" style="font-weight:700; font-size:0.8rem;">Daftar menu yang dipesan</div>';
-    echo '      <div class="table-responsive mt-2">';
-    echo '        <table class="table table-dark table-hover align-middle" style="background: rgba(15,23,42,.25); border-color: rgba(148,163,184,.2);">';
-    echo '          <thead><tr>';
-    echo '            <th>Menu</th><th>Variant</th><th class="text-center">Qty</th><th class="text-end">Harga</th><th class="text-end">Subtotal Item</th><th>Catatan</th>';
-    echo '          </tr></thead>';
-    echo '          <tbody>';
-
-    if (!empty($items)) {
-        foreach ($items as $it) {
-            $qty = (int)($it['qty'] ?? 0);
-            $price = (float)($it['price'] ?? 0);
-            $subtotalItem = $qty * $price;
-            $productName = (string)($it['product_name'] ?? '-');
-            $variant = (string)($it['variant_name'] ?? ($it['variant'] ?? 'Original'));
-            $notes = (string)($it['notes'] ?? '');
-            echo '<tr>';
-            echo '  <td class="fw-semibold">'.h($productName).'</td>';
-            echo '  <td>'.h($variant).'</td>';
-            echo '  <td class="text-center fw-semibold">'.h($qty).'</td>';
-            echo '  <td class="text-end">'.formatRp($price).'</td>';
-            echo '  <td class="text-end fw-bold">'.formatRp($subtotalItem).'</td>';
-            echo '  <td>'.(trim($notes) !== '' ? '<span class="text-white-50 small">'.h($notes).'</span>' : '-').'</td>';
-            echo '</tr>';
-        }
-    } else {
-        echo '<tr><td colspan="6" class="text-center text-white-50">Tidak ada item.</td></tr>';
-    }
-
-    echo '          </tbody>';
-    echo '        </table>';
-    echo '      </div>';
-    echo '    </div>';
-
-    echo '  </div>';
-    echo '</div>';
-    exit;
+  } else {
+    echo '<tr><td colspan="6" class="text-center text-white-50 py-3">Tidak ada item pesanan</td></tr>';
+  }
+  echo '</tbody></table></div></div>';
+  echo '</div></div>';
+  echo '</div>';
+  exit;
 }
 
-// -----------------------------
-// Update status endpoint
-// -----------------------------
-if (isset($_POST['action']) && $_POST['action'] === 'update_status') {
-    $orderId = isset($_POST['order_id']) ? (int)$_POST['order_id'] : 0;
-    $newStatus = isset($_POST['status']) ? trim((string)$_POST['status']) : '';
+$where=[];$bind=[];$types='';
+if($status!==''){$where[]='status = ?';$bind[]=$status;$types.='s';}
+if($paymentStatus!==''){$where[]='payment_status = ?';$bind[]=$paymentStatus;$types.='s';}
+if($q!==''){$where[]='(order_number LIKE ? OR patient_session_id LIKE ? OR tenant_id LIKE ?)';$like='%'.$q.'%';$bind[]=$like;$bind[]=$like;$bind[]=$like;$types.='sss';}
+$whereSql=$where?' WHERE '.implode(' AND ',$where):'';
 
-    if ($orderId > 0 && in_array($newStatus, $allowedOrderStatuses, true)) {
-        $sql = 'UPDATE orders SET status = ? WHERE id = ?';
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param('si', $newStatus, $orderId);
-        $stmt->execute();
+$stmtCount=$conn->prepare('SELECT COUNT(*) AS total FROM orders'.$whereSql);
+if($bind){$stmtCount->bind_param($types,...$bind);} $stmtCount->execute();
+$resCount=$stmtCount->get_result();
+$totalRows=$resCount?(int)($resCount->fetch_assoc()['total']??0):0;
+$totalPages=max(1,(int)ceil($totalRows/$perPage));
+if($page>$totalPages) $page=$totalPages;
+$offset=($page-1)*$perPage;
 
-        $sqlHist = 'INSERT INTO order_status_histories (order_id, status, changed_by, notes, created_at) VALUES (?, ?, ?, ?, NOW())';
-        $stmtHist = $conn->prepare($sqlHist);
-        $changedBy = (int)$_SESSION['user_id'];
-        $notesHist = 'Status diubah';
-        $stmtHist->bind_param('isis', $orderId, $newStatus, $changedBy, $notesHist);
-        $stmtHist->execute();
-    }
+$listTypes=$types.'ii';
+$listBind=$bind; $listBind[]=$perPage; $listBind[]=$offset;
+$stmtList=$conn->prepare('SELECT id, order_number, patient_session_id, tenant_id, subtotal, discount, delivery_fee, grand_total, payment_status, status, created_at FROM orders'.$whereSql.' ORDER BY id DESC LIMIT ? OFFSET ?');
+if($listBind){$stmtList->bind_param($listTypes,...$listBind);} 
+$stmtList->execute();
+$resList=$stmtList->get_result();
+$orders=[]; while($row=$resList?$resList->fetch_assoc():null){$orders[]=$row;}
 
-    header('Location: orders.php?status=success_update');
-    exit;
-}
-
-// -----------------------------
-// List orders with search/filter/pagination
-// -----------------------------
-$where = [];
-$types = '';
-$params = [];
-
-if ($q !== '') {
-    $where[] = '(orders.order_number LIKE ? OR orders.id LIKE ?)';
-    $types .= 'ss';
-    $params[] = '%' . $q . '%';
-    $params[] = '%' . $q . '%';
-}
-
-if ($status !== '' && in_array($status, $allowedOrderStatuses, true)) {
-    $where[] = 'orders.status = ?';
-    $types .= 's';
-    $params[] = $status;
-}
-
-if ($paymentStatus !== '') {
-    $where[] = 'orders.payment_status = ?';
-    $types .= 's';
-    $params[] = $paymentStatus;
-}
-
-$whereSql = '';
-if (count($where) > 0) {
-    $whereSql = 'WHERE ' . implode(' AND ', $where);
-}
-
-$sqlCount = 'SELECT COUNT(*) AS total FROM orders ' . $whereSql;
-$stmtCount = $conn->prepare($sqlCount);
-if ($whereSql !== '') {
-    $stmtCount->bind_param($types, ...$params);
-}
-$stmtCount->execute();
-$resCount = $stmtCount->get_result();
-$totalRows = $resCount ? (int)($resCount->fetch_assoc()['total'] ?? 0) : 0;
-$totalPages = max(1, (int)ceil($totalRows / $perPage));
-
-// created_at exists as requested
-$sql = 'SELECT id, order_number, patient_session_id, tenant_id, subtotal, discount, delivery_fee, grand_total, payment_status, status, created_at
-        FROM orders ' . $whereSql . '
-        ORDER BY created_at DESC
-        LIMIT ? OFFSET ?';
-
-$stmt = $conn->prepare($sql);
-if ($whereSql !== '') {
-    $bindTypes = $types . 'ii';
-    $bindParams = array_merge($params, [$perPage, $offset]);
-    $stmt->bind_param($bindTypes, ...$bindParams);
-} else {
-    $stmt->bind_param('ii', $perPage, $offset);
-}
-$stmt->execute();
-$res = $stmt->get_result();
-$orders = [];
-if ($res) {
-    while ($row = $res->fetch_assoc()) {
-        $orders[] = $row;
-    }
-}
-
-$qsBase = 'q=' . urlencode($q) . '&status=' . urlencode($status) . '&payment_status=' . urlencode($paymentStatus);
+$qsBase=[]; if($q!=='') $qsBase['q']=$q; if($status!=='') $qsBase['status']=$status; if($paymentStatus!=='') $qsBase['payment_status']=$paymentStatus;
+function pageLink($page,$base){$base['page']=$page; return 'orders.php?'.http_build_query($base);} 
 ?>
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin - Pesanan</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Admin Pesanan - RSI Food &amp; Mart</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+<style>
+:root{--bg:#0f172a;--text:#e5e7eb;--muted:#94a3b8;}
+body{background:var(--bg) !important;color:var(--text);}
+.table-transparent thead th,.table-transparent tbody td{color:#fff !important;}
+.table-transparent{background:transparent !important;}
+.table-transparent thead{background:rgba(15,23,42,.65) !important; border-bottom:1px solid rgba(148,163,184,.25) !important;}
+.table-transparent td,.table-transparent th{background:transparent !important; border-color:rgba(148,163,184,.12) !important;}
+.table-transparent tbody tr{border-bottom:1px solid rgba(148,163,184,.12) !important;}
+.table-transparent *{color:#fff !important;}
+.text-white*{color:#fff !important;}
+</style>
 </head>
 <body>
-  <?php require __DIR__ . '/sidebar.php'; ?>
+<?php require __DIR__ . '/sidebar.php'; ?>
+<main class="content-shift p-4">
+<div class="container-fluid rounded-4 p-4" style="background: rgba(15, 23, 42, 0.55) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3 pb-3" style="border-bottom:1px solid rgba(148,163,184,.15) !important;">
+<div>
+<h2 class="fw-bold m-0 text-white" style="font-size:2rem;">Admin Pesanan</h2>
+<div class="text-white-50 small">Kelola status pesanan dan lihat detail item</div>
+</div>
+</div>
 
-  <main class="content-shift p-4">
-    <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
+<form method="GET" class="mb-3">
+<div class="row g-2 align-items-end">
+<div class="col-12 col-md-5">
+<label class="form-label text-white-50 small mb-1">Pencarian</label>
+<input type="text" name="q" value="<?php echo h($q); ?>" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2" placeholder="order_number / patient_session_id / tenant_id" />
+</div>
+<div class="col-12 col-md-3">
+<label class="form-label text-white-50 small mb-1">Status Pesanan</label>
+<select name="status" class="form-select bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2" style="color-scheme:dark;">
+<option value="" <?php echo $status===''?'selected':''; ?>>Semua</option>
+<?php foreach($allowedOrderStatuses as $st){ echo '<option value="'.h($st).'" '.($status===$st?'selected':'').'>'.h($st).'</option>'; } ?>
+</select>
+</div>
+<div class="col-12 col-md-3">
+<label class="form-label text-white-50 small mb-1">Payment Status</label>
+<select name="payment_status" class="form-select bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3 py-2" style="color-scheme:dark;">
+<option value="" <?php echo $paymentStatus===''?'selected':''; ?>>Semua</option>
+<?php foreach(['unpaid','paid','failed'] as $ps){ echo '<option value="'.h($ps).'" '.($paymentStatus===$ps?'selected':'').'>'.h($ps).'</option>'; } ?>
+</select>
+</div>
+<div class="col-12 col-md-1 d-grid">
+<button class="btn btn-success rounded-3 py-2 fw-semibold" type="submit">Cari</button>
+</div>
+</div>
+</form>
 
-      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
-        <div>
-          <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Pesanan</h2>
-        </div>
+<div class="table-responsive" id="ordersTableWrap" style="border-radius:16px;">
+<table class="table table-hover align-middle mb-0 table-transparent" style="min-width:1200px;">
+<thead class="text-uppercase" style="font-size:.8rem; font-weight:800;">
+<tr>
+<th class="py-3 px-2 text-center">ID</th>
+<th class="py-3">Order</th>
+<th class="py-3">Patient Session</th>
+<th class="py-3">Tenant</th>
+<th class="py-3 text-end">Total</th>
+<th class="py-3">Payment</th>
+<th class="py-3">Status</th>
+<th class="py-3 text-center">Aksi</th>
+</tr>
+</thead>
+<tbody>
+<?php if(empty($orders)): ?>
+<tr><td colspan="8" class="text-center text-white-50 py-5">Data pesanan tidak ditemukan</td></tr>
+<?php else: foreach($orders as $o): ?>
+<tr style="background: transparent !important;">
+<td class="text-center fw-semibold text-white" style="font-family:monospace;"><?php echo h($o['id']); ?></td>
+<td class="text-white">
+<div class="fw-semibold" style="font-family:monospace;">#<?php echo h($o['order_number']); ?></div>
+<div class="text-white-50 small"><?php echo h(date('d M Y H:i',strtotime((string)($o['created_at']??'')))); ?></div>
+</td>
+<td class="text-white-50" style="font-family:monospace;"><?php echo h($o['patient_session_id']); ?></td>
+<td class="text-white-50" style="font-family:monospace;"><?php echo h($o['tenant_id']); ?></td>
+<td class="text-end fw-bold text-success"><?php echo h(money($o['grand_total'])); ?></td>
+<td class="text-center">{PAY}</td>
+<td class="text-center">{ORD}</td>
+<td class="text-center">
+<div class="d-flex flex-column flex-md-row gap-2 justify-content-center align-items-center">
+<button type="button" class="btn btn-sm btn-outline-light rounded-3" data-bs-toggle="modal" data-bs-target="#modalOrderDetail" data-order-id="<?php echo h($o['id']); ?>"><i class="bi bi-eye"></i></button>
+<form method="POST" action="orders.php?<?php echo h(http_build_query(['q'=>$q,'status'=>$status,'payment_status'=>$paymentStatus,'page'=>$page,'action'=>'update_status'])); ?>" class="d-flex gap-1 align-items-center">
+<input type="hidden" name="id" value="<?php echo h($o['id']); ?>" />
+<select name="status" class="form-select form-select-sm bg-dark bg-opacity-25 text-white border-secondary border-opacity-50" style="min-width:160px; color-scheme:dark;">
+<?php foreach($allowedOrderStatuses as $st){ $sel=((string)$o['status']===$st)?'selected':''; echo '<option value="'.h($st).'" '.$sel.'>'.h($st).'</option>'; } ?>
+</select>
+<button type="submit" class="btn btn-sm btn-success rounded-3 px-3"><i class="bi bi-check2-circle"></i></button>
+</form>
+</div>
+</td>
+</tr>
+<?php endforeach; endif; ?>
+</tbody>
+</table>
+</div>
 
-        <div class="d-flex flex-wrap gap-2">
-          <form method="GET" action="orders.php" class="d-flex flex-wrap gap-2 align-items-center">
-            <input type="text" name="q" value="<?php echo h($q); ?>" class="form-control rounded-3 bg-dark text-white border-secondary" placeholder="Cari nomor pesanan..." style="min-width: 220px; font-size:0.9rem;" />
+<?php
+$base=$qsBase;
+$prev=$page>1?$page-1:1;
+$next=$page<$totalPages?$page+1:$totalPages;
+?>
+<nav class="mt-4" aria-label="Pagination">
+<ul class="pagination justify-content-center mb-0" style="--bs-pagination-color: var(--text); --bs-pagination-bg: transparent; --bs-pagination-border-color: rgba(148,163,184,.2);">
+<li class="page-item <?php echo $page<=1?'disabled':''; ?>"><a class="page-link" href="<?php echo $page<=1?'#':pageLink($prev,$base); ?>" tabindex="<?php echo $page<=1?-1:0; ?>">&laquo;</a></li>
+<?php
+$start=max(1,$page-2);$end=min($totalPages,$page+2);
+for($p=$start;$p<=$end;$p++){
+  echo '<li class="page-item '.($p===$page?'active':'').'"><a class="page-link" style="background:'.($p===$page?'rgba(34,197,94,.25)':'transparent').' !important; border-color:'.($p===$page?'rgba(34,197,94,.55)':'rgba(148,163,184,.2)').'" href="'.h(pageLink($p,$base)).'">'.h($p).'</a></li>';
+}
+?>
+<li class="page-item <?php echo $page>=$totalPages?'disabled':''; ?>"><a class="page-link" href="<?php echo $page>=$totalPages?'#':pageLink($next,$base); ?>" tabindex="<?php echo $page>=$totalPages?-1:0; ?>">&raquo;</a></li>
+</ul>
+</nav>
+</div>
+</main>
 
-            <select name="status" class="form-select rounded-3 bg-dark text-white border-secondary" style="min-width: 170px; font-size:0.9rem;">
-              <option value="" <?php echo $status === '' ? 'selected' : ''; ?>>Semua Status</option>
-              <?php foreach ($allowedOrderStatuses as $st): ?>
-                <option value="<?php echo h($st); ?>" <?php echo $status === $st ? 'selected' : ''; ?>><?php echo h($st); ?></option>
-              <?php endforeach; ?>
-            </select>
+<div class="modal fade" id="modalOrderDetail" tabindex="-1" aria-hidden="true">
+<div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" style="max-width:1140px;">
+<div class="modal-content border-0 rounded-4 text-white shadow-lg" style="background:#0b1223; border:1px solid rgba(148,163,184,.15) !important;">
+<div class="modal-header border-secondary border-opacity-25">
+<div class="d-flex align-items-center gap-2">
+<i class="bi bi-receipt-cutoff fs-4" style="color:#22c55e;"></i>
+<h5 class="modal-title fw-bold m-0">Detail Pesanan</h5>
+</div>
+<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<div class="modal-body"><div id="orderDetailBody" class="text-white"></div></div>
+</div>
+</div>
+</div>
 
-            <input type="text" name="payment_status" value="<?php echo h($paymentStatus); ?>" class="form-control rounded-3 bg-dark text-white border-secondary" placeholder="Filter payment_status (mis: unpaid/paid)" style="min-width: 220px; font-size:0.9rem;" />
-
-            <button type="submit" class="btn btn-secondary rounded-3 px-3"><i class="bi bi-search"></i></button>
-          </form>
-        </div>
-      </div>
-
-      <?php if (isset($_GET['status']) && $_GET['status'] === 'success_update'): ?>
-        <div class="alert alert-success border-0 rounded-3 mb-4" role="alert" style="background: rgba(34, 197, 94, 0.12) !important; color: #86efac !important;">
-          <i class="bi bi-check-circle-fill me-2"></i> Status pesanan diperbarui.
-        </div>
-      <?php endif; ?>
-
-      <div class="table-responsive rounded-3" style="border: 1px solid rgba(148, 163, 184, 0.15) !important; background: transparent !important;">
-        <table class="table table-hover align-middle mb-0" style="background: transparent !important; color: #e5e7eb !important; min-width: 1300px;">
-          <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15,23,42,.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
-            <tr>
-              <th class="py-3 px-3 text-center" style="width: 140px;">No. Pesanan</th>
-              <th class="py-3 text-center" style="width: 220px;">patient_session_id</th>
-              <th class="py-3 text-center" style="width: 120px;">tenant_id</th>
-              <th class="py-3 text-center" style="width: 120px;">Subtotal</th>
-              <th class="py-3 text-center" style="width: 120px;">Diskon</th>
-              <th class="py-3 text-center" style="width: 120px;">Ongkir</th>
-              <th class="py-3 text-center" style="width: 150px;">Grand Total</th>
-              <th class="py-3 text-center" style="width: 180px;">Payment Status</th>
-              <th class="py-3 text-center" style="width: 190px;">Status Pesanan</th>
-              <th class="py-3 text-center" style="width: 190px;">Tanggal Dibuat</th>
-              <th class="py-3 text-center" style="width: 150px;">Detail</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php if (!empty($orders)): ?>
-              <?php foreach ($orders as $o):
-                $createdLabel = !empty($o['created_at']) ? date('d M Y H:i', strtotime((string)$o['created_at'])) : '-';
-              ?>
-                <tr style="border-bottom: 1px solid rgba(148,163,184,.12) !important;">
-                  <td class="text-center fw-semibold" style="color:#94a3b8 !important;">#<?php echo h($o['order_number'] ?? $o['id']); ?></td>
-                  <td class="text-center" style="font-family:monospace;"><?php echo h($o['patient_session_id'] ?? '-'); ?></td>
-                  <td class="text-center" style="font-family:monospace;"><?php echo h($o['tenant_id'] ?? '-'); ?></td>
-                  <td class="text-center fw-semibold text-warning"><?php echo formatRp($o['subtotal'] ?? 0); ?></td>
-                  <td class="text-center fw-semibold text-info"><?php echo formatRp($o['discount'] ?? 0); ?></td>
-                  <td class="text-center fw-semibold text-primary"><?php echo formatRp($o['delivery_fee'] ?? 0); ?></td>
-                  <td class="text-center fw-bold text-success"><?php echo formatRp($o['grand_total'] ?? 0); ?></td>
-                  <td class="text-center"><?php echo badgePayment((string)($o['payment_status'] ?? '')); ?></td>
-                  <td class="text-center">
-                    <form method="POST" action="orders.php" onsubmit="return confirm('Ubah status pesanan ini?');" class="d-flex justify-content-center">
-                      <input type="hidden" name="action" value="update_status" />
-                      <input type="hidden" name="order_id" value="<?php echo (int)$o['id']; ?>" />
-                      <select name="status" class="form-select form-select-sm bg-dark text-white border-secondary" style="min-width: 210px;" onchange="this.form.submit()">
-                        <?php foreach ($allowedOrderStatuses as $st): ?>
-                          <option value="<?php echo h($st); ?>" <?php echo ((string)($o['status'] ?? '')) === $st ? 'selected' : ''; ?>><?php echo h($st); ?></option>
-                        <?php endforeach; ?>
-                      </select>
-                    </form>
-                  </td>
-                  <td class="text-center text-white-50 small"><?php echo h($createdLabel); ?></td>
-                  <td class="text-center">
-                    <button class="btn btn-sm btn-outline-warning rounded-2" data-bs-toggle="modal" data-bs-target="#modalOrderDetail" onclick="loadOrderDetail(<?php echo (int)$o['id']; ?>)">
-                      <i class="bi bi-eye"></i> Detail
-                    </button>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            <?php else: ?>
-              <tr>
-                <td colspan="11" class="text-center py-5 text-white-50">Belum ada pesanan.</td>
-              </tr>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
-
-      <?php if ($totalPages > 1): ?>
-        <div class="d-flex justify-content-center mt-4">
-          <ul class="pagination mb-0 gap-1 shadow-sm">
-            <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
-              <a class="page-link rounded-2 bg-dark text-white border-secondary" href="orders.php?page=<?php echo $page-1; ?>&<?php echo $qsBase; ?>">Prev</a>
-            </li>
-            <?php for ($i=1;$i<=$totalPages;$i++): ?>
-              <li class="page-item <?php echo $page === $i ? 'active' : ''; ?>">
-                <a class="page-link rounded-2 <?php echo $page === $i ? 'bg-primary border-primary text-white' : 'bg-dark text-white border-secondary'; ?>" href="orders.php?page=<?php echo $i; ?>&<?php echo $qsBase; ?>">'.$i.'</a>
-              </li>
-            <?php endfor; ?>
-            <li class="page-item <?php echo $page >= $totalPages ? 'disabled' : ''; ?>">
-              <a class="page-link rounded-2 bg-dark text-white border-secondary" href="orders.php?page=<?php echo $page+1; ?>&<?php echo $qsBase; ?>">Next</a>
-            </li>
-          </ul>
-        </div>
-      <?php endif; ?>
-
-    </div>
-  </main>
-
-  <div class="modal fade" id="modalOrderDetail" tabindex="-1" aria-labelledby="modalOrderDetailLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
-      <div class="modal-content" style="background: rgba(15, 23, 42, 0.93) !important; border: 1px solid rgba(148, 163, 184, 0.2); color:#e5e7eb; border-radius: 16px;">
-        <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
-          <h5 class="modal-title fw-bold" id="modalOrderDetailLabel">Detail Pesanan</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body" id="orderDetailBody" style="min-height:240px;">
-          <div class="text-center py-5 text-white-50">Memuat detail...</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    function loadOrderDetail(orderId) {
-      const body = document.getElementById('orderDetailBody');
-      if (body) body.innerHTML = '<div class="text-center py-5 text-white-50">Memuat detail...</div>';
-      fetch('orders.php?action=detail&id=' + encodeURIComponent(orderId))
-        .then(r => r.text())
-        .then(html => { if (body) body.innerHTML = html; })
-        .catch(() => { if (body) body.innerHTML = '<div class="text-center py-5 text-danger">Gagal memuat detail.</div>'; });
-    }
-  </script>
+<script>
+(function(){
+  const modalEl=document.getElementById('modalOrderDetail');
+  if(!modalEl) return;
+  modalEl.addEventListener('show.bs.modal',function(ev){
+    const btn=ev.relatedTarget;
+    if(!btn) return;
+    const orderId=btn.getAttribute('data-order-id');
+    const body=document.getElementById('orderDetailBody');
+    if(body) body.innerHTML='<div class="text-white-50 py-4 text-center">Memuat detail...</div>';
+    if(!orderId) return;
+    fetch('orders.php?action=detail&id='+encodeURIComponent(orderId))
+      .then(r=>r.text())
+      .then(html=>{ if(body) body.innerHTML=html; })
+      .catch(()=>{ if(body) body.innerHTML='<div class="text-danger py-4 text-center">Gagal memuat detail</div>'; });
+  });
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-
