@@ -19,7 +19,7 @@ $menu = [
           ]
       ],
       
-        'master_group'  => [
+    'master_group'  => [
         'label' => 'Master Data', 'icon' => 'bi-layers-half', 'class' => '',
         'sub'   => [
             'categories.php'     => [ 'href' => 'categories.php',     'label' => 'Kategori Produk', 'icon' => 'bi-tags-fill' ],
@@ -27,6 +27,14 @@ $menu = [
             'units.php'          => [ 'href' => 'units.php',          'label' => 'Satuan / Units',  'icon' => 'bi-calculator-fill' ],
         ]
     ],
+
+    'marketing_group'  => [
+        'label' => 'Marketing', 'icon' => 'bi-megaphone', 'class' => '',
+        'sub'   => [
+            'banners.php' => [ 'href' => 'banners.php', 'label' => 'Banners', 'icon' => 'bi-card-image' ],
+        ]
+    ],
+
 
     'produk_group'  => [
         'label' => 'Produk', 'icon' => 'bi-bag-dash-fill', 'class' => '',
