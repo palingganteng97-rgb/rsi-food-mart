@@ -1,28 +1,12 @@
 <?php
-// carts.php - Keranjang Belanja (rebuild dari nol)
-// PHP Native + MySQLi
-// Fitur:
-// - Menampilkan item dari carts & cart_items
-// - Menampilkan: gambar produk, nama, harga, qty, variant, addon, catatan, subtotal
-// - Tombol: tambah qty, kurang qty, edit pesanan, hapus
-// - Grand total selalu dihitung dari database
-// - Modal edit: qty, variant, checkbox addon, notes dengan realtime price
-// - Persistensi checkbox addon saat modal dibuka ulang
-
 include 'db.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// =====================
-// Konfigurasi tenant carts.php (proyek saat ini memakai tenant_id=1 untuk halaman ini)
-// =====================
 $tenant_id = 1;
 
-// =====================
-// Helper
-// =====================
 function h($s): string {
     return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 }
@@ -71,15 +55,6 @@ function ensure_active_cart(mysqli $conn, int $tenant_id): int {
 }
 
 function fetch_cart_items(mysqli $conn, int $cart_id): array {
-    // DB saat ini: cart_items hanya punya (id, cart_id, product_id, qty, price, notes)
-    // variant & addon TIDAK dipersist di tabel cart_items saat ini.
-    // Untuk memenuhi requirement tanpa mengakses kolom yang tidak ada,
-    // kami akan:
-    // - menampilkan variant sebagai 'Original' (fallback)
-    // - menampilkan addon sebagai kosong (karena data addon per item tidak tersedia dari DB)
-    //
-    // Namun fitur edit/addon yang Anda minta TANPA struktur baru tidak mungkin dipersist.
-    // Solusi arsitektur terbaik: buat tabel relasi baru.
 
     $sql = "SELECT ci.id AS cart_item_id,
                    ci.product_id,
@@ -131,8 +106,6 @@ function fetch_grand_total(mysqli $conn, int $cart_id): float {
 }
 
 function fetch_addon_items_by_product(mysqli $conn, int $product_id): array {
-    // Menggunakan struktur addon yang sudah ada di proyek: addon_items
-    // Diasumsikan addon_items mengandung (id, addon_id, item_name, price) sebagaimana get_addon_items.php
     $sql = "SELECT ai.id, ai.item_name, ai.price
             FROM addon_items ai
             INNER JOIN product_addons pa ON ai.addon_id = pa.id
@@ -143,7 +116,6 @@ function fetch_addon_items_by_product(mysqli $conn, int $product_id): array {
     $stmt->bind_param('i', $product_id);
     $stmt->execute();
     $res = $stmt->get_result();
-
     $out = [];
     if ($res) {
         while ($row = $res->fetch_assoc()) {
@@ -157,9 +129,6 @@ function fetch_addon_items_by_product(mysqli $conn, int $product_id): array {
     return $out;
 }
 
-// =====================
-// ACTIONS
-// =====================
 $action = isset($_GET['action']) ? (string)$_GET['action'] : '';
 $cart_id = ensure_active_cart($conn, $tenant_id);
 
@@ -188,7 +157,6 @@ if ($action === 'qty' && isset($_GET['key'], $_GET['type'])) {
             mysqli_rollback($conn);
         }
     }
-
     header('Location: carts.php');
     exit;
 }
@@ -200,20 +168,15 @@ if ($action === 'delete' && isset($_GET['key'])) {
         $stmt->bind_param('ii', $cart_item_id, $cart_id);
         $stmt->execute();
     }
-
     header('Location: carts.php');
     exit;
 }
 
-// Edit pesanan: tanpa kolom addon/variant per item pada schema saat ini,
-// maka kita hanya update qty dan notes. Modal tetap menampilkan addon/variant,
-// tapi persistensi addon tidak bisa dilakukan sampai tabel relasi baru dibuat.
 if ($action === 'update_item' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $cart_item_id = as_int($_POST['cart_key'] ?? 0, 0);
     $new_qty = as_int($_POST['qty'] ?? 1, 1);
     $new_notes = isset($_POST['notes']) ? trim((string)$_POST['notes']) : '';
 
-    // variant & addons diambil agar UI bekerja, namun belum bisa dipersist ke DB yang ada.
     $new_variant = isset($_POST['variant']) ? trim((string)$_POST['variant']) : 'Original';
     $new_addon_ids = isset($_POST['addons']) ? $_POST['addons'] : [];
     if (!is_array($new_addon_ids)) $new_addon_ids = [];
@@ -228,9 +191,6 @@ if ($action === 'update_item' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// =====================
-// RENDER
-// =====================
 $cart_items = fetch_cart_items($conn, $cart_id);
 $grand_total = fetch_grand_total($conn, $cart_id);
 ?>
