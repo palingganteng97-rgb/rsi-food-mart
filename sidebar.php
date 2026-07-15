@@ -9,20 +9,20 @@ $currentFile = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
 $menu = [
     'home.php'      => [ 'href' => 'home.php', 'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
 
-      'tenants_group' => [
-          'label' => 'Tenants', 'icon' => 'bi-house-lock-fill', 'class' => 'd-mobile-none',
-          'sub'   => [
-              'tenants.php'                => [ 'href' => 'tenants.php',                'label' => 'Data Tenant',            'icon' => 'bi-house-lock-fill' ],
-              'tenant_operating_hours.php' => [ 'href' => 'tenant_operating_hours.php', 'label' => 'Tenant Operating Hours', 'icon' => 'bi-clock-history' ],
-              'tenant_holidays.php'        => [ 'href' => 'tenant_holidays.php',        'label' => 'Tenant Holidays',        'icon' => 'bi-calendar-x' ],
-              'tenant_settings.php'        => [ 'href' => 'tenant_settings.php',        'label' => 'Tenant Settings',        'icon' => 'bi-gear-fill' ],
-          ]
-      ],
+    'tenants_group' => [
+        'label' => 'Tenants', 'icon' => 'bi-building-gear', 'class' => 'd-mobile-none',
+        'sub'   => [
+            'tenants.php'                => [ 'href' => 'tenants.php',                'label' => 'Data Tenant',            'icon' => 'bi-house-lock-fill' ],
+            'tenant_operating_hours.php' => [ 'href' => 'tenant_operating_hours.php', 'label' => 'Tenant Operating Hours', 'icon' => 'bi-clock-history' ],
+            'tenant_holidays.php'        => [ 'href' => 'tenant_holidays.php',        'label' => 'Tenant Holidays',        'icon' => 'bi-calendar-x' ],
+            'tenant_settings.php'        => [ 'href' => 'tenant_settings.php',        'label' => 'Tenant Settings',        'icon' => 'bi-sliders' ],
+        ]
+    ],
       
     'master_group'  => [
         'label' => 'Master Data', 'icon' => 'bi-layers-half', 'class' => '',
         'sub'   => [
-            'categories.php'     => [ 'href' => 'categories.php',     'label' => 'Kategori Produk', 'icon' => 'bi-tags-fill' ],
+            'categories.php'     => [ 'href' => 'categories.php',     'label' => 'Kategori Produk', 'icon' => 'bi-grid-fill' ],
             'brands.php'         => [ 'href' => 'brands.php',         'label' => 'Brand / Merk',    'icon' => 'bi-patch-check-fill' ],
             'units.php'          => [ 'href' => 'units.php',          'label' => 'Satuan / Units',  'icon' => 'bi-calculator-fill' ],
         ]
@@ -31,10 +31,11 @@ $menu = [
     'marketing_group'  => [
         'label' => 'Marketing', 'icon' => 'bi-megaphone', 'class' => '',
         'sub'   => [
-            'banners.php' => [ 'href' => 'banners.php', 'label' => 'Banners', 'icon' => 'bi-card-image' ],
+            'banners.php'  => [ 'href' => 'banners.php',  'label' => 'Banners',  'icon' => 'bi-card-image' ],
+            'promos.php'   => [ 'href' => 'promos.php',   'label' => 'Promos',   'icon' => 'bi-tags-fill' ],
+            'vouchers.php' => [ 'href' => 'vouchers.php', 'label' => 'Vouchers', 'icon' => 'bi-ticket-perforated-fill' ],
         ]
     ],
-
 
     'produk_group'  => [
         'label' => 'Produk', 'icon' => 'bi-bag-dash-fill', 'class' => '',
@@ -49,7 +50,7 @@ $menu = [
     ],
 
     'user.php'     => [ 'href' => 'user.php',    'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-none d-lg-block' ], 
-    'profile.php'  => [ 'href' => 'profile.php', 'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-block d-lg-none' ], 
+    'profile.php'  => [ 'href' => 'profile.php', 'label' => 'User', 'icon' => 'bi-person-bounding-box', 'class' => 'd-block d-lg-none' ], 
     
     'roles.php'       => [ 'href' => 'roles.php',       'label' => 'Roles',       'icon' => 'bi-shield-lock', 'class' => 'd-mobile-none' ], 
     'permissions.php' => [ 'href' => 'permissions.php', 'label' => 'Permissions', 'icon' => 'bi-key',         'class' => 'd-mobile-none' ], 
