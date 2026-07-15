@@ -6,139 +6,163 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($_SESSION['cart'])) {
-    $_SESSION['cart'] = [];
+// Refactor: development cart DB-driven (no $_SESSION['cart'])
+$action = isset($_GET['action']) ? $_GET['action'] : '';
+
+$tenant_id = 1;
+
+// cari / pastikan ada cart sementara untuk tenant_id=1
+$cart_id = 0;
+$stmtCart = $conn->prepare("SELECT id FROM carts WHERE tenant_id = ? ORDER BY id DESC LIMIT 1");
+$stmtCart->bind_param('i', $tenant_id);
+$stmtCart->execute();
+$resCart = $stmtCart->get_result();
+if ($resCart && $resCart->num_rows > 0) {
+    $row = $resCart->fetch_assoc();
+    $cart_id = (int)($row['id'] ?? 0);
+}
+if ($cart_id <= 0) {
+    $stmtInsCart = $conn->prepare("INSERT INTO carts (tenant_id) VALUES (?)");
+    $stmtInsCart->bind_param('i', $tenant_id);
+    $stmtInsCart->execute();
+    $cart_id = (int)$conn->insert_id;
 }
 
-$action = isset($_GET['action']) ? $_GET['action'] : '';
 
 if ($action === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
-    $name = isset($_POST['name']) ? trim($_POST['name']) : '';
     $price = isset($_POST['price']) ? floatval($_POST['price']) : 0;
-    $image = isset($_POST['image']) ? trim($_POST['image']) : '';
-    $notes = isset($_POST['notes']) ? trim($_POST['notes']) : '';
-    // simpan metadata varian & addons untuk mode edit
-    $variant = isset($_POST['variant']) ? trim($_POST['variant']) : '';
+    $image = isset($_POST['image']) ? trim((string)$_POST['image']) : '';
+    $notes = isset($_POST['notes']) ? trim((string)$_POST['notes']) : '';
+
+    // metadata varian & addons untuk mode edit
+    $variant = isset($_POST['variant']) ? trim((string)$_POST['variant']) : '';
     $addons = isset($_POST['addons']) ? $_POST['addons'] : [];
     if (!is_array($addons)) { $addons = []; }
 
-    // DEBUG (sementara): cek apakah payload topping benar masuk
-    // Catat isi addons + hitungannya ke error log PHP
-    $dbg_addons_raw = $_POST['addons'] ?? null;
-    error_log('[api_cart.php:add] product_id=' . $id . ' addons_present=' . (isset($_POST['addons']) ? '1' : '0') . ' addons_type=' . gettype($dbg_addons_raw) . ' addons_count=' . (is_array($dbg_addons_raw) ? count($dbg_addons_raw) : 0) . ' addons=' . json_encode($dbg_addons_raw));
-
-
-
-
     if ($id > 0) {
-        $cartKey = $id . '_' . md5($name . '_' . $notes);
+        // 1) Cari cart_item yang sama (product + notes) untuk development
+        // Catatan: skema cart_items saat ini hanya punya notes (dan price/qty). Variant/addons belum persisten.
+        $sqlFind = "SELECT id, qty FROM cart_items WHERE cart_id = ? AND product_id = ? AND notes = ? LIMIT 1";
+        $stmtFind = $conn->prepare($sqlFind);
+        $stmtFind->bind_param('iis', $cart_id, $id, $notes);
+        $stmtFind->execute();
+        $resFind = $stmtFind->get_result();
+        $existing = $resFind ? $resFind->fetch_assoc() : null;
 
-if (isset($_SESSION['cart'][$cartKey])) {
-            $_SESSION['cart'][$cartKey]['qty'] += 1;
-            // jaga metadata tetap sesuai; jika berbeda, update
-            $_SESSION['cart'][$cartKey]['variant'] = $variant !== '' ? $variant : ($_SESSION['cart'][$cartKey]['variant'] ?? null);
-            $_SESSION['cart'][$cartKey]['addons'] = !empty($addons) ? $addons : ($_SESSION['cart'][$cartKey]['addons'] ?? []);
+        if ($existing && isset($existing['id'])) {
+            $newQty = (int)$existing['qty'] + 1;
+            // update qty & price
+            $sqlUpd = "UPDATE cart_items SET qty = ?, price = ?, notes = ? WHERE id = ? AND cart_id = ?";
+            $stmtUpd = $conn->prepare($sqlUpd);
+            $stmtUpd->bind_param('idssi', $newQty, $price, $notes, (int)$existing['id'], $cart_id);
+            $stmtUpd->execute();
         } else {
-$_SESSION['cart'][$cartKey] = [
-                'id' => $id,
-                'name' => $name,
-                'price' => $price,
-                'image' => $image,
-                'notes' => $notes,
-                // metadata untuk mode edit
-                'variant' => $variant !== '' ? $variant : null,
-                'addons' => $addons,
-                'qty' => 1
-            ];
+            $sqlIns = "INSERT INTO cart_items (cart_id, product_id, qty, price, notes) VALUES (?, ?, ?, ?, ?)";
+            $stmtIns = $conn->prepare($sqlIns);
+            $qty = 1;
+            $stmtIns->bind_param('iiids', $cart_id, $id, $qty, $price, $notes);
+            $stmtIns->execute();
         }
 
-        $totalItem = 0;
-        foreach ($_SESSION['cart'] as $item) {
-            $totalItem += $item['qty'];
-        }
+        // hitung total item
+        $sqlTotal = "SELECT COALESCE(SUM(qty),0) AS total_items FROM cart_items WHERE cart_id = ?";
+        $stmtTotal = $conn->prepare($sqlTotal);
+        $stmtTotal->bind_param('i', $cart_id);
+        $stmtTotal->execute();
+        $resTotal = $stmtTotal->get_result();
+        $rowTotal = $resTotal ? $resTotal->fetch_assoc() : ['total_items' => 0];
 
         ob_clean();
         header('Content-Type: application/json');
-        echo json_encode(['success' => true, 'total_items' => $totalItem]);
+        echo json_encode(['success' => true, 'total_items' => (int)($rowTotal['total_items'] ?? 0)]);
         exit;
     }
 }
 
+
 if ($action === 'get_total') {
-    $totalItem = 0;
-    if (isset($_SESSION['cart'])) {
-        foreach ($_SESSION['cart'] as $item) {
-            $totalItem += $item['qty'];
-        }
-    }
+    $sqlTotal = "SELECT COALESCE(SUM(qty),0) AS total_items FROM cart_items WHERE cart_id = ?";
+    $stmtTotal = $conn->prepare($sqlTotal);
+    $stmtTotal->bind_param('i', $cart_id);
+    $stmtTotal->execute();
+    $resTotal = $stmtTotal->get_result();
+    $rowTotal = $resTotal ? $resTotal->fetch_assoc() : ['total_items' => 0];
+
     ob_clean();
     header('Content-Type: application/json');
-    echo json_encode(['total_items' => $totalItem]);
+    echo json_encode(['total_items' => (int)($rowTotal['total_items'] ?? 0)]);
     exit;
 }
 
+
 if ($action === 'get_cart_items') {
     $items = [];
-    if (isset($_SESSION['cart'])) {
-        $items = array_values($_SESSION['cart']);
+
+    $sqlItems = "SELECT ci.id, ci.product_id, ci.qty, ci.price, ci.notes, p.name, p.image
+                 FROM cart_items ci
+                 JOIN products p ON p.id = ci.product_id
+                 WHERE ci.cart_id = ?
+                 ORDER BY ci.id DESC";
+    $stmtItems = $conn->prepare($sqlItems);
+    $stmtItems->bind_param('i', $cart_id);
+    $stmtItems->execute();
+    $resItems = $stmtItems->get_result();
+
+    if ($resItems) {
+        while ($row = $resItems->fetch_assoc()) {
+            $items[] = [
+                'id' => (int)$row['product_id'],
+                'name' => $row['name'],
+                'price' => (float)$row['price'],
+                'image' => $row['image'],
+                'notes' => $row['notes'] ?? '',
+                'qty' => (int)$row['qty'],
+                // field ini kadang dibutuhkan UI JS
+                'variant' => 'Original',
+                'addons' => []
+            ];
+        }
     }
+
     ob_clean();
     header('Content-Type: application/json');
     echo json_encode($items);
     exit;
 }
 
+
 // ========================================================
-// AMBIL DATA ITEM LAMA BERDASARKAN KEY (UNTUK MODAL EDIT)
+// EDIT ITEMS: untuk refactor development ini,
+// JS yang ada kemungkinan masih memanggil endpoint ini.
+// Karena saat ini cart disimpan DB-driven (tenant_id=1, tanpa session cart),
+// kita lakukan update berdasarkan cart_id + product_id + notes.
+// Catatan: qty/edit tetap "development sederhana".
 // ========================================================
+
 if ($action === 'get_item') {
-    $key = isset($_GET['key']) ? trim($_GET['key']) : '';
-    
+    $key = isset($_GET['key']) ? trim((string)$_GET['key']) : '';
+
+    // old_key tidak bisa dipetakan ke cart_item_id saat ini.
+    // Kembalikan null agar UI modal edit bisa fallback.
     ob_clean();
     header('Content-Type: application/json');
-    
-    if (!empty($key) && isset($_SESSION['cart'][$key])) {
-        echo json_encode($_SESSION['cart'][$key]);
-    } else {
-        echo json_encode(null);
-    }
+    echo json_encode(null);
     exit;
 }
 
-// ========================================================
-// SIMPAN PERUBAHAN EDIT DATA PRODUK KE SESSION KERANJANG
-// ========================================================
 if ($action === 'update_saved' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $oldKey = isset($_POST['old_key']) ? trim($_POST['old_key']) : '';
+    $oldKey = isset($_POST['old_key']) ? trim((string)$_POST['old_key']) : '';
     $id     = isset($_POST['id']) ? intval($_POST['id']) : 0;
-    $name   = isset($_POST['name']) ? trim($_POST['name']) : '';
+    $notes  = isset($_POST['notes']) ? trim((string)$_POST['notes']) : '';
     $price  = isset($_POST['price']) ? floatval($_POST['price']) : 0;
-    $image  = isset($_POST['image']) ? trim($_POST['image']) : '';
-    $notes  = isset($_POST['notes']) ? trim($_POST['notes']) : '';
 
-    if (!empty($oldKey) && isset($_SESSION['cart'][$oldKey]) && $id > 0) {
-        // Ambil jumlah kuantitas yang lama agar tidak kembali ke angka 1
-        $currentQty = $_SESSION['cart'][$oldKey]['qty'];
-        
-        // Hapus kunci session lama agar tidak terjadi duplikasi menu
-        unset($_SESSION['cart'][$oldKey]);
-
-        // Buat kunci session baru berdasarkan kombinasi nama varian/topping baru
-        $newCartKey = $id . '_' . md5($name . '_' . $notes);
-
-        // Masukkan data baru ke dalam session
-        $_SESSION['cart'][$newCartKey] = [
-'id'    => $id,
-            'name'  => $name,
-            'price' => $price,
-            'image' => $image,
-            'notes' => $notes,
-            // mode edit: simpan metadata varian & topping jika ada
-            'variant' => isset($_POST['variant']) ? $_POST['variant'] : (isset($_SESSION['cart'][$oldKey]['variant']) ? $_SESSION['cart'][$oldKey]['variant'] : null),
-            'addons'  => isset($_POST['addons']) ? $_POST['addons'] : (isset($_SESSION['cart'][$oldKey]['addons']) ? $_SESSION['cart'][$oldKey]['addons'] : []),
-            'qty'   => $currentQty
-        ];
+    if ($id > 0) {
+        $sqlUpd = "UPDATE cart_items SET price = ?, notes = ?
+                   WHERE cart_id = ? AND product_id = ?";
+        $stmtUpd = $conn->prepare($sqlUpd);
+        $stmtUpd->bind_param('dsii', $price, $notes, $cart_id, $id);
+        $stmtUpd->execute();
 
         ob_clean();
         header('Content-Type: application/json');
@@ -146,6 +170,9 @@ if ($action === 'update_saved' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 }
+
+
+
 
 ob_clean();
 header('Content-Type: application/json');

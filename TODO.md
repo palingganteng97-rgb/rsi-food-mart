@@ -1,18 +1,5 @@
-# TODO - RSI_FOOD&MART (Template Dark Mode)
-
-- [x] Buat `sidebar.php` (mobile topbar + desktop fixed sidebar + offcanvas + active menu via JS)
-- [x] Buat `index.php` (redirect ke `home.php` jika session user_id aktif)
-- [x] Buat `home.php` (grid katalog dummy + search + filter diet + bottom nav mobile)
-- [x] Buat `profile.php` (fetch data user dari MySQL via mysqli berdasarkan `$_SESSION['user_id']`)
-- [ ] Uji di browser:
-  - [ ] Pastikan redirect di `index.php`
-  - [ ] Pastikan sidebar tidak bertabrakan dengan main pada HP & laptop
-  - [ ] Pastikan class `.active` hijau muncul sesuai halaman
-- [ ] Jika struktur DB/koneksi berbeda, sesuaikan kredensial & nama tabel/kolom di `profile.php`
-
-# TODO - Auth UI
-- [ ] Perbaiki tampilan `login.php` jadi Bootstrap dark card layout (tanpa ubah logika).
-- [ ] Perbaiki tampilan `register.php` jadi Bootstrap dark card layout (tanpa ubah logika).
-- [ ] Perbaiki tampilan `lupa-password.php` jadi Bootstrap dark card layout (tanpa ubah logika).
-- [ ] Uji di browser: login/register/lupa-password.
-
+- [x] Identify relevant action handlers in `carts.php` (add_to_cart, update_item) and current pivot reading query.
+- [x] Replace `action=add_to_cart` logic: unit price = base_price + sum(addon_items.price), insert into `cart_items`, insert topping into `cart_item_addons`, transaction commit/rollback.
+- [ ] Replace `action=update_item` logic to: recompute unit price from base_price + addons (pivot), update only manual notes in `cart_items.notes`, then DELETE + INSERT into `cart_item_addons` within transaction.
+- [ ] Re-verify cart reading uses pivot (cart_item_addons -> addon_items) and never uses notes for topping.
+- [ ] Run a quick PHP lint / syntax check (optional).

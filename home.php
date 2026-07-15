@@ -171,12 +171,10 @@ if ($fetchQuery) {
                                 <div class="fw-bold text-success" style="font-size: 1rem;">
                                     Rp <?= number_format($prod['base_price'], 0, ',', '.') ?>
                                 </div>
-                                
-<button type="button" class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" 
-        onclick="event.stopPropagation(); tambahKeKeranjang(<?= (int)$prod['id'] ?>, '<?= addslashes(htmlspecialchars($prod['name'], ENT_QUOTES, 'UTF-8')) ?>', <?= floatval($prod['base_price']) ?>, '<?= addslashes($prod['image'] ?? '') ?>', '')">
-    <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
-</button>
-
+                            <button type="button" class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" 
+                                    onclick="event.stopPropagation(); tambahKeKeranjang(<?= (int)$prod['id'] ?>, '<?= addslashes(htmlspecialchars($prod['name'], ENT_QUOTES, 'UTF-8')) ?>', <?= floatval($prod['base_price']) ?>, '<?= addslashes($prod['image'] ?? '') ?>', '')">
+                                <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
+                            </button>
                             </div>
                         </div>
                     </div>

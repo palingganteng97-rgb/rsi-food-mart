@@ -14,6 +14,7 @@ window.__detailMode = window.__detailMode || 'add';
 
     // default label & mode
     const cartBtn = document.getElementById('btn_detail_add_cart');
+    // prevent duplicate declarations from earlier merge versions
     if (cartBtn) {
         cartBtn.innerHTML = '<i class="bi bi-cart-plus-fill"></i> Tambah ke Keranjang';
         cartBtn.classList.remove('btn-warning');
@@ -198,8 +199,8 @@ window.__detailMode = window.__detailMode || 'add';
     
 
 
-    const cartBtn = document.getElementById('btn_detail_add_cart');
-    cartBtn.onclick = function() {
+    const cartBtnLocal = document.getElementById('btn_detail_add_cart');
+    cartBtnLocal.onclick = function() {
         // Mode edit: simpan perubahan ke item keranjang yang sedang diedit
         if (window.__detailMode === 'edit' && window.__editCartKey && window.__editProductId) {
             // kumpulkan varian/topping saat ini
@@ -331,7 +332,9 @@ function resetFilters(){
   applyFilters();
 }
 
-function tambahKeKeranjang(id, name, price, image, notes) {
+function tambahKeKeranjang(id, name, price, image, notes) { 
+    // no-op: keeps legacy global name used by inline onclick
+
     const userNotes = notes ? notes : '';
     
     // ambil metadata varian & addons dari UI (agar bisa di-edit kembali)
@@ -382,15 +385,19 @@ document.addEventListener("DOMContentLoaded", function() {
         .catch(err => console.error(err));
 });
 
-function updateCartBadgeDisplay(totalItems) {
-    const badgeEl = document.getElementById('totalCartItemsCount'); 
-    if (badgeEl) {
-        // Mencetak angka item secara dinamis ke boks Total Pesanan
-        badgeEl.innerText = totalItems + " item";
-    }
-}
+// NOTE: duplicate updateCartBadgeDisplay removed (kept the first definition).
+
+
+// expose global functions for inline onclick handlers
+window.openDetailProduct = openDetailProduct;
+window.tambahKeKeranjang = tambahKeKeranjang;
+window.updateQty = window.updateQty;
+window.loadProductDetail = window.loadProductDetail;
+window.closeDetailModal = window.closeDetailModal;
+
 
 function openCart() {
+    window.openCart = openCart;
     const bodyContainer = document.getElementById('cartModalBody');
     const totalContainer = document.getElementById('cartModalTotal');
     const btnCheckout = document.getElementById('btnCheckout');

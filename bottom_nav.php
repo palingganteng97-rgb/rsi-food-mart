@@ -36,8 +36,10 @@
                     0 item
                 </div>
             </div>
-            <button class="btn btn-success rounded-3 px-4 py-2 fw-medium" type="button" onclick="window.location.href='keranjang.php'"> 
-              <i class="bi bi-basket2 me-2"></i> Lihat Keranjang 
+            
+            <!-- PERBAIKAN: Menyatukan kembali tag button yang terpotong dan memasukkan atribut onclick dengan benar -->
+            <button class="btn btn-success d-flex align-items-center" onclick="window.location.href='carts.php'">
+                <i class="bi bi-basket2 me-2"></i> Lihat Keranjang 
             </button>
         </div>
     </div>

@@ -25,7 +25,12 @@ if (isset($_POST['submit'])) {
         $patient_session_id = mysqli_insert_id($conn);
 
         // Simpan session pasien (pisah dari admin/login)
+        // NOTE: tenant_id belum ada pada form ini, jadi sementara gunakan default 1.
+        // Setelah debugging selesai, jika tenant_id punya sumbernya, ubah mappingnya.
+        $tenant_id = 1;
+
         $_SESSION['patient_session_id'] = (int)$patient_session_id;
+        $_SESSION['tenant_id'] = (int)$tenant_id;
         $_SESSION['patient_name'] = $patient_name;
         $_SESSION['medical_record_number'] = $medical_record_number;
         $_SESSION['room'] = $room;
