@@ -333,20 +333,37 @@ body{background:var(--bg) !important;color:var(--text);}
 </div>
 
 <?php
-$base=$qsBase;
-$prev=$page>1?$page-1:1;
-$next=$page<$totalPages?$page+1:$totalPages;
+// Base query string untuk menjaga parameter filter tetap terbawa saat paging
+$qsBase = http_build_query(['q' => $q, 'status' => $status, 'payment_status' => $paymentStatus, 'page' => $page]);
+$qsBase = $qsBase !== '' ? ('?' . $qsBase) : '';
+
+
+$prev = $page > 1 ? $page - 1 : 1;
+$next = $page < $totalPages ? $page + 1 : $totalPages;
+
+if (!function_exists('pageLink')) {
+    function pageLink(int $pageNum, string $qsBase = ''): string {
+        $pageNum = max(1, $pageNum);
+        $sep = ($qsBase !== '' && str_contains($qsBase, '?')) ? '&' : (strpos($qsBase, '?') !== false ? '&' : '?');
+        // $qsBase biasanya sudah berupa "?q=...&..." atau kosong
+        return ($qsBase !== '')
+            ? rtrim($qsBase, '?&') . (str_contains($qsBase, '?') ? '&' : '?') . 'page=' . $pageNum
+            : '?page=' . $pageNum;
+    }
+}
 ?>
 <nav class="mt-4" aria-label="Pagination">
 <ul class="pagination justify-content-center mb-0" style="--bs-pagination-color: var(--text); --bs-pagination-bg: transparent; --bs-pagination-border-color: rgba(148,163,184,.2);">
-<li class="page-item <?php echo $page<=1?'disabled':''; ?>"><a class="page-link" href="<?php echo $page<=1?'#':pageLink($prev,$base); ?>" tabindex="<?php echo $page<=1?-1:0; ?>">&laquo;</a></li>
+<li class="page-item <?php echo $page<=1?'disabled':''; ?>"><a class="page-link" href="<?php echo $page<=1?'#':pageLink($prev,$qsBase); ?>" tabindex="<?php echo $page<=1?-1:0; ?>">&laquo;</a></li>
+
 <?php
 $start=max(1,$page-2);$end=min($totalPages,$page+2);
 for($p=$start;$p<=$end;$p++){
-  echo '<li class="page-item '.($p===$page?'active':'').'"><a class="page-link" style="background:'.($p===$page?'rgba(34,197,94,.25)':'transparent').' !important; border-color:'.($p===$page?'rgba(34,197,94,.55)':'rgba(148,163,184,.2)').'" href="'.h(pageLink($p,$base)).'">'.h($p).'</a></li>';
+  echo '<li class="page-item '.($p===$page?'active':'').'"><a class="page-link" style="background:'.($p===$page?'rgba(34,197,94,.25)':'transparent').' !important; border-color:'.($p===$page?'rgba(34,197,94,.55)':'rgba(148,163,184,.2)').'" href="'.h(pageLink($p,$qsBase)).'">'.h($p).'</a></li>';
+
 }
 ?>
-<li class="page-item <?php echo $page>=$totalPages?'disabled':''; ?>"><a class="page-link" href="<?php echo $page>=$totalPages?'#':pageLink($next,$base); ?>" tabindex="<?php echo $page>=$totalPages?-1:0; ?>">&raquo;</a></li>
+<li class="page-item <?php echo $page>=$totalPages?'disabled':''; ?>"><a class="page-link" href="<?php echo $page>=$totalPages?'#':pageLink($next,$qsBase); ?>" tabindex="<?php echo $page>=$totalPages?-1:0; ?>">&raquo;</a></li>
 </ul>
 </nav>
 </div>

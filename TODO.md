@@ -1,13 +1,20 @@
-# TODO - Fix Keranjang & Alur Checkout (RSI_FOOD&MART)
+# TODO - Varian & Topping POS Cart (carts.php)
 
-## Progress
-- [x] Periksa dan baca `carts.php`, identifikasi potensi penyebab redirect palsu & parsing JS
-- [x] Refactor `carts.php` agar selalu menampilkan item dari database (`carts` + `cart_items`) dan tidak mengandalkan session cart lama
-- [x] Pastikan JavaScript di `carts.php` tidak terpotong dan string PHP ke JS memakai `json_encode`
-
-## Remaining (cek lintas file)
-- [ ] Audit `checkout_process.php` agar tidak menghapus/invalidasi session sebelum checkout selesai dan agar cart yang valid berdasarkan patient_session_id diambil konsisten
-- [ ] Pastikan `api_cart.php` dan tombol "Tambah ke Keranjang" benar-benar menulis ke `cart_items` yang terbaca oleh `carts.php` untuk pasien yang sama
-- [ ] Audit file terkait: `home.php`, `detail_product_modal.php`, `catalog_handler.js`, `cart_items.php`, `orders.php`, `order_items.php` (JOIN/kolom & filter)
-- [ ] Jalankan uji alur end-to-end: QR Scan → Form Pasien → Home → Detail Produk → Tambah Ke Keranjang → carts.php → Edit → Checkout → orders & order_items
+- [ ] Buat query SQL: ALTER TABLE cart_items tambah kolom `variant` (jika belum ada)
+- [ ] Buat tabel relasi: `cart_item_addons` (id, cart_item_id, addon_item_id) + FK ON DELETE CASCADE
+- [ ] Update fungsi PHP `fetch_cart_items($conn,$cart_id)` untuk:
+  - [ ] Ambil `variant` dari `cart_items`
+  - [ ] Ambil topping terpilih dari `cart_item_addons` join `addon_items`
+  - [ ] Kembalikan `base_price_only` (harga produk dasar) dan `addons` terpilih + total topping per item
+  - [ ] Set `unit_price` = base_price_only + sum(addon harga)
+- [ ] Update handler `update_item`:
+  - [ ] UPDATE `cart_items` untuk qty dan variant
+  - [ ] DELETE topping lama dari `cart_item_addons`
+  - [ ] INSERT topping baru berdasarkan `$_POST['addons']` (array addon_item_id)
+- [ ] Ubah HTML modal Edit Pesanan:
+  - [ ] Saat modal dibuka, tampilkan semua topping dari master via `fetch_addon_items_by_product`
+  - [ ] Checkbox topping di-checked otomatis berdasarkan selected addon yang tersimpan
+  - [ ] JS live: subtotal berubah saat checkbox topping diubah (base_price_only + addons_checked_total) * qty
+  - [ ] Pastikan submit mengirim `addons[]` (addon_item_id list) + `variant` + `qty`
+- [ ] Uji manual di browser sesuai 3 skenario utama
 

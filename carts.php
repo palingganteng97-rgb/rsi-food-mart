@@ -54,12 +54,12 @@ function ensure_active_cart(mysqli $conn, int $tenant_id): int {
     return (int)$conn->insert_id;
 }
 
+// AMBIL DATA TRANSAKSI & PARSING FORMAT STRING NOTES (Bebas Error Database)
 function fetch_cart_items(mysqli $conn, int $cart_id): array {
-
     $sql = "SELECT ci.id AS cart_item_id,
                    ci.product_id,
                    ci.qty,
-                   ci.price AS unit_price,
+                   ci.price AS base_price_only,
                    ci.notes,
                    p.name AS product_name,
                    p.image AS product_image
@@ -79,30 +79,81 @@ function fetch_cart_items(mysqli $conn, int $cart_id): array {
             $cart_item_id = (int)($row['cart_item_id'] ?? 0);
             if ($cart_item_id <= 0) continue;
 
+            $product_id = (int)($row['product_id'] ?? 0);
+            $raw_notes = (string)($row['notes'] ?? '');
+            
+            // Variabel bawaan default parsing string
+            $variant = 'Original';
+            $selected_addon_ids = [];
+            $pure_notes = $raw_notes;
+
+            // Jika teks notes mengandung format data terstruktur buatan kita
+            if (strpos($raw_notes, 'Varian:') !== false) {
+                $parts = explode('|', $raw_notes);
+                $pure_notes = '';
+                foreach ($parts as $part) {
+                    $part = trim($part);
+                    if (strpos($part, 'Varian:') === 0) {
+                        $variant = trim(substr($part, 7));
+                    } elseif (strpos($part, 'ToppingID:') === 0) {
+                        $id_string = trim(substr($part, 10));
+                        if ($id_string !== '') {
+                            $selected_addon_ids = array_map('intval', explode(',', $id_string));
+                        }
+                    } elseif (strpos($part, 'Catatan:') === 0) {
+                        $pure_notes = trim(substr($part, 8));
+                    }
+                }
+            }
+
+            // Ambil rincian data nama & harga topping live berdasarkan ID pilihan diatas
+            $addons_list = [];
+            $addon_sum = 0.0;
+            if (!empty($selected_addon_ids)) {
+                $ids_string = implode(',', $selected_addon_ids);
+                $addon_res = $conn->query("SELECT id, item_name, price FROM addon_items WHERE id IN ($ids_string) ORDER BY item_name ASC");
+                if ($addon_res) {
+                    while ($a_row = $addon_res->fetch_assoc()) {
+                        $price = as_float($a_row['price'] ?? 0, 0);
+                        $addon_sum += $price;
+                        $addons_list[] = [
+                            'id' => (int)$a_row['id'],
+                            'item_name' => (string)$a_row['item_name'],
+                            'price' => $price,
+                        ];
+                    }
+                }
+            }
+
+            $base_price_only = as_float($row['base_price_only'] ?? 0, 0);
+            $unit_price = $base_price_only + $addon_sum;
+
             $items[$cart_item_id] = [
                 'cart_item_id' => $cart_item_id,
-                'product_id' => (int)($row['product_id'] ?? 0),
+                'product_id' => $product_id,
                 'qty' => as_int($row['qty'] ?? 1, 1),
-                'unit_price' => as_float($row['unit_price'] ?? 0, 0),
-                'notes' => (string)($row['notes'] ?? ''),
-                'variant' => 'Original',
-                'addons' => [],
+                'base_price_only' => $base_price_only,
+                'unit_price' => $unit_price,
+                'notes' => $pure_notes,
+                'variant' => $variant,
+                'addons' => $addons_list,
+                'selected_addon_ids' => $selected_addon_ids,
                 'product_name' => (string)($row['product_name'] ?? 'Menu'),
                 'product_image' => (string)($row['product_image'] ?? ''),
             ];
         }
     }
-
     return $items;
 }
 
+// HITUNG TOTAL REALTIME DARI STRUKTUR NOTES PARSING
 function fetch_grand_total(mysqli $conn, int $cart_id): float {
-    $stmt = $conn->prepare('SELECT COALESCE(SUM(qty * price), 0) AS grand_total FROM cart_items WHERE cart_id = ?');
-    $stmt->bind_param('i', $cart_id);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    $row = $res ? $res->fetch_assoc() : null;
-    return as_float($row['grand_total'] ?? 0, 0);
+    $items = fetch_cart_items($conn, $cart_id);
+    $grand_total = 0.0;
+    foreach ($items as $item) {
+        $grand_total += ($item['unit_price'] * $item['qty']);
+    }
+    return $grand_total;
 }
 
 function fetch_addon_items_by_product(mysqli $conn, int $product_id): array {
@@ -172,18 +223,33 @@ if ($action === 'delete' && isset($_GET['key'])) {
     exit;
 }
 
+// PROSES SIMPAN VARIANT & CHECK/UNCHECK TOPPING GABUNG KEMBALI KE NOTES
 if ($action === 'update_item' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $cart_item_id = as_int($_POST['cart_key'] ?? 0, 0);
     $new_qty = as_int($_POST['qty'] ?? 1, 1);
-    $new_notes = isset($_POST['notes']) ? trim((string)$_POST['notes']) : '';
+    $user_notes = isset($_POST['notes']) ? trim((string)$_POST['notes']) : '';
 
     $new_variant = isset($_POST['variant']) ? trim((string)$_POST['variant']) : 'Original';
     $new_addon_ids = isset($_POST['addons']) ? $_POST['addons'] : [];
     if (!is_array($new_addon_ids)) $new_addon_ids = [];
 
+    // Menyusun string terformat untuk dimasukkan kembali ke kolom notes
+    $final_components = [];
+    $final_components[] = "Varian: " . $new_variant;
+    
+    if (!empty($new_addon_ids)) {
+        $clean_ids = array_map('intval', $new_addon_ids);
+        $final_components[] = "ToppingID: " . implode(',', $clean_ids);
+    }
+    if ($user_notes !== '') {
+        $final_components[] = "Catatan: " . $user_notes;
+    }
+    
+    $compiled_notes = implode(' | ', $final_components);
+
     if ($cart_item_id > 0 && $new_qty > 0) {
         $stmt = $conn->prepare('UPDATE cart_items SET qty = ?, notes = ? WHERE id = ? AND cart_id = ?');
-        $stmt->bind_param('isii', $new_qty, $new_notes, $cart_item_id, $cart_id);
+        $stmt->bind_param('isii', $new_qty, $compiled_notes, $cart_item_id, $cart_id);
         $stmt->execute();
     }
 
@@ -303,23 +369,40 @@ $grand_total = fetch_grand_total($conn, $cart_id);
                         'qty' => (int)$item['qty'],
                         'variant' => $item['variant'],
                         'notes' => $item['notes'],
-                        'unit_price' => (float)$item['unit_price'],
+                        'base_price_only' => (float)$item['base_price_only'],
+                        'selected_addon_ids' => $item['selected_addon_ids'],
                         'product_name' => $item['product_name'],
                         'product_image' => $item['product_image'],
                     ], JSON_UNESCAPED_UNICODE); ?>)'
                     style="box-shadow:none; font-size:0.85rem; opacity:0.9;">
                     <i class="bi bi-pencil-square me-1"></i> Edit Pesanan
                   </button>
-
-                  <button
-                    type="button"
-                    class="btn text-danger bg-transparent p-0 border-0 small"
-                    data-bs-toggle="modal"
-                    data-bs-target="#modalConfirmDelete"
-                    onclick="prepareDelete(<?php echo (int)$cart_item_id; ?>, <?php echo json_encode($item['product_name'], JSON_UNESCAPED_UNICODE); ?>)"
-                    style="box-shadow:none; font-size:0.85rem; opacity:0.9;">
-                    <i class="bi bi-trash3-fill me-1"></i> Hapus
+                  
+                  <!-- Tombol pemicu Modal Konfirmasi Hapus Item -->
+                  <button type="button" class="btn text-danger bg-transparent p-0 border-0 small mt-1" data-bs-toggle="modal" data-bs-target="#modalHapusItem<?= $cart_item_id; ?>" style="box-shadow:none; font-size:0.85rem;">
+                    <i class="bi bi-trash me-1"></i> Hapus Item
                   </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal Konfirmasi Hapus Item Berdasarkan ID Unik -->
+          <div class="modal fade" id="modalHapusItem<?= $cart_item_id; ?>" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+              <div class="modal-content text-white rounded-4 border-0" style="background: #111827; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+                <div class="modal-header border-0 pb-0">
+                  <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2">
+                    <i class="bi bi-exclamation-triangle-fill"></i> Hapus Item
+                  </h5>
+                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="box-shadow: none;"></button>
+                </div>
+                <div class="modal-body py-3">
+                  <p class="text-white-50 m-0" style="font-size: 0.95rem; line-height: 1.5;">Apakah Anda yakin ingin mengeluarkan menu <strong><?= h($item['product_name']); ?></strong> ini dari daftar keranjang belanja Anda?</p>
+                </div>
+                <div class="modal-footer border-0 pt-0 d-flex gap-2">
+                  <button type="button" class="btn btn-sm rounded-pill px-4 fw-medium text-white border-0" data-bs-dismiss="modal" style="background: #1f2937;">Batal</button>
+                  <a href="carts.php?action=delete&key=<?= $cart_item_id; ?>" class="btn btn-danger btn-sm rounded-pill px-4 fw-medium shadow-sm">Ya, Hapus</a>
                 </div>
               </div>
             </div>
@@ -351,33 +434,10 @@ $grand_total = fetch_grand_total($conn, $cart_id);
         </div>
 
         <form method="POST" action="checkout_process.php">
-        <!-- Jika menggunakan tag tautan (Link) -->
-        <a href="checkout_process.php" class="btn btn-success w-100 rounded-3 py-2 fw-medium d-flex align-items-center justify-content-center gap-2">
-            <i class="bi bi-wallet2"></i> Lanjutkan Pemesanan
-        </a>
-
+          <a href="checkout_process.php" class="btn btn-success w-100 rounded-3 py-2 fw-medium d-flex align-items-center justify-content-center gap-2">
+              <i class="bi bi-wallet2"></i> Lanjutkan Pemesanan
+          </a>
         </form>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: Confirm Delete -->
-<div class="modal fade" id="modalConfirmDelete" tabindex="-1" aria-hidden="true" aria-labelledby="modalConfirmDeleteLabel">
-  <div class="modal-dialog modal-dialog-centered" style="max-width: 450px;">
-    <div class="modal-content text-white rounded-4 border-0 shadow-lg" style="background: rgba(15, 23, 42, 0.96) !important; border: 1px solid rgba(148, 163, 184, 0.18) !important; backdrop-filter: blur(16px);">
-      <div class="modal-header border-bottom border-secondary border-opacity-25 p-3 px-4">
-        <h5 class="modal-title fw-bold text-danger" id="modalConfirmDeleteLabel">
-          <i class="bi bi-exclamation-triangle-fill"></i> Hapus Item
-        </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="box-shadow: none;"></button>
-      </div>
-      <div class="modal-body p-4 text-white-50 fs-6" id="delete_item_text_target" style="line-height: 1.5;">
-        Apakah Anda yakin ingin mengeluarkan menu ini dari daftar keranjang belanja Anda?
-      </div>
-      <div class="modal-footer border-top border-secondary border-opacity-25 p-3 px-4 justify-content-end gap-2">
-        <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-3 fw-medium" data-bs-dismiss="modal" style="font-size: 0.88rem;">Batal</button>
-        <a id="btn_execute_delete_link" href="#" class="btn btn-sm btn-danger rounded-pill px-4 fw-medium shadow-sm" style="font-size: 0.88rem;">Ya, Hapus</a>
       </div>
     </div>
   </div>
@@ -447,9 +507,6 @@ $grand_total = fetch_grand_total($conn, $cart_id);
           <div class="mb-4">
             <label class="form-label text-white-50 small fw-medium mb-2" style="opacity:.85;">Pilih Tambahan Topping / Addons</label>
             <div id="edit_addons_container" class="d-flex flex-column gap-2 p-2 rounded-3" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.12);"></div>
-            <div class="text-warning small mt-2">
-              Catatan: addons/variant belum bisa dipersist di database karena tabel `cart_items` saat ini belum menyimpan addon per item.
-            </div>
           </div>
 
           <div class="mb-2">
@@ -529,8 +586,9 @@ $grand_total = fetch_grand_total($conn, $cart_id);
       qty: item.qty || 1,
       variant: item.variant || 'Original',
       notes: item.notes || '',
-      // harga unit yang tersimpan di DB adalah price; di sistem saat ini tidak terpisah base/addon.
-      base_price: parseFloat(item.unit_price) || 0
+      // base_price_only dari DB (tanpa addon)
+      base_price: parseFloat(item.base_price_only) || 0,
+      selected_addon_ids: Array.isArray(item.selected_addon_ids) ? item.selected_addon_ids.map(x => parseInt(x)).filter(x => !isNaN(x)) : []
     };
 
     document.getElementById('edit_cart_key').value = item.cart_item_id;
@@ -571,16 +629,18 @@ $grand_total = fetch_grand_total($conn, $cart_id);
           return;
         }
 
-        // Karena addon yang dipilih TIDAK dipersist di DB saat ini,
-        // semua checkbox default unchecked.
+        const selectedIds = Array.isArray(__edit_state.selected_addon_ids) ? __edit_state.selected_addon_ids : [];
+
         addons.forEach(a => {
           const addonId = parseInt(a.id);
           const price = parseFloat(a.price) || 0;
           const safeName = a.item_name || '';
+          const checked = selectedIds.includes(addonId);
+
           addonsContainer.innerHTML += `
             <div class="form-check d-flex align-items-center justify-content-between p-2 rounded-2 mx-2" style="background: rgba(2,6,23,.25); border: 1px solid rgba(148,163,184,.10);">
               <div>
-                <input class="form-check-input me-2 addon-checkbox-input" type="checkbox" name="addons[]" value="${addonId}" data-price="${price}" id="addon_${addonId}">
+                <input class="form-check-input me-2 addon-checkbox-input" type="checkbox" name="addons[]" value="${addonId}" data-price="${price}" id="addon_${addonId}" ${checked ? 'checked' : ''}>
                 <label class="form-check-label text-white small" for="addon_${addonId}">${safeName}</label>
               </div>
               <span class="text-success small fw-semibold">+Rp ${Math.round(price).toLocaleString('id-ID')}</span>

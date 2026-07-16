@@ -6,16 +6,19 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// 1. Ambil patient_session_id dari session browser pasien
-$patient_session_id = isset($_SESSION['patient_session_id']) ? intval($_SESSION['patient_session_id']) : 0;
+// Pembantu fungsi parsing float agar seragam
+function parse_as_float($v): float {
+    $f = filter_var($v, FILTER_VALIDATE_FLOAT);
+    return $f === false ? 0.0 : (float)$f;
+}
 
+$patient_session_id = isset($_SESSION['patient_session_id']) ? intval($_SESSION['patient_session_id']) : 0;
 $cart_items = [];
 $main_cart_id = 0;
 $tenant_id = 1;
 
 // Jalankan query standar berdasarkan session pasien saat ini jika valid
 if ($patient_session_id > 0) {
-    // Pastikan ID tersebut benar-benar ada di tabel patient_sessions (Validasi Foreign Key)
     $check_session = mysqli_query($conn, "SELECT id FROM patient_sessions WHERE id = $patient_session_id");
     if ($check_session && mysqli_num_rows($check_session) > 0) {
         $cart_query = "SELECT ci.*, c.id AS main_cart_id, c.tenant_id 
@@ -29,10 +32,7 @@ if ($patient_session_id > 0) {
     }
 }
 
-// =========================================================================
-// LOGIKA FAILSAFE: Jika session tidak cocok, cari data keranjang di database 
-// yang patient_session_id-nya VALID & ADA di tabel patient_sessions
-// =========================================================================
+// Failsafe: cari data keranjang di database yang patient_session_id-nya VALID
 if (empty($cart_items)) {
     $failsafe_query = "SELECT ci.*, c.id AS main_cart_id, c.tenant_id, c.patient_session_id 
                        FROM cart_items ci
@@ -43,22 +43,18 @@ if (empty($cart_items)) {
     
     if ($failsafe_result && mysqli_num_rows($failsafe_result) > 0) {
         $cart_items = mysqli_fetch_all($failsafe_result, MYSQLI_ASSOC);
-        
-        // PERBAIKAN UTAMA: Tambahkan indeks [0] karena mysqli_fetch_all menghasilkan array berundak
         $patient_session_id = intval($cart_items[0]['patient_session_id']);
         $_SESSION['patient_session_id'] = $patient_session_id;
     }
 }
 
-// Jika setelah validasi silang data keranjang tetap kosong, lakukan fallback ke cart aktif tenant terbaru.
-// Ini mencegah redirect palsu ketika session pasien tidak sinkron, tapi item sebenarnya masih ada di database.
+// Fallback ke cart aktif tenant terbaru jika masih kosong
 if (empty($cart_items)) {
     $fallback_cart_query = "SELECT ci.*, c.id AS main_cart_id, c.tenant_id, c.patient_session_id
-                              FROM cart_items ci
-                              JOIN carts c ON ci.cart_id = c.id
-                              WHERE c.tenant_id = ?
-                              ORDER BY c.id DESC, ci.id ASC
-                              LIMIT 200";
+                            FROM cart_items ci
+                            JOIN carts c ON ci.cart_id = c.id
+                            WHERE c.tenant_id = ?
+                            ORDER BY c.id DESC, ci.id ASC LIMIT 200";
 
     $fallback_stmt = $conn->prepare($fallback_cart_query);
     $fallback_stmt->bind_param('i', $tenant_id);
@@ -67,8 +63,6 @@ if (empty($cart_items)) {
 
     if ($fallback_res && $fallback_res->num_rows > 0) {
         $cart_items = mysqli_fetch_all($fallback_res, MYSQLI_ASSOC);
-
-        // Kalau ada patient_session_id dari cart, update session agar tetap konsisten
         if (!empty($cart_items[0]['patient_session_id'])) {
             $_SESSION['patient_session_id'] = (int)$cart_items[0]['patient_session_id'];
             $patient_session_id = (int)$cart_items[0]['patient_session_id'];
@@ -76,35 +70,84 @@ if (empty($cart_items)) {
     }
 }
 
-// Jika tetap kosong, barulah redirect error.
+// =========================================================================
+// INTEGRASI BAGIAN 1: LOGIKA FLEKSIBEL (PERBAIKAN KOLOM TENANT_ID)
+// =========================================================================
+$check_ps = mysqli_query($conn, "SELECT id FROM patient_sessions WHERE id = $patient_session_id");
+if ($patient_session_id <= 0 || !$check_ps || mysqli_num_rows($check_ps) === 0) {
+    // Memperbaiki kolom kosong agar sesuai dengan struktur asli database RSI lokal Anda
+    mysqli_query($conn, "INSERT INTO patient_sessions () VALUES ()");
+    $patient_session_id = intval(mysqli_insert_id($conn));
+    $_SESSION['patient_session_id'] = $patient_session_id;
+    
+    // Perbarui kaitan data induk di tabel carts agar sinkron dengan sesi baru
+    if (!empty($cart_items)) {
+        $main_cart_id = intval($cart_items[0]['main_cart_id']);
+        mysqli_query($conn, "UPDATE carts SET patient_session_id = $patient_session_id WHERE id = $main_cart_id");
+    }
+}
+
+// Jika setelah semua skenario fallback tetap kosong, barulah lempar error.
 if (empty($cart_items)) {
     header("Location: carts.php?status=error&msg=" . urlencode("Keranjang belanja kosong. Silakan scan ulang QR Code Ruangan."));
     exit();
 }
 
-// Mengunci data ID induk keranjang dan ID tenant dari baris record pertama hasil query
 $main_cart_id = intval($cart_items[0]['main_cart_id']);
 $tenant_id    = intval($cart_items[0]['tenant_id'] ?? 1); 
 
-// 2. Hitung total akumulasi bayar belanja di backend
+// =========================================================================
+// INTEGRASI BAGIAN 2: HITUNG TOTAL AKURAT TERMASUK HARGA TOPPING DARI NOTES
+// =========================================================================
 $grand_total = 0;
+$processed_cart_items = []; 
+
 foreach ($cart_items as $item) {
-    $grand_total += (int)$item['qty'] * (float)$item['price'];
+    $qty = intval($item['qty']);
+    $base_price = parse_as_float($item['price']);
+    $raw_notes = (string)($item['notes'] ?? '');
+    
+    $addon_sum = 0.0;
+    
+    // Pecah string notes untuk mencari "ToppingID:"
+    if (strpos($raw_notes, 'Varian:') !== false) {
+        $parts = explode('|', $raw_notes);
+        foreach ($parts as $part) {
+            $part = trim($part);
+            if (strpos($part, 'ToppingID:') === 0) {
+                $id_string = trim(substr($part, 10));
+                if ($id_string !== '') {
+                    $selected_addon_ids = array_map('intval', explode(',', $id_string));
+                    $ids_clean_str = implode(',', $selected_addon_ids);
+                    
+                    $addon_res = mysqli_query($conn, "SELECT SUM(price) AS total_addon_price FROM addon_items WHERE id IN ($ids_clean_str)");
+                    if ($addon_res) {
+                        $addon_row = mysqli_fetch_assoc($addon_res);
+                        $addon_sum = parse_as_float($addon_row['total_addon_price']);
+                    }
+                }
+            }
+        }
+    }
+    
+    $final_unit_price = $base_price + $addon_sum;
+    $grand_total += ($qty * $final_unit_price);
+    
+    $item['final_calculated_price'] = $final_unit_price;
+    $processed_cart_items[] = $item;
 }
 
 // =========================================================================
-// MULAI PROSES DATABASE TRANSACTION (ANTI-GAGAL)
+// MULAI PROSES DATABASE TRANSACTION
 // =========================================================================
 mysqli_begin_transaction($conn);
 
 try {
-    // Membuat nomor invoice unik otomatis (INV-TAHUNBULANTANGGAL-ACAK)
     $order_number = "INV-" . date('Ymd') . "-" . rand(1000, 9999);
-    
     $status         = 'PENDING';
     $payment_status = 'UNPAID';
     
-    // 3. Masukkan data ke induk tabel 'orders'
+    // Masukkan data ke induk tabel 'orders'
     $insert_order_query = "INSERT INTO orders (order_number, patient_session_id, tenant_id, grand_total, status, payment_status, created_at) 
                            VALUES ('$order_number', $patient_session_id, $tenant_id, $grand_total, '$status', '$payment_status', NOW())";
     
@@ -112,14 +155,13 @@ try {
         throw new Exception("Gagal membuat data transaksi orders: " . mysqli_error($conn));
     }
     
-    // Mengambil ID pesanan orders yang baru saja tercipta
     $new_order_id = mysqli_insert_id($conn);
     
-    // 4. Pindahkan setiap baris menu makanan dari 'cart_items' ke 'order_items'
-    foreach ($cart_items as $item) {
+    // Pindahkan setiap baris menu makanan ke 'order_items'
+    foreach ($processed_cart_items as $item) {
         $product_id = intval($item['product_id']);
         $qty        = intval($item['qty']);
-        $price      = floatval($item['price']);
+        $price      = floatval($item['final_calculated_price']); 
         $notes      = mysqli_real_escape_string($conn, trim($item['notes'] ?? ''));
         
         $insert_item_query = "INSERT INTO order_items (order_id, product_id, qty, price, notes) 
@@ -130,7 +172,7 @@ try {
         }
     }
     
-    // 5. Catat log jejak transaksi pembuka ke tabel 'order_status_histories'
+    // Catat log histori transaksi pembuka
     $log_notes = mysqli_real_escape_string($conn, "Pesanan otomatis masuk sistem melalui checkout keranjang belanja.");
     $insert_history_query = "INSERT INTO order_status_histories (order_id, status, changed_by, notes, created_at) 
                              VALUES ($new_order_id, '$status', NULL, '$log_notes', NOW())";
@@ -139,30 +181,29 @@ try {
         throw new Exception("Gagal mencatat log histori awal status.");
     }
     
-    // 6. Bersihkan isi item keranjang belanja (cart_items)
+    // Bersihkan isi item keranjang belanja (cart_items)
     $delete_items_query = "DELETE FROM cart_items WHERE cart_id = $main_cart_id";
     if (!mysqli_query($conn, $delete_items_query)) {
         throw new Exception("Gagal mengosongkan item keranjang.");
     }
     
-    // 7. Bersihkan data induk keranjang (carts)
+    // Bersihkan data induk keranjang (carts)
     $delete_cart_query = "DELETE FROM carts WHERE id = $main_cart_id";
     if (!mysqli_query($conn, $delete_cart_query)) {
         throw new Exception("Gagal menghapus instalasi keranjang.");
     }
     
-    // Jika seluruh rangkaian proses di atas sukses tanpa interupsi, simpan permanen ke database
+    // Jika sukses tanpa interupsi, simpan permanen ke database
     mysqli_commit($conn);
     
-    // Sukses! Alihkan halaman pasien langsung ke daftar pesanan utama
     header("Location: orders.php?status=success_add");
     exit();
 
 } catch (Exception $e) {
-    // Apabila terjadi error di tengah jalan, batalkan semua manipulasi data di atas agar database bersih kembali
     mysqli_rollback($conn);
-    
-    header("Location: carts.php?status=error&msg=" . urlencode($e->getMessage()));
+    // Trik Pembersihan Error: memunculkan teks deskripsi asli jika masih menyumbat
+    echo "<h1>Terjadi Error Saat Simpan Transaksi:</h1>";
+    echo "<p>" . h($e->getMessage()) . "</p>";
     exit();
 }
 ?>
