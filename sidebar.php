@@ -13,7 +13,7 @@ parse_str(parse_url($currentUri, PHP_URL_QUERY) ?? '', $queryParams);
 $currentTenantId = $queryParams['tenant_id'] ?? '';
 
 $menu = [
-    'home.php' => [ 'href' => 'home.php', 'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
+'dashboard.php' => [ 'href' => 'dashboard.php', 'label' => 'Dashboard', 'icon' => 'bi-speedometer2' ],
     'tenants_group' => [
         'label' => 'Tenants', 'icon' => 'bi-building-gear', 'class' => 'd-mobile-none',
         'sub' => [
@@ -58,6 +58,7 @@ $menu = [
         ]
     ],
 
+    'master_barcode.php' => [ 'href' => 'master_barcode.php', 'label' => 'Master Barcode', 'icon' => 'bi-qr-code-scan' ],
     'user.php' => [ 'href' => 'user.php', 'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-none d-lg-block' ],
     'profile.php' => [ 'href' => 'profile.php', 'label' => 'User', 'icon' => 'bi-person-bounding-box', 'class' => 'd-block d-lg-none' ],
     'roles.php' => [ 'href' => 'roles.php', 'label' => 'Roles', 'icon' => 'bi-shield-lock', 'class' => 'd-mobile-none' ],
@@ -225,8 +226,8 @@ function activeClass(string $file, string $currentFile, string $currentTenantId)
     <div class="sidebar-scroll-container py-3">
       <div class="navmenu">
         <?php foreach ($menu as $key => $item): ?>
-          <!-- FILTER MOBILE: Hanya izinkan key 'home.php' dan 'profile.php' -->
-          <?php if (!in_array($key, ['home.php', 'profile.php'])) { continue; } ?>
+          <!-- FILTER MOBILE: Hanya izinkan key 'dashboard.php' dan 'profile.php' -->
+          <?php if (!in_array($key, ['dashboard.php', 'profile.php'])) { continue; } ?>
 
           <?php if (isset($item['sub'])): $isSubActive = array_key_exists($currentFile, $item['sub']); ?>
             <div class="w-100 mb-1 <?= $item['class'] ?? ''; ?>">

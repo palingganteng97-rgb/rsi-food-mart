@@ -5,11 +5,12 @@ include "db.php"; // Memanggil koneksi database ($conn) & session_start()
 $errorMsg = '';
 $isLoginSukses = false;
 
-// 1. Jika sesi user_id sudah aktif, langsung alihkan ke home.php jika diakses secara normal
+// 1. Jika sesi user_id sudah aktif, langsung alihkan ke dashboard.php jika diakses secara normal
 if (isset($_SESSION['user_id']) && !empty($_SESSION['user_id']) && $_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header("Location: home.php");
+    header("Location: dashboard.php");
     exit;
 }
+
 
 // 2. Proses penanganan data saat menerima kiriman POST dari login.php
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -106,8 +107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         setTimeout(function() {
             if (loginStatus === true) {
-                // Sesuai alur: Jika datang dari form login, setelah splash screen akan masuk ke home.php
-                window.location.href = "home.php";
+        // Sesuai alur: Jika datang dari form login, setelah splash screen akan masuk ke dashboard.php
+                window.location.href = "dashboard.php";
+
             } else {
                 // Jika diakses tanpa POST (buka aplikasi pertama kali), setelah splash screen ke login.php
                 window.location.href = "login.php";

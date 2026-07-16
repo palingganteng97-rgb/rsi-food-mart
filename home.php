@@ -5,19 +5,20 @@ include "db.php";
 // session_start sudah dipanggil di db.php
 
 // =========================================================================
-// PERBAIKAN UTAMA: Izinkan masuk jika dia Admin (user_id) ATAU Pasien (patient_session_id)
+// Mode Pasien (standalone): Izinkan hanya jika ada sesi pasien aktif (patient QR)
 // =========================================================================
-$isAdmin   = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
 $isPatient = isset($_SESSION['patient_session_id']) && $_SESSION['patient_session_id'] > 0;
 
-if (!$isAdmin && !$isPatient) {
-    // Jika bukan admin dan tidak memiliki sesi pasien aktif, alihkan ke login/index
+if (!$isPatient) {
+    // Setelah Form Pasien, alurnya harus mengarah ke home.php dengan session pasien.
+    // Jika tidak ada, arahkan ke halaman entry awal.
     header("Location: index.php");
     exit;
 }
 
-// Menentukan nama sapaan di dashboard (Nama Admin atau Nama Pasien)
-$userName = $_SESSION['name'] ?? ($_SESSION['patient_name'] ?? 'Pasien');
+// Menentukan nama sapaan di halaman katalog pasien
+$userName = $_SESSION['patient_name'] ?? 'Pasien';
+
 
 // --- TAMBAHKAN QUERY INI UNTUK MENGHITUNG KELUARAN JUMLAH ITEM AWAL ---
 // Jika patient_session_id belum ada, set default 0 agar query tidak crash
@@ -85,7 +86,14 @@ if ($fetchQuery) {
     .bi-clock-history, .text-white-icon { color: #ffffff !important; opacity: 1 !important; filter: drop-shadow(0 0 1px rgba(255,255,255,0.2)); }
     input[type="time"]::-webkit-calendar-picker-indicator,
     input[type="date"]::-webkit-calendar-picker-indicator {filter: invert(1) brightness(100%) contrast(100%) !important;cursor: pointer;}
-    @media (min-width: 992px) { main.content-shift { margin-left: 280px; } .bottom-nav { display:none; } }
+    /* Standalone pasien: bottom nav tetap tampil, tapi sesuaikan agar tidak ikut margin sidebar */
+    :root { --sidebar-w: 0px; }
+
+    @media (min-width: 992px) { 
+        .bottom-nav { display:none; } /* tetap sesuai desain lama */
+    }
+
+    .bottom-nav-fixed { margin-left: 0 !important; }
 
     /* ========================================================
        TAMBAHAN BARU: ANIMASI KARTU MELUNCUR TERBANG KE KERANJANG
@@ -104,11 +112,11 @@ if ($fetchQuery) {
     }
 </style>
 
+
 </head>
 <body>
-  <?php require __DIR__ . '/sidebar.php'; ?>
 
-<main class="content-shift page-body">
+<main class="page-body">
     <div class="container py-3">
         <!-- HEADER ETALASE MENU -->
         <div class="d-flex align-items-center justify-content-between mb-3">
@@ -212,7 +220,8 @@ if ($fetchQuery) {
 <!-- Panggil file komponen HTML modal kustom -->
 <?php include 'detail_product_modal.php'; ?>
 
-  <?php include "bottom_nav.php"; ?>
+<?php include "bottom_nav.php"; ?>
+
 
 <!-- Hubungkan ke file eksternal JavaScript catalog handler -->
 <script src="catalog_handler.js?v=1.1"></script>

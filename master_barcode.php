@@ -231,17 +231,10 @@ if ($editId > 0) {
 
 </head>
 <body class="text-light">
+  <?php require __DIR__ . '/sidebar.php'; ?>
 
-<nav class="navbar navbar-expand-lg navbar-dark" style="background: rgba(2,6,23,.55); border-bottom: 1px solid rgba(148,163,184,.12);">
-  <div class="container-fluid px-4">
-    <span class="navbar-brand fw-bold">
-      <i class="bi bi-qr-code-scan me-2 text-success"></i>Master Barcode Ruangan
-    </span>
-  </div>
-</nav>
-
-<main class="container py-4">
-  <div class="glass p-4 p-md-5">
+<main class="content-shift p-4">
+  <div class="container-fluid glass p-4 p-md-5 text-light">
 
     <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
       <div>
