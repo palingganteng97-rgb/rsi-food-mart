@@ -65,6 +65,15 @@ $menu = [
             'delivery_tracking.php'      => [ 'href' => 'delivery_tracking.php', 'label' => 'Pelacakan Live', 'icon' => 'bi-geo-alt' ],
         ]
     ],
+
+    'payments_group' => [
+        'label' => 'Pembayaran', 'icon'  => 'bi-credit-card', 'class' => '','sub'   => [
+            'payment_methods.php' => [ 'href' => 'payment_methods.php', 'label' => 'Metode Pembayaran', 'icon' => 'bi-wallet2' ],
+            'payments.php'        => [ 'href' => 'payments.php', 'label' => 'Daftar Pembayaran', 'icon' => 'bi-cash-coin' ],
+            'refunds.php'         => [ 'href' => 'refunds.php', 'label' => 'Pengembalian Dana (Refund)', 'icon' => 'bi-arrow-counterclockwise' ],
+        ]
+    ],
+
     'master_barcode.php' => [ 'href' => 'master_barcode.php', 'label' => 'Master Barcode', 'icon' => 'bi-qr-code-scan' ],
     'user.php' => [ 'href' => 'user.php', 'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-none d-lg-block' ],
     'profile.php' => [ 'href' => 'profile.php', 'label' => 'User', 'icon' => 'bi-person-bounding-box', 'class' => 'd-block d-lg-none' ],
@@ -312,5 +321,79 @@ function activeClass(string $file, string $currentFile, string $currentTenantId)
         if (href && href === current) a.classList.add('active');
       }catch(e){}
     });
+
+    function getActiveMenuEl(container){
+      if (!container) return null;
+      // Prioritas: link dengan class active
+      const el = container.querySelector('.nav-link.active');
+      if (el) return el;
+      // fallback: aria-current atau class lain yang mungkin ada
+      return container.querySelector('[aria-current="page"]') || container.querySelector('.active');
+    }
+
+    function ensureSubmenuOpenForEl(el){
+      if (!el) return;
+      // Jika menu aktif berada di dalam collapse Bootstrap, pastikan collapse tersebut di-open
+      // Dengan vanilla JS: tambahkan class "show" ke .collapse dan set aria-expanded=true pada toggle.
+      const collapses = [];
+      let p = el;
+      while (p){
+        if (p.classList && p.classList.contains('collapse')) collapses.push(p);
+        p = p.parentElement;
+      }
+      collapses.forEach(collapse => {
+        collapse.classList.add('show');
+        const id = collapse.getAttribute('id');
+        if (id){
+          const btn = document.querySelector('[data-bs-target="#'+CSS.escape(id)+'"]');
+          if (btn){
+            btn.setAttribute('aria-expanded','true');
+            btn.classList.add('active');
+          }
+        }
+      });
+    }
+
+    function scrollContainerToCenter(container, target){
+      if (!container || !target) return;
+
+      // Hitung posisi target relatif terhadap container
+      const cRect = container.getBoundingClientRect();
+      const tRect = target.getBoundingClientRect();
+
+      // targetTopInContainer = (jarak top target terhadap top container) + scrollTop
+      const targetTopInContainer = (tRect.top - cRect.top) + container.scrollTop;
+
+      const centerOfContainer = container.scrollTop + (cRect.height / 2);
+      const targetCenter = targetTopInContainer + (target.offsetHeight / 2);
+
+      const nextScrollTop = container.scrollTop + (targetCenter - centerOfContainer);
+
+      container.scrollTo({
+        top: Math.max(0, nextScrollTop),
+        behavior: 'smooth'
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', function(){
+      // Berlaku untuk desktop (sidebar-scroll-container di desktop) dan mobile (sidebar-scroll-container di offcanvas)
+      const containers = document.querySelectorAll('.sidebar-scroll-container');
+      if (!containers || !containers.length) return;
+
+      // Tunggu sedikit agar layout collapse selesai
+      setTimeout(function(){
+        containers.forEach(container => {
+          const target = getActiveMenuEl(container);
+          if (!target) return;
+
+          ensureSubmenuOpenForEl(target);
+          // Reflow setelah submenu dibuka
+          requestAnimationFrame(function(){
+            scrollContainerToCenter(container, target);
+          });
+        });
+      }, 50);
+    });
   })();
 </script>
+

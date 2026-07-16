@@ -433,11 +433,98 @@ $grand_total = fetch_grand_total($conn, $cart_id);
           <span class="text-success fw-bold fs-4"><?php echo money_id($grand_total); ?></span>
         </div>
 
-        <form method="POST" action="checkout_process.php">
-          <a href="checkout_process.php" class="btn btn-success w-100 rounded-3 py-2 fw-medium d-flex align-items-center justify-content-center gap-2">
+        <?php
+        // Ambil daftar metode pembayaran untuk modal pemilihan
+        $pm = [];
+        $pmRes = $conn->query("SELECT id, name, provider, is_online FROM payment_methods ORDER BY id DESC");
+        if ($pmRes) {
+            while ($row = $pmRes->fetch_assoc()) {
+                $pm[] = $row;
+            }
+        }
+        ?>
+
+        <form method="POST" action="checkout_process.php" id="formCheckout">
+          <input type="hidden" name="payment_method_id" id="payment_method_id" value="">
+          <a href="#" class="btn btn-success w-100 rounded-3 py-2 fw-medium d-flex align-items-center justify-content-center gap-2"
+             data-bs-toggle="modal" data-bs-target="#modalPilihMetodePembayaran">
               <i class="bi bi-wallet2"></i> Lanjutkan Pemesanan
           </a>
         </form>
+
+        <!-- MODAL: Pilih Metode Pembayaran -->
+        <div class="modal fade" id="modalPilihMetodePembayaran" tabindex="-1" aria-labelledby="modalPilihMetodePembayaranLabel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" style="max-width: 560px;">
+            <div class="modal-content text-white rounded-4 border-0" style="background: #111827; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+              <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold" id="modalPilihMetodePembayaranLabel">
+                  <i class="bi bi-cash-stack me-2 text-success"></i> Pilih Metode Pembayaran
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="box-shadow:none;"></button>
+              </div>
+
+              <div class="modal-body py-3">
+                <?php if (count($pm) === 0): ?>
+                  <div class="text-white-50 text-center py-3">
+                    Tidak ada metode pembayaran. Silakan hubungi admin.
+                  </div>
+                <?php else: ?>
+                  <div class="d-flex flex-column gap-2">
+                    <?php foreach ($pm as $method):
+                      $mid = (int)($method['id'] ?? 0);
+                      $mname = (string)($method['name'] ?? 'Metode');
+                      $provider = trim((string)($method['provider'] ?? ''));
+                      $label = $provider !== '' ? ($mname . ' (' . $provider . ')') : $mname;
+                    ?>
+                      <label class="d-flex align-items-center justify-content-between gap-3 p-3 rounded-3" style="background: rgba(2,6,23,.35); border: 1px solid rgba(148,163,184,.18); cursor: pointer;">
+                        <span class="d-flex flex-column">
+                          <span class="fw-semibold"><?php echo h($label); ?></span>
+                          <span class="text-white-50 small">ID: <?php echo h($mid); ?></span>
+                        </span>
+                        <span>
+                          <input class="form-check-input" type="radio" name="pm_radio" value="<?php echo h($mid); ?>" <?php echo $mid === (int)$pm[0]['id'] ? 'checked' : ''; ?> onclick="setPaymentMethod(<?php echo h($mid); ?>)" />
+                        </span>
+                      </label>
+                    <?php endforeach; ?>
+                  </div>
+                <?php endif; ?>
+              </div>
+
+              <div class="modal-footer border-0 pt-0 d-flex gap-2">
+                <button type="button" class="btn btn-sm rounded-pill px-4 fw-medium text-white border-0" data-bs-dismiss="modal" style="background:#1f2937; box-shadow:none;">Batal</button>
+                <button type="button" class="btn btn-sm btn-success rounded-pill px-4 fw-medium shadow-sm"
+                        onclick="submitCheckoutWithSelectedMethod()" <?php echo count($pm) === 0 ? 'disabled' : ''; ?> >
+                  Lanjut
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <script>
+          function setPaymentMethod(id) {
+            const el = document.getElementById('payment_method_id');
+            if (el) el.value = String(id);
+          }
+
+          function submitCheckoutWithSelectedMethod() {
+            const el = document.getElementById('payment_method_id');
+            if (!el || !el.value) {
+              alert('Pilih metode pembayaran terlebih dahulu.');
+              return;
+            }
+            const form = document.getElementById('formCheckout');
+            if (!form) return;
+            form.submit();
+          }
+
+          document.addEventListener('DOMContentLoaded', function() {
+            // set default metode pembayaran sesuai pilihan radio pertama
+            const radio = document.querySelector('input[name="pm_radio"]:checked');
+            if (radio) setPaymentMethod(radio.value);
+          });
+        </script>
+
       </div>
     </div>
   </div>

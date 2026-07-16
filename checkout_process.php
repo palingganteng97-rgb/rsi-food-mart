@@ -17,6 +17,17 @@ $cart_items = [];
 $main_cart_id = 0;
 $tenant_id = 1;
 
+$payment_method_id = isset($_POST['payment_method_id']) ? intval($_POST['payment_method_id']) : 0;
+if ($payment_method_id <= 0) {
+    // fallback: ambil metode pembayaran pertama agar alur tidak putus
+    $pmStmt = $conn->query("SELECT id FROM payment_methods ORDER BY id DESC LIMIT 1");
+    if ($pmStmt && $pmStmt->num_rows > 0) {
+        $row = $pmStmt->fetch_assoc();
+        $payment_method_id = intval($row['id'] ?? 0);
+    }
+}
+
+
 // Jalankan query standar berdasarkan session pasien saat ini jika valid
 if ($patient_session_id > 0) {
     $check_session = mysqli_query($conn, "SELECT id FROM patient_sessions WHERE id = $patient_session_id");
@@ -150,12 +161,17 @@ try {
     // Masukkan data ke induk tabel 'orders'
     $insert_order_query = "INSERT INTO orders (order_number, patient_session_id, tenant_id, grand_total, status, payment_status, created_at) 
                            VALUES ('$order_number', $patient_session_id, $tenant_id, $grand_total, '$status', '$payment_status', NOW())";
-    
+
     if (!mysqli_query($conn, $insert_order_query)) {
         throw new Exception("Gagal membuat data transaksi orders: " . mysqli_error($conn));
     }
-    
+
     $new_order_id = mysqli_insert_id($conn);
+
+    // Siapkan nomor transaksi pembayaran
+    // Konsisten dengan format nomor order yang sudah dipakai project: INV-YYYYmmdd-rand
+    $transaction_number = $order_number;
+
     
     // Pindahkan setiap baris menu makanan ke 'order_items'
     foreach ($processed_cart_items as $item) {
@@ -171,6 +187,17 @@ try {
             throw new Exception("Gagal memproses detail item produk: " . mysqli_error($conn));
         }
     }
+
+    // Catat data pembayaran
+    // Pastikan kolom-kolom yang dipakai sesuai dengan yang dibaca di payments.php
+    // (order_id, payment_method_id, transaction_number, status)
+    $insert_payment_query = "INSERT INTO payments (order_id, payment_method_id, transaction_number, status, created_at)
+                              VALUES ($new_order_id, $payment_method_id, '$transaction_number', '$payment_status', NOW())";
+
+    if (!mysqli_query($conn, $insert_payment_query)) {
+        throw new Exception("Gagal mencatat data pembayaran: " . mysqli_error($conn));
+    }
+
     
     // Catat log histori transaksi pembuka
     $log_notes = mysqli_real_escape_string($conn, "Pesanan otomatis masuk sistem melalui checkout keranjang belanja.");
@@ -196,8 +223,15 @@ try {
     // Jika sukses tanpa interupsi, simpan permanen ke database
     mysqli_commit($conn);
     
-    header("Location: orders.php?status=success_add");
+    // Redirect ke halaman yang relevan untuk melihat payment/order
+    // Di project ini, halaman orders.php dipakai untuk admin riwayat pesanan.
+    // Namun target user adalah halaman pembayaran/status transaksi; gunakan orders.php sebagai fallback.
+    $redirectUrl = "payments.php?status=success_create";
+
+    // Jika payments sudah tersimpan, arahkan juga ke list pembayaran admin
+    header("Location: $redirectUrl");
     exit();
+
 
 } catch (Exception $e) {
     mysqli_rollback($conn);

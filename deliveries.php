@@ -129,191 +129,254 @@ if ($courierRes) {
 <body>
   <?php require __DIR__ . '/sidebar.php'; ?>
 
-  <main class="content-shift p-4">
+<main class="content-shift p-4">
     <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
 
-      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
         <div>
-          <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Deliveries</h2>
+            <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Deliveries</h2>
         </div>
         <div>
-          <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalDelivery" onclick="openTambahDelivery()">
+            <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalDelivery" onclick="openTambahDelivery()">
             <i class="bi bi-plus-circle"></i> Tambah Pengiriman
-          </button>
+            </button>
         </div>
-      </div>
+        </div>
 
-      <?php if (!empty($status)): ?>
+        <?php if (!empty($status)): ?>
         <div class="alert <?= strpos($status, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
-          <strong>
+            <strong>
             <?php 
-              if ($status === 'success_create') echo "Data pengiriman berhasil ditambahkan!";
-              elseif ($status === 'success_update') echo "Data pengiriman berhasil diperbarui!";
-              elseif ($status === 'success_delete') echo "Data pengiriman berhasil dihapus!";
-              elseif ($status === 'error') echo "Operasi gagal: " . htmlspecialchars($msg);
-              else echo "Operasi: " . htmlspecialchars($status);
+                if ($status === 'success_create') echo "Data pengiriman berhasil ditambahkan!";
+                elseif ($status === 'success_update') echo "Data pengiriman berhasil diperbarui!";
+                elseif ($status === 'success_delete') echo "Data pengiriman berhasil dihapus!";
+                elseif ($status === 'error') echo "Operasi gagal: " . htmlspecialchars($msg);
+                else echo "Operasi: " . htmlspecialchars($status);
             ?>
-          </strong>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
-      <?php endif; ?>
+        <?php endif; ?>
 
-      <div id="dragScrollDeliveryContainer" class="table-responsive rounded-3" style="border: none !important; background: transparent !important;">
+        <div id="dragScrollDeliveryContainer" class="table-responsive rounded-3" style="border: none !important; background: transparent !important;">
         <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 950px; user-select: none; border-collapse: collapse !important;">
-          <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
+            <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
             <tr>
-              <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;">ID</th>
-              <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 220px;">Order</th>
-              <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 220px;">Courier</th>
-              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 140px;">Status</th>
-              <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 200px;">Pickup Time</th>
-              <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 200px;">Delivery Time</th>
-              <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 220px;">Proof Photo</th>
-              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Aksi</th>
+                <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;">ID</th>
+                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 220px;">Order</th>
+                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 220px;">Courier</th>
+                <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 140px;">Status</th>
+                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 200px;">Pickup Time</th>
+                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 200px;">Delivery Time</th>
+                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 220px;">Proof Photo</th>
+                <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Aksi</th>
             </tr>
-          </thead>
-          <tbody style="background: transparent !important;">
+            </thead>
+            <tbody style="background: transparent !important;">
             <?php if (!empty($deliveries)): ?>
-              <?php foreach ($deliveries as $row): ?>
+                <?php foreach ($deliveries as $row): ?>
                 <tr style="background: transparent !important; font-size: 0.88rem;">
-                  <td class="text-center fw-semibold" style="color: #94a3b8 !important;"><?= (int)$row['id'] ?></td>
-                  <td class="fw-semibold text-white"><?= htmlspecialchars($row['order_number'] ?? '-') ?></td>
-                  <td class="text-white-50"><?= htmlspecialchars($row['courier_name'] ?? '-') ?></td>
-                  <td class="text-center">
+                    <td class="text-center fw-semibold" style="color: #94a3b8 !important;"><?= (int)$row['id'] ?></td>
+                    <td class="fw-semibold text-white"><?= htmlspecialchars($row['order_number'] ?? '-') ?></td>
+                    <td class="text-white-50"><?= htmlspecialchars($row['courier_name'] ?? '-') ?></td>
+                    <td class="text-center">
                     <?php
-                      $st = strtoupper(trim((string)($row['status'] ?? '')));
-                      if ($st === 'DELIVERED' || $st === 'DONE') {
+                        $st = strtoupper(trim((string)($row['status'] ?? '')));
+                        if ($st === 'DELIVERED' || $st === 'DONE') {
                         echo '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 px-3 py-1.5 rounded-pill">Delivered</span>';
-                      } elseif ($st === 'ON_PROGRESS' || $st === 'PICKUP' || $st === 'IN_PROGRESS') {
+                        } elseif ($st === 'ON_PROGRESS' || $st === 'PICKUP' || $st === 'IN_PROGRESS') {
                         echo '<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-50 px-3 py-1.5 rounded-pill">On Progress</span>';
-                      } else {
+                        } else {
                         echo '<span class="badge bg-secondary bg-opacity-25 text-white border border-secondary border-opacity-50 px-3 py-1.5 rounded-pill">'.htmlspecialchars($row['status'] ?? '-').'</span>';
-                      }
+                        }
                     ?>
-                  </td>
-                  <td class="text-white-50"><?= htmlspecialchars($row['pickup_time'] ?? '-') ?></td>
-                  <td class="text-white-50"><?= htmlspecialchars($row['delivery_time'] ?? '-') ?></td>
-                  <td class="text-white-50"><?= htmlspecialchars($row['proof_photo'] ?? '-') ?></td>
-                  <td class="text-center">
+                    </td>
+                    <td class="text-white-50"><?= htmlspecialchars($row['pickup_time'] ?? '-') ?></td>
+                    <td class="text-white-50"><?= htmlspecialchars($row['delivery_time'] ?? '-') ?></td>
+                    <td class="text-white-50"><?= htmlspecialchars($row['proof_photo'] ?? '-') ?></td>
+                    <td class="text-center">
                     <div class="d-flex justify-content-center gap-2">
-                      <button class="btn btn-sm btn-outline-warning rounded-2" data-bs-toggle="modal" data-bs-target="#modalDelivery" onclick='openEditDelivery(<?= json_encode($row) ?>)'>
+                        <button class="btn btn-sm btn-outline-warning rounded-2" data-bs-toggle="modal" data-bs-target="#modalDelivery" onclick='openEditDelivery(<?= json_encode($row) ?>)'>
                         <i class="bi bi-pencil-square"></i>
-                      </button>
-                      <a href="deliveries.php?action=delete&id=<?= (int)$row['id'] ?>" class="btn btn-sm btn-outline-danger rounded-2" onclick="return confirm('Apakah Anda yakin ingin menghapus pengiriman ini?')">
+                        </button>
+                        <!-- Perbaikan Utama: Mengganti tag <a> menjadi tombol pemicu modal konfirmasi hapus -->
+                        <button type="button" class="btn btn-sm btn-outline-danger rounded-2" data-bs-toggle="modal" data-bs-target="#modalHapusDelivery" onclick="openHapusDelivery(<?= $row['id'] ?>, '<?= htmlspecialchars($row['order_number'] ?? '-') ?>')">
                         <i class="bi bi-trash"></i>
-                      </a>
+                        </button>
                     </div>
-                  </td>
+                    </td>
                 </tr>
-              <?php endforeach; ?>
+                <?php endforeach; ?>
             <?php else: ?>
-              <tr>
+                <tr>
                 <td colspan="8" class="text-center py-5 text-muted italic" style="background: transparent !important; border: none !important;">Belum ada data pengiriman.</td>
-              </tr>
+                </tr>
             <?php endif; ?>
-          </tbody>
+            </tbody>
         </table>
-      </div>
+        </div>
 
     </div>
-  </main>
 
-  <!-- Modal Delivery (Create/Update) -->
-  <div class="modal fade" id="modalDelivery" tabindex="-1" aria-labelledby="modalDeliveryLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content" style="background: rgba(15, 23, 42, 0.93) !important; backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.2); color: #e5e7eb; border-radius: 16px;">
-        <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
-          <h5 class="modal-title fw-bold text-white" id="modalDeliveryLabel">Form Data Pengiriman</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+</main>
+
+<!-- Modal Delivery (Create/Update) -->
+<div class="modal fade" id="modalDelivery" tabindex="-1" aria-labelledby="modalDeliveryLabel" aria-hidden="true">
+<div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content" style="background: rgba(15, 23, 42, 0.93) !important; backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.2); color: #e5e7eb; border-radius: 16px;">
+    <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
+        <h5 class="modal-title fw-bold text-white" id="modalDeliveryLabel">Form Data Pengiriman</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <form id="formDelivery" action="deliveries.php" method="POST">
+        <input type="hidden" name="action" id="delivery-action" value="create">
+        <input type="hidden" name="id" id="delivery-id" value="">
+
+        <div class="modal-body" style="overflow: visible !important;">
+        <div class="row g-3">
+            <div class="col-md-6">
+            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Order <span class="text-danger">*</span></label>
+            <select class="form-select" name="order_id" id="delivery-order-id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                <option value="" disabled selected>-- Pilih Order --</option>
+                <?php foreach ($orders as $o): ?>
+                <option value="<?= (int)$o['id'] ?>"><?= htmlspecialchars($o['order_number'] ?? ('Order #'.$o['id'])) ?></option>
+                <?php endforeach; ?>
+            </select>
+            </div>
+
+            <div class="col-md-6">
+            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Courier <span class="text-danger">*</span></label>
+            <select class="form-select" name="courier_id" id="delivery-courier-id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                <option value="" disabled selected>-- Pilih Kurir --</option>
+                <?php foreach ($couriers as $c): ?>
+                <option value="<?= (int)$c['id'] ?>"><?= htmlspecialchars($c['name'] ?? ('Courier #'.$c['id'])) ?></option>
+                <?php endforeach; ?>
+            </select>
+            </div>
+
+            <div class="col-md-12">
+            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Status</label>
+            <input type="text" class="form-control" name="status" id="delivery-status" placeholder="Contoh: PENDING, ON_PROGRESS, DELIVERED" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
+            </div>
+
+            <div class="col-md-6">
+            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Pickup Time</label>
+            <input type="datetime-local" class="form-control" name="pickup_time" id="delivery-pickup-time" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
+            </div>
+
+            <div class="col-md-6">
+            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Delivery Time</label>
+            <input type="datetime-local" class="form-control" name="delivery_time" id="delivery-delivery-time" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
+            </div>
+
+            <div class="col-md-12">
+            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Proof Photo</label>
+            <input type="text" class="form-control" name="proof_photo" id="delivery-proof-photo" placeholder="Nama file / path foto" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
+            </div>
+        </div>
         </div>
 
-        <form id="formDelivery" action="deliveries.php" method="POST">
-          <input type="hidden" name="action" id="delivery-action" value="create">
-          <input type="hidden" name="id" id="delivery-id" value="">
+        <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.15); background: rgba(15, 23, 42, 0.95); border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="submit" class="btn btn-success" id="btnSubmitDelivery">Simpan Data</button>
+        </div>
+    </form>
+    </div>
+</div>
+</div>
 
-          <div class="modal-body" style="overflow: visible !important;">
-            <div class="row g-3">
-              <div class="col-md-6">
-                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Order <span class="text-danger">*</span></label>
-                <select class="form-select" name="order_id" id="delivery-order-id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                  <option value="" disabled selected>-- Pilih Order --</option>
-                  <?php foreach ($orders as $o): ?>
-                    <option value="<?= (int)$o['id'] ?>"><?= htmlspecialchars($o['order_number'] ?? ('Order #'.$o['id'])) ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Courier <span class="text-danger">*</span></label>
-                <select class="form-select" name="courier_id" id="delivery-courier-id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                  <option value="" disabled selected>-- Pilih Kurir --</option>
-                  <?php foreach ($couriers as $c): ?>
-                    <option value="<?= (int)$c['id'] ?>"><?= htmlspecialchars($c['name'] ?? ('Courier #'.$c['id'])) ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-
-              <div class="col-md-12">
-                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Status</label>
-                <input type="text" class="form-control" name="status" id="delivery-status" placeholder="Contoh: PENDING, ON_PROGRESS, DELIVERED" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Pickup Time</label>
-                <input type="datetime-local" class="form-control" name="pickup_time" id="delivery-pickup-time" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Delivery Time</label>
-                <input type="datetime-local" class="form-control" name="delivery_time" id="delivery-delivery-time" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-              </div>
-
-              <div class="col-md-12">
-                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Proof Photo</label>
-                <input type="text" class="form-control" name="proof_photo" id="delivery-proof-photo" placeholder="Nama file / path foto" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-              </div>
-            </div>
-          </div>
-
-          <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.15); background: rgba(15, 23, 42, 0.95); border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-            <button type="submit" class="btn btn-success" id="btnSubmitDelivery">Simpan Data</button>
-          </div>
-        </form>
+<!-- KOMPONEN BARU: Struktur Modal Pop-Up Konfirmasi Hapus Data Pengiriman -->
+<div class="modal fade" id="modalHapusDelivery" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+    <div class="modal-content text-white rounded-4 border-0" style="background: #111827; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2">
+          <i class="bi bi-exclamation-triangle-fill"></i> Hapus Pengiriman
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="box-shadow: none;"></button>
+      </div>
+      <div class="modal-body py-3">
+        <p class="text-white-50 m-0" style="font-size: 0.95rem; line-height: 1.5;">Apakah Anda yakin ingin menghapus data pengiriman untuk order <strong id="txtDeleteOrderInfo" class="text-white">-</strong>?</p>
+      </div>
+      <div class="modal-footer border-0 pt-0 d-flex gap-2">
+        <button type="button" class="btn btn-sm rounded-pill px-4 fw-medium text-white border-0" data-bs-dismiss="modal" style="background: #1f2937;">Batal</button>
+        <a id="btnConfirmDeleteDelivery" href="#" class="btn btn-danger btn-sm rounded-pill px-4 fw-medium shadow-sm">Ya, Hapus</a>
       </div>
     </div>
   </div>
+</div>
 
-  <script>
-    function openTambahDelivery() {
-      document.getElementById('formDelivery').reset();
-      document.getElementById('modalDeliveryLabel').innerText = 'Tambah Data Pengiriman';
-      document.getElementById('delivery-id').value = '';
-      document.getElementById('delivery-action').value = 'create';
-      document.getElementById('btnSubmitDelivery').className = 'btn btn-success';
-      document.getElementById('btnSubmitDelivery').innerText = 'Simpan Data';
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // DISESUAIKAN: Mengganti ID menjadi dragScrollDeliveryContainer agar pas dengan HTML tabel pengiriman
+    const deliverySlider = document.getElementById('dragScrollDeliveryContainer');
+    if (!deliverySlider) return;
+    
+    let isDown = false, startX, scrollLeft;
+    
+    deliverySlider.addEventListener('mousedown', (e) => {
+        // Mencegah gangguan geser jika admin mengklik tombol edit atau hapus di dalam tabel
+        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+        isDown = true; 
+        deliverySlider.style.cursor = 'grabbing';
+        startX = e.pageX - deliverySlider.offsetLeft; 
+        scrollLeft = deliverySlider.scrollLeft;
+    });
+    
+    deliverySlider.addEventListener('mouseleave', () => { isDown = false; deliverySlider.style.cursor = 'grab'; });
+    deliverySlider.addEventListener('mouseup', () => { isDown = false; deliverySlider.style.cursor = 'grab'; });
+    
+    deliverySlider.addEventListener('mousemove', (e) => {
+        if (!isDown) return; 
+        e.preventDefault();
+        const x = e.pageX - deliverySlider.offsetLeft;
+        // Kalikan 1.5 atau 2 jika ingin pergeseran tabel terasa lebih cepat dan ringan
+        deliverySlider.scrollLeft = scrollLeft - ((x - startX) * 1.5);
+    });
+});
+
+function openTambahDelivery() {
+    document.getElementById('formDelivery').reset();
+    document.getElementById('modalDeliveryLabel').innerText = 'Tambah Data Pengiriman';
+    document.getElementById('delivery-id').value = '';
+    document.getElementById('delivery-action').value = 'create';
+    document.getElementById('btnSubmitDelivery').className = 'btn btn-success';
+    document.getElementById('btnSubmitDelivery').innerText = 'Simpan Data';
+}
+
+function openEditDelivery(data) {
+    document.getElementById('formDelivery').reset();
+    document.getElementById('modalDeliveryLabel').innerText = 'Perbarui Data Pengiriman';
+    document.getElementById('delivery-id').value = data.id;
+    document.getElementById('delivery-action').value = 'update';
+
+    document.getElementById('delivery-order-id').value = data.order_id;
+    document.getElementById('delivery-courier-id').value = data.courier_id;
+    document.getElementById('delivery-status').value = data.status || '';
+    document.getElementById('delivery-proof-photo').value = data.proof_photo || '';
+
+    // datetime-local expects format YYYY-MM-DDTHH:MM; jika DB simpan berbeda, biarkan kosong.
+    document.getElementById('delivery-pickup-time').value = (data.pickup_time || '').replace(' ', 'T');
+    document.getElementById('delivery-delivery-time').value = (data.delivery_time || '').replace(' ', 'T');
+
+    document.getElementById('btnSubmitDelivery').className = 'btn btn-warning text-dark fw-medium';
+    document.getElementById('btnSubmitDelivery').innerText = 'Perbarui Data';
+}
+
+// FUNGSI BARU: Untuk mengisi data ke Modal Konfirmasi Hapus secara dinamis
+function openHapusDelivery(id, orderNumber) {
+    const btnConfirmDelete = document.getElementById('btnConfirmDeleteDelivery');
+    const txtOrderInfo = document.getElementById('txtDeleteOrderInfo');
+    
+    if (btnConfirmDelete) {
+        btnConfirmDelete.href = 'deliveries.php?action=delete&id=' + id;
     }
-
-    function openEditDelivery(data) {
-      document.getElementById('formDelivery').reset();
-      document.getElementById('modalDeliveryLabel').innerText = 'Perbarui Data Pengiriman';
-      document.getElementById('delivery-id').value = data.id;
-      document.getElementById('delivery-action').value = 'update';
-
-      document.getElementById('delivery-order-id').value = data.order_id;
-      document.getElementById('delivery-courier-id').value = data.courier_id;
-      document.getElementById('delivery-status').value = data.status || '';
-
-      document.getElementById('delivery-proof-photo').value = data.proof_photo || '';
-
-      // datetime-local expects format YYYY-MM-DDTHH:MM; jika DB simpan berbeda, biarkan kosong.
-      document.getElementById('delivery-pickup-time').value = (data.pickup_time || '').replace(' ', 'T');
-      document.getElementById('delivery-delivery-time').value = (data.delivery_time || '').replace(' ', 'T');
-
-      document.getElementById('btnSubmitDelivery').className = 'btn btn-warning text-dark fw-medium';
-      document.getElementById('btnSubmitDelivery').innerText = 'Perbarui Data';
+    if (txtOrderInfo) {
+        txtOrderInfo.innerText = orderNumber;
     }
-  </script>
+}
+</script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
