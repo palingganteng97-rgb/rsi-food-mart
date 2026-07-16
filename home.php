@@ -157,9 +157,18 @@ if ($fetchQuery) {
 
         <!-- GRID INTEGRASI DAFTAR PRODUK MAKANAN SEHAT -->
         <div id="catalogGrid" class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mt-2 mb-5">
-            <?php if (!empty($listActiveProducts)): foreach ($listActiveProducts as $prod): ?>
+            <?php 
+            if (!empty($listActiveProducts)): 
+                // Ambil ID sesi aktif pasien (default ke 1 jika kosong) untuk pencocokan status hati
+                $current_session_id = isset($_SESSION['patient_session_id']) ? intval($_SESSION['patient_session_id']) : 1;
+
+                foreach ($listActiveProducts as $prod): 
+                    // Pengecekan live status apakah produk ini sudah pernah difavoritkan oleh sesi pasien aktif
+                    $fav_check = $conn->query("SELECT id FROM favorites WHERE patient_session_id = $current_session_id AND product_id = " . (int)$prod['id']);
+                    $is_favorited = ($fav_check && $fav_check->num_rows > 0);
+            ?>
                 <div class="col">
-                    <div class="card-food h-100 d-flex flex-column text-white" 
+                    <div class="card-food h-100 d-flex flex-column text-white position-relative" 
                          data-title="<?= htmlspecialchars($prod['name']) ?>" 
                          data-diet="<?= htmlspecialchars($prod['category_name'] ?? '') ?>"
                          role="button"
@@ -167,7 +176,7 @@ if ($fetchQuery) {
                          style="cursor: pointer;">
                         
                         <!-- Area Gambar Produk -->
-                        <div class="food-img">
+                        <div class="food-img position-relative">
                             <?php if (!empty($prod['image']) && file_exists("uploads/products/" . $prod['image'])): ?>
                                 <img src="uploads/products/<?= htmlspecialchars($prod['image']) ?>" alt="<?= htmlspecialchars($prod['name']) ?>">
                             <?php else: ?>
@@ -176,6 +185,14 @@ if ($fetchQuery) {
                                     <span style="font-size: 0.75rem;">No Image</span>
                                 </div>
                             <?php endif; ?>
+
+                            <!-- TOMBOL INTERAKTIF: Klik Hati Tambah/Hapus Favorit Pasien -->
+                            <a href="add_favorite.php?product_id=<?= (int)$prod['id']; ?>&tenant_id=<?= (int)($prod['tenant_id'] ?? 1); ?>" 
+                               class="btn p-0 rounded-circle shadow-sm d-flex align-items-center justify-content-center position-absolute" 
+                               onclick="event.stopPropagation();"
+                               style="top: 12px; right: 12px; width: 32px; height: 32px; z-index: 10; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.15); transition: all 0.2s ease;">
+                                <i class="bi <?= $is_favorited ? 'bi-heart-fill text-danger' : 'bi-heart text-white-50'; ?>" style="font-size: 1rem;"></i>
+                            </a>
                         </div>
 
                         <!-- Detail Info Produk -->
@@ -194,10 +211,10 @@ if ($fetchQuery) {
                                 <div class="fw-bold text-success" style="font-size: 1rem;">
                                     Rp <?= number_format($prod['base_price'], 0, ',', '.') ?>
                                 </div>
-                            <button type="button" class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" 
-                                    onclick="event.stopPropagation(); tambahKeKeranjang(<?= (int)$prod['id'] ?>, '<?= addslashes(htmlspecialchars($prod['name'], ENT_QUOTES, 'UTF-8')) ?>', <?= floatval($prod['base_price']) ?>, '<?= addslashes($prod['image'] ?? '') ?>', '')">
-                                <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
-                            </button>
+                                <button type="button" class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" 
+                                        onclick="event.stopPropagation(); tambahKeKeranjang(<?= (int)$prod['id'] ?>, '<?= addslashes(htmlspecialchars($prod['name'], ENT_QUOTES, 'UTF-8')) ?>', <?= floatval($prod['base_price']) ?>, '<?= addslashes($prod['image'] ?? '') ?>', '')">
+                                    <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
+                                </button>
                             </div>
                         </div>
                     </div>

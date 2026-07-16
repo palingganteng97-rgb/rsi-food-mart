@@ -270,6 +270,38 @@ if ($query_tenant) {
 let deleteCategoryModalInstance = null;
 let categoryModalInstance = null;
 
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. FITUR DRAG SCROLL (Geser Tabel Menggunakan Mouse)
+    const categorySlider = document.getElementById('dragScrollCategoryContainer');
+    if (!categorySlider) return;
+    
+    let isDown = false, startX, scrollLeft;
+    
+    categorySlider.addEventListener('mousedown', (e) => {
+        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+        isDown = true; 
+        categorySlider.style.cursor = 'grabbing';
+        startX = e.pageX - categorySlider.offsetLeft; 
+        scrollLeft = categorySlider.scrollLeft;
+    });
+    
+    categorySlider.addEventListener('mouseleave', () => { isDown = false; categorySlider.style.cursor = 'grab'; });
+    categorySlider.addEventListener('mouseup', () => { isDown = false; categorySlider.style.cursor = 'grab'; });
+    
+    categorySlider.addEventListener('mousemove', (e) => {
+        if (!isDown) return; 
+        e.preventDefault();
+        const x = e.pageX - categorySlider.offsetLeft;
+        categorySlider.scrollLeft = scrollLeft - ((x - startX) * 1.5);
+    });
+
+    // 2. OTOMATIS BERSIHKAN URL PARAMETER SAAT DI-REFRESH
+    if (window.history.replaceState && window.location.search.includes('status')) {
+        const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+    }
+});
+
 function getCategoryModal() {
     if (!categoryModalInstance) {
         categoryModalInstance = new bootstrap.Modal(document.getElementById('modalCategory'));

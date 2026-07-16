@@ -21,7 +21,8 @@ $menu = [
             'tenant_operating_hours.php' => [ 'href' => 'tenant_operating_hours.php', 'label' => 'Tenant Operating Hours', 'icon' => 'bi-clock-history' ],
             'tenant_holidays.php' => [ 'href' => 'tenant_holidays.php', 'label' => 'Tenant Holidays', 'icon' => 'bi-calendar-x' ],
             'tenant_settings.php' => [ 'href' => 'tenant_settings.php', 'label' => 'Tenant Settings', 'icon' => 'bi-sliders' ],
-        ]
+            'tenant_reviews.php' => [ 'href' => 'tenant_reviews.php', 'label' => 'Ulasan Tenant', 'icon' => 'bi-star-half' ],
+            ]
     ],
     'master_group' => [
         'label' => 'Master Data', 'icon' => 'bi-layers-half', 'class' => '',
@@ -42,14 +43,16 @@ $menu = [
     'produk_group' => [
         'label' => 'Produk', 'icon' => 'bi-bag-dash-fill', 'class' => '',
         'sub' => [
-            'products.php' => [ 'href' => 'products.php', 'label' => 'Data Produk', 'icon' => 'bi-box-seam-fill' ],
-            'product_images.php' => [ 'href' => 'product_images.php', 'label' => 'Gambar Produk', 'icon' => 'bi-images' ],
+            'products.php'         => [ 'href' => 'products.php', 'label' => 'Data Produk', 'icon' => 'bi-box-seam-fill' ],
+            'product_images.php'   => [ 'href' => 'product_images.php', 'label' => 'Gambar Produk', 'icon' => 'bi-images' ],
             'product_variants.php' => [ 'href' => 'product_variants.php', 'label' => 'Varian Produk', 'icon' => 'bi-grid-3x3-gap-fill' ],
-            'product_addons.php' => [ 'href' => 'product_addons.php', 'label' => 'Topping Produk', 'icon' => 'bi-egg-fried' ],
-            'addon_items.php' => [ 'href' => 'addon_items.php', 'label' => 'Item Topping', 'icon' => 'bi-list-ul' ],
-            'product_reviews.php' => [ 'href' => 'product_reviews.php', 'label' => 'Ulasan Produk', 'icon' => 'bi-star-fill' ],
+            'product_addons.php'   => [ 'href' => 'product_addons.php', 'label' => 'Topping Produk', 'icon' => 'bi-egg-fried' ],
+            'addon_items.php'      => [ 'href' => 'addon_items.php', 'label' => 'Item Topping', 'icon' => 'bi-list-ul' ],
+            'product_reviews.php'  => [ 'href' => 'product_reviews.php', 'label' => 'Ulasan Produk', 'icon' => 'bi-star-fill' ],
+            'favorites.php'        => [ 'href' => 'favorites.php', 'label' => 'Menu Favorit', 'icon' => 'bi-heart-fill' ],
         ]
     ],
+
     'orders_group' => [
         'label' => 'Pesanan', 'icon'  => 'bi-receipt-cutoff', 'class' => '','sub'   => [
             'orders.php'                 => [ 'href' => 'orders.php', 'label' => 'Pesanan Pelanggan', 'icon' => 'bi-cart-check' ],
@@ -92,16 +95,12 @@ foreach ($menu as $key => $item) {
     }
 }
 
-/**
- * Memeriksa apakah file dan parameter query cocok dengan URL saat ini untuk menandai menu aktif.
- */
 function activeClass(string $file, string $currentFile, string $currentTenantId): string {
     // Jika file yang dicek adalah produk, pastikan juga mencocokkan parameter query tenant_id
     if ($file === 'products.php' && $currentFile === 'products.php') {
         // Misalkan menu produk default tidak memiliki tenant_id, atau sesuaikan dengan kebutuhan render link Anda
         return empty($currentTenantId) ? 'active' : '';
     }
-    
     return $file === $currentFile ? 'active' : '';
 }
 ?>
@@ -324,12 +323,23 @@ function activeClass(string $file, string $currentFile, string $currentTenantId)
 
     function getActiveMenuEl(container){
       if (!container) return null;
-      // Prioritas: link dengan class active
-      const el = container.querySelector('.nav-link.active');
-      if (el) return el;
-      // fallback: aria-current atau class lain yang mungkin ada
-      return container.querySelector('[aria-current="page"]') || container.querySelector('.active');
+
+      // Fokus ke href yang sesuai current file, bukan mengandalkan class .active
+      // karena class .active bisa tidak terset untuk submenu tertentu.
+      const currentHref = (window.location.pathname || '').split('/').pop();
+      if (currentHref) {
+        const byHref = container.querySelector('.nav-link[href$="/'+CSS.escape(currentHref)+'"], .nav-link[href="'+CSS.escape(currentHref)+'"]');
+        // Catatan: selektor di atas mendukung dua bentuk: href="favorites.php" atau href=".../favorites.php"
+
+        if (byHref) return byHref;
+      }
+
+      // Fallback: Prioritas: link dengan class active
+      return container.querySelector('.nav-link.active') ||
+             container.querySelector('[aria-current="page"]') ||
+             container.querySelector('.active');
     }
+
 
     function ensureSubmenuOpenForEl(el){
       if (!el) return;

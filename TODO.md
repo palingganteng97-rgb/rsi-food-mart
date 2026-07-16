@@ -1,9 +1,10 @@
-# TODO
+- [x] Analisis `tenant_reviews.php` dan struktur query saat ini
+- [x] Ubah `tenant_reviews.php` menjadi halaman read-only: hapus handler CRUD (create/update/delete)
+- [x] Hapus UI form tambah/edit/hapus + modal edit
+- [ ] Ubah query READ agar menampilkan minimal: tenant, (opsional) produk, pasien/username, rating, isi review, (opsional) foto, tanggal
+- [x] Tambahkan fitur: pencarian, filter tenant, filter rating, filter tanggal, pagination
+- [x] Pastikan query aman (prepare/bind) dan tidak mengubah proses pasien memberikan review
+- [ ] Uji manual: reload halaman admin dan verifikasi data tampil, filter & pagination bekerja
 
-- [x] Tambah fitur auto-scroll sidebar ke menu aktif saat halaman dimuat (DOMContentLoaded)
-  - [x] Pastikan submenu yang mengandung menu aktif terbuka (collapse `.show`)
-  - [x] Scroll container `.sidebar-scroll-container` agar item aktif berada di sekitar tengah viewport sidebar
-  - [x] Berlaku untuk seluruh halaman admin (karena sidebar reusable)
-  - [x] Gunakan vanilla JS, tanpa library baru
 
 
