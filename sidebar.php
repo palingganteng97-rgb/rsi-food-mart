@@ -58,6 +58,13 @@ $menu = [
         ]
     ],
 
+    'deliveries_group' => [
+        'label' => 'Pengiriman', 'icon'  => 'bi-truck', 'class' => '','sub'   => [
+            'couriers.php'               => [ 'href' => 'couriers.php', 'label' => 'Data Kurir', 'icon' => 'bi-person-badge' ],
+            'deliveries.php'             => [ 'href' => 'deliveries.php', 'label' => 'Daftar Pengiriman', 'icon' => 'bi-box-seam' ],
+            'delivery_tracking.php'      => [ 'href' => 'delivery_tracking.php', 'label' => 'Pelacakan Live', 'icon' => 'bi-geo-alt' ],
+        ]
+    ],
     'master_barcode.php' => [ 'href' => 'master_barcode.php', 'label' => 'Master Barcode', 'icon' => 'bi-qr-code-scan' ],
     'user.php' => [ 'href' => 'user.php', 'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-none d-lg-block' ],
     'profile.php' => [ 'href' => 'profile.php', 'label' => 'User', 'icon' => 'bi-person-bounding-box', 'class' => 'd-block d-lg-none' ],
