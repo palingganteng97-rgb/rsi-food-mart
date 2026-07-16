@@ -101,151 +101,220 @@ $msg = isset($_GET['msg']) ? (string)$_GET['msg'] : '';
 <body>
   <?php require __DIR__ . '/sidebar.php'; ?>
 
-  <main class="content-shift p-4">
+<main class="content-shift p-4">
     <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
 
-      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
-        <div>
-          <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Payment Methods</h2>
-          <div class="text-white-50" style="font-size:.9rem;">Kelola metode pembayaran</div>
-        </div>
-        <div>
-          <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalPaymentMethod" onclick="openTambahPaymentMethod()">
-            <i class="bi bi-plus-circle"></i> Tambah Metode
-          </button>
-        </div>
-      </div>
-
-      <?php if (!empty($status)): ?>
-        <div class="alert <?= strpos($status, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
-          <strong>
-            <?php 
-              if ($status === 'success_create') echo "Data metode berhasil ditambahkan!";
-              elseif ($status === 'success_update') echo "Data metode berhasil diperbarui!";
-              elseif ($status === 'success_delete') echo "Data metode berhasil dihapus!";
-              elseif ($status === 'error') echo "Operasi gagal: " . htmlspecialchars($msg);
-              else echo "Operasi: " . htmlspecialchars($status);
-            ?>
-          </strong>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-      <?php endif; ?>
-
-      <div id="dragScrollPaymentMethodsContainer" class="table-responsive rounded-3" style="border: none !important; background: transparent !important;">
-        <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 820px; user-select: none; border-collapse: collapse !important;">
-          <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
-            <tr>
-              <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;">ID</th>
-              <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 260px;">Name</th>
-              <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 260px;">Provider</th>
-              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 140px;">Online</th>
-              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 180px;">Aksi</th>
-            </tr>
-          </thead>
-          <tbody style="background: transparent !important;">
-            <?php if (!empty($payment_methods)): ?>
-              <?php foreach ($payment_methods as $row): ?>
-                <tr style="background: transparent !important; font-size: 0.88rem;">
-                  <td class="text-center fw-semibold" style="color: #94a3b8 !important;"><?= (int)($row['id'] ?? 0) ?></td>
-                  <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($row['name'] ?? '') ?></td>
-                  <td class="text-white-50" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($row['provider'] ?? '') ?></td>
-                  <td class="text-center" style="background: transparent !important; border: none !important;">
-                    <?php if ((int)($row['is_online'] ?? 0) === 1): ?>
-                      <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 px-3 py-1.5 rounded-pill">Online</span>
-                    <?php else: ?>
-                      <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-3 py-1.5 rounded-pill">Offline</span>
-                    <?php endif; ?>
-                  </td>
-                  <td class="text-center" style="background: transparent !important; border: none !important;">
-                    <div class="d-flex justify-content-center gap-2">
-                      <button class="btn btn-sm btn-outline-warning rounded-2" data-bs-toggle="modal" data-bs-target="#modalPaymentMethod" onclick='openEditPaymentMethod(<?= json_encode($row) ?>)'>
-                        <i class="bi bi-pencil-square"></i>
-                      </button>
-                      <a href="payment_methods.php?action=delete&id=<?= (int)($row['id'] ?? 0) ?>" class="btn btn-sm btn-outline-danger rounded-2" onclick="return confirm('Apakah Anda yakin ingin menghapus metode ini?')">
-                        <i class="bi bi-trash"></i>
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            <?php else: ?>
-              <tr>
-                <td colspan="5" class="text-center py-5 text-muted italic" style="background: transparent !important; border: none !important;">Belum ada data metode pembayaran.</td>
-              </tr>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
-
-    </div>
-  </main>
-
-  <!-- Modal Payment Method (Create/Update) -->
-  <div class="modal fade" id="modalPaymentMethod" tabindex="-1" aria-labelledby="modalPaymentMethodLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content" style="background: rgba(15, 23, 42, 0.93) !important; backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.2); color: #e5e7eb; border-radius: 16px;">
-        <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
-          <h5 class="modal-title fw-bold text-white" id="modalPaymentMethodLabel">Form Metode Pembayaran</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-
-        <form id="formPaymentMethod" action="payment_methods.php" method="POST">
-          <input type="hidden" name="action" id="paymentmethod-action" value="create">
-          <input type="hidden" name="id" id="paymentmethod-id" value="">
-
-          <div class="modal-body" style="overflow: visible !important;">
-            <div class="row g-3">
-              <div class="col-md-6">
-                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Nama Metode <span class="text-danger">*</span></label>
-                <input type="text" name="name" id="paymentmethod-name" class="form-control" maxlength="150" placeholder="Masukkan nama metode" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-              </div>
-
-              <div class="col-md-6">
-                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Provider</label>
-                <input type="text" name="provider" id="paymentmethod-provider" class="form-control" maxlength="150" placeholder="Contoh: BCA / Midtrans / dll" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-              </div>
-
-              <div class="col-md-12">
-                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Status Online</label>
-                <select name="is_online" id="paymentmethod-is_online" class="form-select" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-                  <option value="1" selected>Online</option>
-                  <option value="0">Offline</option>
-                </select>
-              </div>
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
+            <div>
+                <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Metode Pembayaran</h2>
+                <div class="text-white-50 small mt-1">Kelola daftar opsi metode pembayaran pasien</div>
             </div>
-          </div>
+            <div>
+                <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalPaymentMethod" onclick="openTambahMethod()">
+                    <i class="bi bi-plus-circle"></i> Tambah Metode
+                </button>
+            </div>
+        </div>
 
-          <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.15); background: rgba(15, 23, 42, 0.95); border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-            <button type="submit" class="btn btn-success" id="btnSubmitPaymentMethod">Simpan Data</button>
-          </div>
-        </form>
-      </div>
+        <?php if (!empty($status)): ?>
+            <div class="alert <?= strpos($status, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
+                <strong>
+                <?php 
+                    if ($status === 'success_create') echo "Metode pembayaran berhasil ditambahkan!";
+                    elseif ($status === 'success_update') echo "Metode pembayaran berhasil diperbarui!";
+                    elseif ($status === 'success_delete') echo "Metode pembayaran berhasil dihapus!";
+                    elseif ($status === 'error') echo "Operasi gagal: " . htmlspecialchars($msg);
+                ?>
+                </strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        <?php endif; ?>
+
+        <div id="dragScrollPaymentMethodsContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab;">
+            <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 750px; user-select: none; border-collapse: collapse !important;">
+                <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
+                    <tr>
+                        <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;">ID</th>
+                        <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 250px;">Nama Metode</th>
+                        <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 220px;">Provider</th>
+                        <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Jenis</th>
+                        <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody style="background: transparent !important;">
+                    <?php if (!empty($payment_methods)): foreach ($payment_methods as $row): ?>
+                        <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
+                            <td class="text-center fw-medium text-white-50" style="background: transparent !important; border: none !important;"><?= (int)$row['id'] ?></td>
+                            <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($row['name'] ?? '') ?></td>
+                            <td class="text-white-50" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($row['provider'] ?? '-') ?></td>
+                            <td class="text-center" style="background: transparent !important; border: none !important;">
+                                <?php if ((int)($row['is_online'] ?? 0) === 1): ?>
+                                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-50 px-3 py-1.5 rounded-pill"><i class="bi bi-globe me-1"></i> Online</span>
+                                <?php else: ?>
+                                    <span class="badge bg-secondary bg-opacity-25 text-white border border-secondary border-opacity-50 px-3 py-1.5 rounded-pill"><i class="bi bi-cash me-1"></i> Offline / Cash</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-center" style="background: transparent !important; border: none !important;">
+                                <div class="d-flex justify-content-center gap-2">
+                                    <button class="btn btn-sm btn-outline-warning rounded-2" data-bs-toggle="modal" data-bs-target="#modalPaymentMethod" onclick='openEditMethod(<?= json_encode($row) ?>)'>
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger rounded-2" data-bs-toggle="modal" data-bs-target="#modalHapusMethod" onclick="openHapusMethod(<?= $row['id'] ?>, '<?= htmlspecialchars($row['name'] ?? '') ?>')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; else: ?>
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">Belum ada data metode pembayaran.</td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
-  </div>
+</main>
 
-  <script>
-    function openTambahPaymentMethod() {
-      document.getElementById('formPaymentMethod').reset();
-      document.getElementById('modalPaymentMethodLabel').innerText = 'Tambah Metode Pembayaran Baru';
-      document.getElementById('paymentmethod-id').value = '';
-      document.getElementById('paymentmethod-action').value = 'create';
-      document.getElementById('btnSubmitPaymentMethod').className = 'btn btn-success';
-      document.getElementById('btnSubmitPaymentMethod').innerText = 'Simpan Data';
+<!-- MODAL POP-UP: FORM TAMBAH / EDIT METODE PEMBAYARAN -->
+<div class="modal fade" id="modalPaymentMethod" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 450px;">
+        <form id="formPaymentMethod" method="POST" action="payment_methods.php?action=create" class="modal-content text-white rounded-4 border-0" style="background: #1e293b;">
+            <div class="modal-header border-bottom border-secondary border-opacity-20">
+                <h5 class="modal-title fw-bold text-success" id="modalMethodLabel">Tambah Metode Pembayaran</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="box-shadow: none;"></button>
+            </div>
+            <div class="modal-body py-3">
+                <input type="hidden" id="method-id" name="id">
+                
+                <div class="mb-3">
+                    <label for="method-name" class="form-label small text-white-50">Nama Metode <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control bg-dark text-white border-secondary border-opacity-50" id="method-name" name="name" placeholder="Contoh: QRIS, Transfer Mandiri, Tunai..." required style="box-shadow: none;">
+                </div>
+                <div class="mb-3">
+                    <label for="method-provider" class="form-label small text-white-50">Provider / Bank <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control bg-dark text-white border-secondary border-opacity-50" id="method-provider" name="provider" placeholder="Contoh: Bank Mandiri, Midtrans, Cash..." required style="box-shadow: none;">
+                </div>
+                <div class="mb-2">
+                    <label for="method-isonline" class="form-label small text-white-50">Jenis Konektivitas</label>
+                    <select class="form-select bg-dark text-white border-secondary border-opacity-50" id="method-isonline" name="is_online" style="box-shadow: none;">
+                        <option value="1">Online (Payment Gateway/E-Wallet)</option>
+                        <option value="0">Offline (Tunai / Manual Transfer)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-secondary border-opacity-20 d-flex gap-2">
+                <button type="button" class="btn btn-sm rounded-pill px-4 fw-medium text-white border-0" data-bs-dismiss="modal" style="background: #334155;">Batal</button>
+                <button type="submit" id="btnSubmitMethod" class="btn btn-sm btn-success rounded-pill px-4 fw-medium shadow">Simpan Data</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL POP-UP: KONFIRMASI HAPUS METODE PEMBAYARAN -->
+<div class="modal fade" id="modalHapusMethod" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content text-white rounded-4 border-0" style="background: #111827; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2">
+                    <i class="bi bi-exclamation-triangle-fill"></i> Hapus Metode
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="box-shadow: none;"></button>
+            </div>
+            <div class="modal-body py-3">
+                <p class="text-white-50 m-0" style="font-size: 0.95rem; line-height: 1.5;">Apakah Anda yakin ingin menghapus metode pembayaran <strong id="txtDeleteMethodInfo" class="text-white">-</strong>?</p>
+            </div>
+            <div class="modal-footer border-0 pt-0 d-flex gap-2">
+                <button type="button" class="btn btn-sm rounded-pill px-4 fw-medium text-white border-0" data-bs-dismiss="modal" style="background: #1f2937;">Batal</button>
+                <a id="btnConfirmDeleteMethod" href="#" class="btn btn-danger btn-sm rounded-pill px-4 fw-medium shadow-sm">Ya, Hapus</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. FITUR DRAG SCROLL (Geser Tabel Menggunakan Mouse)
+    const methodSlider = document.getElementById('dragScrollPaymentMethodsContainer');
+    if (methodSlider) {
+        let isDown = false, startX, scrollLeft;
+        methodSlider.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+            isDown = true; 
+            methodSlider.style.cursor = 'grabbing';
+            startX = e.pageX - methodSlider.offsetLeft; 
+            scrollLeft = methodSlider.scrollLeft;
+        });
+        methodSlider.addEventListener('mouseleave', () => { isDown = false; methodSlider.style.cursor = 'grab'; });
+        methodSlider.addEventListener('mouseup', () => { isDown = false; methodSlider.style.cursor = 'grab'; });
+        methodSlider.addEventListener('mousemove', (e) => {
+            if (!isDown) return; 
+            e.preventDefault();
+            const x = e.pageX - methodSlider.offsetLeft;
+            methodSlider.scrollLeft = scrollLeft - ((x - startX) * 1.5);
+        });
     }
 
-    function openEditPaymentMethod(data) {
-      document.getElementById('formPaymentMethod').reset();
-      document.getElementById('modalPaymentMethodLabel').innerText = 'Perbarui Data Metode Pembayaran';
-      document.getElementById('paymentmethod-id').value = data.id;
-      document.getElementById('paymentmethod-action').value = 'update';
-      document.getElementById('paymentmethod-name').value = data.name || '';
-      document.getElementById('paymentmethod-provider').value = data.provider || '';
-      document.getElementById('paymentmethod-is_online').value = (data.is_online !== undefined && data.is_online !== null) ? String(data.is_online) : '1';
-      document.getElementById('btnSubmitPaymentMethod').className = 'btn btn-warning text-dark fw-medium';
-      document.getElementById('btnSubmitPaymentMethod').innerText = 'Perbarui Data';
+    // 2. OTOMATIS BERSIHKAN URL PARAMETER & TUTUP ALERT DALAM 3 DETIK
+    if (window.history.replaceState && window.location.search.includes('status')) {
+        const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
     }
-  </script>
+    const alertElement = document.querySelector('.alert');
+    if (alertElement) {
+        setTimeout(() => {
+            const bsAlert = new bootstrap.Alert(alertElement);
+            bsAlert.close();
+        }, 3000);
+    }
+});
+
+// 3. FUNGSI UNTUK MODAL TAMBAH DATA METODE PEMBAYARAN
+function openTambahPaymentMethod() {
+    const form = document.getElementById('formPaymentMethod');
+    form.reset();
+    form.action = 'payment_methods.php?action=create';
+
+    document.getElementById('modalPaymentMethodLabel').innerText = 'Tambah Metode Pembayaran Baru';
+    document.getElementById('paymentmethod-id').value = '';
+    document.getElementById('paymentmethod-action').value = 'create';
+    
+    const btnSubmit = document.getElementById('btnSubmitPaymentMethod');
+    btnSubmit.className = 'btn btn-sm btn-success rounded-pill px-4 fw-medium shadow';
+    btnSubmit.innerText = 'Simpan Data';
+}
+
+// 4. FUNGSI UNTUK MODAL EDIT DATA METODE PEMBAYARAN
+function openEditPaymentMethod(data) {
+    const form = document.getElementById('formPaymentMethod');
+    form.reset();
+    form.action = 'payment_methods.php?action=update';
+
+    document.getElementById('modalPaymentMethodLabel').innerText = 'Perbarui Data Metode Pembayaran';
+    document.getElementById('paymentmethod-id').value = data.id;
+    document.getElementById('paymentmethod-action').value = 'update';
+    document.getElementById('paymentmethod-name').value = data.name || '';
+    document.getElementById('paymentmethod-provider').value = data.provider || '';
+    document.getElementById('paymentmethod-is_online').value = (data.is_online !== undefined && data.is_online !== null) ? String(data.is_online) : '1';
+    
+    const btnSubmit = document.getElementById('btnSubmitPaymentMethod');
+    btnSubmit.className = 'btn btn-sm btn-warning text-dark rounded-pill px-4 fw-medium shadow';
+    btnSubmit.innerText = 'Perbarui Data';
+}
+
+// 5. FUNGSI UNTUK MENGISI DATA KE MODAL KONFIRMASI HAPUS DINAMIS
+function openHapusPaymentMethod(id, methodName) {
+    const btnConfirmDelete = document.getElementById('btnConfirmDeleteMethod');
+    const txtMethodInfo = document.getElementById('txtDeleteMethodInfo');
+    
+    if (btnConfirmDelete) {
+        btnConfirmDelete.href = 'payment_methods.php?action=delete&id=' + id;
+    }
+    if (txtMethodInfo) {
+        txtMethodInfo.innerText = methodName;
+    }
+}
+</script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
