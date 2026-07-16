@@ -170,7 +170,10 @@ body{background:var(--bg) !important;color:var(--text);}
 .table-transparent tbody tr{border-bottom:1px solid rgba(148,163,184,.12) !important;}
 .table-transparent *{color:#fff !important;}
 .text-white*{color:#fff !important;}
+#ordersTableWrap::-webkit-scrollbar {display: none}
+#ordersTableWrap {-ms-overflow-style: none;scrollbar-width: none;}
 </style>
+
 </head>
 <body>
 <?php require __DIR__ . '/sidebar.php'; ?>
@@ -209,7 +212,8 @@ body{background:var(--bg) !important;color:var(--text);}
 </div>
 </form>
 
-<div class="table-responsive" id="ordersTableWrap" style="border-radius:16px;">
+<!-- Tambahkan properti style cursor, user-select, dan touch di elemen pembungkus -->
+<div class="table-responsive" id="ordersTableWrap" style="border-radius:16px; cursor: grab; user-select: none; -webkit-overflow-scrolling: touch;">
 <table class="table table-hover align-middle mb-0 table-transparent" style="min-width:1200px;">
 <thead class="text-uppercase" style="font-size:.8rem; font-weight:800;">
 <tr>
@@ -218,8 +222,8 @@ body{background:var(--bg) !important;color:var(--text);}
 <th class="py-3">Patient Session</th>
 <th class="py-3">Tenant</th>
 <th class="py-3 text-end">Total</th>
-<th class="py-3">Payment</th>
-<th class="py-3">Status</th>
+<th class="py-3 text-center">Payment</th> <!-- Ditambahkan text-center agar sejajar dengan isi -->
+<th class="py-3 text-center">Status</th> <!-- Ditambahkan text-center agar sejajar dengan isi -->
 <th class="py-3 text-center">Aksi</th>
 </tr>
 </thead>
@@ -239,7 +243,8 @@ body{background:var(--bg) !important;color:var(--text);}
 <td class="text-center">{PAY}</td>
 <td class="text-center">{ORD}</td>
 <td class="text-center">
-<div class="d-flex flex-column flex-md-row gap-2 justify-content-center align-items-center">
+<!-- Tambahkan pointer-events: auto agar input/tombol di dalam tabel tidak macet saat diklik -->
+<div class="d-flex flex-column flex-md-row gap-2 justify-content-center align-items-center" style="pointer-events: auto;">
 <button type="button" class="btn btn-sm btn-outline-light rounded-3" data-bs-toggle="modal" data-bs-target="#modalOrderDetail" data-order-id="<?php echo h($o['id']); ?>"><i class="bi bi-eye"></i></button>
 <form method="POST" action="orders.php?<?php echo h(http_build_query(['q'=>$q,'status'=>$status,'payment_status'=>$paymentStatus,'page'=>$page,'action'=>'update_status'])); ?>" class="d-flex gap-1 align-items-center">
 <input type="hidden" name="id" value="<?php echo h($o['id']); ?>" />
@@ -308,7 +313,46 @@ for($p=$start;$p<=$end;$p++){
       .catch(()=>{ if(body) body.innerHTML='<div class="text-danger py-4 text-center">Gagal memuat detail</div>'; });
   });
 })();
+
+document.addEventListener('DOMContentLoaded', function () {
+    const slider = document.getElementById('ordersTableWrap');
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+
+    if (!slider) return;
+
+    slider.addEventListener('mousedown', (e) => {
+        // Jangan aktifkan drag jika pengguna sedang berinteraksi dengan tombol, form, atau select status
+        if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) {
+            return;
+        }
+        isDown = true;
+        slider.style.cursor = 'grabbing';
+        startX = e.pageX - slider.offsetLeft;
+        scrollLeft = slider.scrollLeft;
+    });
+
+    slider.addEventListener('mouseleave', () => {
+        isDown = false;
+        slider.style.cursor = 'grab';
+    });
+
+    slider.addEventListener('mouseup', () => {
+        isDown = false;
+        slider.style.cursor = 'grab';
+    });
+
+    slider.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        e.preventDefault();
+        const x = e.pageX - slider.offsetLeft;
+        const walk = (x - startX) * 1.5; // Sesuaikan sensitivitas pergeseran (1.5)
+        slider.scrollLeft = scrollLeft - walk;
+    });
+});
 </script>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

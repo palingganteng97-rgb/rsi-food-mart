@@ -4,63 +4,64 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$currentFile = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
+// Mengambil nama file saat ini beserta query string (misal: products.php?id=1)
+$currentUri = $_SERVER['REQUEST_URI'] ?? '';
+$currentFile = basename(parse_url($currentUri, PHP_URL_PATH));
+
+// Mengambil parameter tenant_id dari query string jika ada
+parse_str(parse_url($currentUri, PHP_URL_QUERY) ?? '', $queryParams);
+$currentTenantId = $queryParams['tenant_id'] ?? '';
 
 $menu = [
-    'home.php'      => [ 'href' => 'home.php', 'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
-
+    'home.php' => [ 'href' => 'home.php', 'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
     'tenants_group' => [
         'label' => 'Tenants', 'icon' => 'bi-building-gear', 'class' => 'd-mobile-none',
-        'sub'   => [
-            'tenants.php'                => [ 'href' => 'tenants.php',                'label' => 'Data Tenant',            'icon' => 'bi-house-lock-fill' ],
+        'sub' => [
+            'tenants.php' => [ 'href' => 'tenants.php', 'label' => 'Data Tenant', 'icon' => 'bi-house-lock-fill' ],
             'tenant_operating_hours.php' => [ 'href' => 'tenant_operating_hours.php', 'label' => 'Tenant Operating Hours', 'icon' => 'bi-clock-history' ],
-            'tenant_holidays.php'        => [ 'href' => 'tenant_holidays.php',        'label' => 'Tenant Holidays',        'icon' => 'bi-calendar-x' ],
-            'tenant_settings.php'        => [ 'href' => 'tenant_settings.php',        'label' => 'Tenant Settings',        'icon' => 'bi-sliders' ],
+            'tenant_holidays.php' => [ 'href' => 'tenant_holidays.php', 'label' => 'Tenant Holidays', 'icon' => 'bi-calendar-x' ],
+            'tenant_settings.php' => [ 'href' => 'tenant_settings.php', 'label' => 'Tenant Settings', 'icon' => 'bi-sliders' ],
         ]
     ],
-      
-    'master_group'  => [
+    'master_group' => [
         'label' => 'Master Data', 'icon' => 'bi-layers-half', 'class' => '',
-        'sub'   => [
-            'categories.php'     => [ 'href' => 'categories.php',     'label' => 'Kategori Produk', 'icon' => 'bi-grid-fill' ],
-            'brands.php'         => [ 'href' => 'brands.php',         'label' => 'Brand / Merk',    'icon' => 'bi-patch-check-fill' ],
-            'units.php'          => [ 'href' => 'units.php',          'label' => 'Satuan / Units',  'icon' => 'bi-calculator-fill' ],
+        'sub' => [
+            'categories.php' => [ 'href' => 'categories.php', 'label' => 'Kategori Produk', 'icon' => 'bi-grid-fill' ],
+            'brands.php' => [ 'href' => 'brands.php', 'label' => 'Brand / Merk', 'icon' => 'bi-patch-check-fill' ],
+            'units.php' => [ 'href' => 'units.php', 'label' => 'Satuan / Units', 'icon' => 'bi-calculator-fill' ],
         ]
     ],
-
-    'marketing_group'  => [
+    'marketing_group' => [
         'label' => 'Marketing', 'icon' => 'bi-megaphone', 'class' => '',
-        'sub'   => [
-            'banners.php'  => [ 'href' => 'banners.php',  'label' => 'Banners',  'icon' => 'bi-card-image' ],
-            'promos.php'   => [ 'href' => 'promos.php',   'label' => 'Promos',   'icon' => 'bi-tags-fill' ],
+        'sub' => [
+            'banners.php' => [ 'href' => 'banners.php', 'label' => 'Banners', 'icon' => 'bi-card-image' ],
+            'promos.php' => [ 'href' => 'promos.php', 'label' => 'Promos', 'icon' => 'bi-tags-fill' ],
             'vouchers.php' => [ 'href' => 'vouchers.php', 'label' => 'Vouchers', 'icon' => 'bi-ticket-perforated-fill' ],
         ]
     ],
-
-    'produk_group'  => [
+    'produk_group' => [
         'label' => 'Produk', 'icon' => 'bi-bag-dash-fill', 'class' => '',
-        'sub'   => [
-            'products.php'         => [ 'href' => 'products.php',         'label' => 'Data Produk',     'icon' => 'bi-box-seam-fill' ],
-            'product_images.php'   => [ 'href' => 'product_images.php',   'label' => 'Gambar Produk',   'icon' => 'bi-images' ],
-            'product_variants.php' => [ 'href' => 'product_variants.php', 'label' => 'Varian Produk',   'icon' => 'bi-grid-3x3-gap-fill' ],
-            'product_addons.php'   => [ 'href' => 'product_addons.php',   'label' => 'Topping Produk',  'icon' => 'bi-egg-fried' ],
-            'addon_items.php'      => [ 'href' => 'addon_items.php',      'label' => 'Item Topping',    'icon' => 'bi-list-ul' ],
-            'product_reviews.php'  => [ 'href' => 'product_reviews.php',  'label' => 'Ulasan Produk',   'icon' => 'bi-star-fill' ],
-        ]
-    ],
-
-    'orders_group' => [
-        'label' => 'Pesanan', 'icon' => 'bi-receipt-cutoff', 'class' => '',
         'sub' => [
-            'orders.php' => [ 'href' => 'orders.php', 'label' => ' Pesanan Pelanggan', 'icon' => 'bi-cart-check' ],
+            'products.php' => [ 'href' => 'products.php', 'label' => 'Data Produk', 'icon' => 'bi-box-seam-fill' ],
+            'product_images.php' => [ 'href' => 'product_images.php', 'label' => 'Gambar Produk', 'icon' => 'bi-images' ],
+            'product_variants.php' => [ 'href' => 'product_variants.php', 'label' => 'Varian Produk', 'icon' => 'bi-grid-3x3-gap-fill' ],
+            'product_addons.php' => [ 'href' => 'product_addons.php', 'label' => 'Topping Produk', 'icon' => 'bi-egg-fried' ],
+            'addon_items.php' => [ 'href' => 'addon_items.php', 'label' => 'Item Topping', 'icon' => 'bi-list-ul' ],
+            'product_reviews.php' => [ 'href' => 'product_reviews.php', 'label' => 'Ulasan Produk', 'icon' => 'bi-star-fill' ],
+        ]
+    ],
+    'orders_group' => [
+        'label' => 'Pesanan', 'icon'  => 'bi-receipt-cutoff', 'class' => '','sub'   => [
+            'orders.php'                 => [ 'href' => 'orders.php', 'label' => 'Pesanan Pelanggan', 'icon' => 'bi-cart-check' ],
+            'order_items.php'            => [ 'href' => 'order_items.php', 'label' => 'Detail Item Pesanan', 'icon' => 'bi-list-stars' ],
+            'order_status_histories.php' => [ 'href' => 'order_status_histories.php', 'label' => 'Histori Status', 'icon' => 'bi-clock-history' ],
         ]
     ],
 
-    'user.php'     => [ 'href' => 'user.php',    'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-none d-lg-block' ], 
-    'profile.php'  => [ 'href' => 'profile.php', 'label' => 'User', 'icon' => 'bi-person-bounding-box', 'class' => 'd-block d-lg-none' ], 
-    
-    'roles.php'       => [ 'href' => 'roles.php',       'label' => 'Roles',       'icon' => 'bi-shield-lock', 'class' => 'd-mobile-none' ], 
-    'permissions.php' => [ 'href' => 'permissions.php', 'label' => 'Permissions', 'icon' => 'bi-key',         'class' => 'd-mobile-none' ], 
+    'user.php' => [ 'href' => 'user.php', 'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-none d-lg-block' ],
+    'profile.php' => [ 'href' => 'profile.php', 'label' => 'User', 'icon' => 'bi-person-bounding-box', 'class' => 'd-block d-lg-none' ],
+    'roles.php' => [ 'href' => 'roles.php', 'label' => 'Roles', 'icon' => 'bi-shield-lock', 'class' => 'd-mobile-none' ],
+    'permissions.php' => [ 'href' => 'permissions.php', 'label' => 'Permissions', 'icon' => 'bi-key', 'class' => 'd-mobile-none' ],
 ];
 
 // =========================================================================
@@ -74,7 +75,16 @@ foreach ($menu as $key => $item) {
     }
 }
 
-function activeClass(string $file, string $currentFile): string {
+/**
+ * Memeriksa apakah file dan parameter query cocok dengan URL saat ini untuk menandai menu aktif.
+ */
+function activeClass(string $file, string $currentFile, string $currentTenantId): string {
+    // Jika file yang dicek adalah produk, pastikan juga mencocokkan parameter query tenant_id
+    if ($file === 'products.php' && $currentFile === 'products.php') {
+        // Misalkan menu produk default tidak memiliki tenant_id, atau sesuaikan dengan kebutuhan render link Anda
+        return empty($currentTenantId) ? 'active' : '';
+    }
+    
     return $file === $currentFile ? 'active' : '';
 }
 ?>
