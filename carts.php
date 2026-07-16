@@ -351,9 +351,11 @@ $grand_total = fetch_grand_total($conn, $cart_id);
         </div>
 
         <form method="POST" action="checkout_process.php">
-          <button class="btn btn-success w-100 py-2.5 fw-medium rounded-3" type="submit" <?php echo ($grand_total <= 0) ? 'disabled' : ''; ?> name="checkout" value="1">
-            <i class="bi bi-credit-card-2-front me-2"></i> Lanjutkan Pemesanan
-          </button>
+        <!-- Jika menggunakan tag tautan (Link) -->
+        <a href="checkout_process.php" class="btn btn-success w-100 rounded-3 py-2 fw-medium d-flex align-items-center justify-content-center gap-2">
+            <i class="bi bi-wallet2"></i> Lanjutkan Pemesanan
+        </a>
+
         </form>
       </div>
     </div>

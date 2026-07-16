@@ -1,5 +1,11 @@
 <?php
+// patient_sessions.php
 include 'db.php';
+
+// PERBAIKAN UTAMA: Wajib jalankan session_start() agar data $_SESSION tersimpan permanen di gawai pasien
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Menangkap otomatis nama ruangan dari scan QR Code
 $room_otomatis = isset($_GET['room']) ? htmlspecialchars($_GET['room']) : '';
@@ -15,7 +21,7 @@ if (isset($_POST['submit'])) {
     
     // Waktu masuk session pasien
     $login_at              = date('Y-m-d H:i:s');
-    // Expired otomatis 1 hari kemudian (bisa disesuaikan)
+    // Expired otomatis 1 hari kemudian
     $expired_at            = date('Y-m-d H:i:s', strtotime('+1 day')); 
 
     $query = "INSERT INTO patient_sessions (medical_record_number, patient_name, phone, room, bed, class, doctor, login_at, expired_at) 
@@ -24,22 +30,21 @@ if (isset($_POST['submit'])) {
     if (mysqli_query($conn, $query)) {
         $patient_session_id = mysqli_insert_id($conn);
 
-        // Simpan session pasien (pisah dari admin/login)
-        // NOTE: tenant_id belum ada pada form ini, jadi sementara gunakan default 1.
-        // Setelah debugging selesai, jika tenant_id punya sumbernya, ubah mappingnya.
+        // Simpan session pasien (Berhasil tersimpan karena session_start() sudah aktif di atas)
         $tenant_id = 1;
 
-        $_SESSION['patient_session_id'] = (int)$patient_session_id;
-        $_SESSION['tenant_id'] = (int)$tenant_id;
-        $_SESSION['patient_name'] = $patient_name;
-        $_SESSION['medical_record_number'] = $medical_record_number;
-        $_SESSION['room'] = $room;
-        $_SESSION['bed'] = $bed;
-        $_SESSION['class'] = $class;
-        $_SESSION['doctor'] = $doctor;
-        $_SESSION['login_at'] = $login_at;
-        $_SESSION['expired_at'] = $expired_at;
+        $_SESSION['patient_session_id']      = (int)$patient_session_id;
+        $_SESSION['tenant_id']              = (int)$tenant_id;
+        $_SESSION['patient_name']            = $patient_name;
+        $_SESSION['medical_record_number']   = $medical_record_number;
+        $_SESSION['room']                    = $room;
+        $_SESSION['bed']                     = $bed;
+        $_SESSION['class']                   = $class;
+        $_SESSION['doctor']                  = $doctor;
+        $_SESSION['login_at']                = $login_at;
+        $_SESSION['expired_at']              = $expired_at;
 
+        // Dialihkan dengan aman ke etalase menu tanpa hambatan
         header("Location: home.php");
         exit;
     } else {
@@ -47,6 +52,7 @@ if (isset($_POST['submit'])) {
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="id">
 <head>

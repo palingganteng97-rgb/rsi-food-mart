@@ -1,5 +1,13 @@
-- [x] Identify relevant action handlers in `carts.php` (add_to_cart, update_item) and current pivot reading query.
-- [x] Replace `action=add_to_cart` logic: unit price = base_price + sum(addon_items.price), insert into `cart_items`, insert topping into `cart_item_addons`, transaction commit/rollback.
-- [ ] Replace `action=update_item` logic to: recompute unit price from base_price + addons (pivot), update only manual notes in `cart_items.notes`, then DELETE + INSERT into `cart_item_addons` within transaction.
-- [ ] Re-verify cart reading uses pivot (cart_item_addons -> addon_items) and never uses notes for topping.
-- [ ] Run a quick PHP lint / syntax check (optional).
+# TODO - Fix Keranjang & Alur Checkout (RSI_FOOD&MART)
+
+## Progress
+- [x] Periksa dan baca `carts.php`, identifikasi potensi penyebab redirect palsu & parsing JS
+- [x] Refactor `carts.php` agar selalu menampilkan item dari database (`carts` + `cart_items`) dan tidak mengandalkan session cart lama
+- [x] Pastikan JavaScript di `carts.php` tidak terpotong dan string PHP ke JS memakai `json_encode`
+
+## Remaining (cek lintas file)
+- [ ] Audit `checkout_process.php` agar tidak menghapus/invalidasi session sebelum checkout selesai dan agar cart yang valid berdasarkan patient_session_id diambil konsisten
+- [ ] Pastikan `api_cart.php` dan tombol "Tambah ke Keranjang" benar-benar menulis ke `cart_items` yang terbaca oleh `carts.php` untuk pasien yang sama
+- [ ] Audit file terkait: `home.php`, `detail_product_modal.php`, `catalog_handler.js`, `cart_items.php`, `orders.php`, `order_items.php` (JOIN/kolom & filter)
+- [ ] Jalankan uji alur end-to-end: QR Scan → Form Pasien → Home → Detail Produk → Tambah Ke Keranjang → carts.php → Edit → Checkout → orders & order_items
+

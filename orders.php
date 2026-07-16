@@ -1,157 +1,228 @@
 <?php
+// orders.php - Manajemen dan Riwayat Pesanan Pelanggan
 include 'db.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
-if (!isset($_SESSION['user_id'])) { header('Location: login.php'); exit; }
 
-$perPage=10;$allowedOrderStatuses=['pending','accepted','preparing','ready','picked_up','delivering','completed','cancelled'];
-
-$action=isset($_GET['action'])?(string)$_GET['action']:'';
-$q=isset($_GET['q'])?trim((string)$_GET['q']):'';
-$status=isset($_GET['status'])?trim((string)$_GET['status']):'';
-$paymentStatus=isset($_GET['payment_status'])?trim((string)$_GET['payment_status']):'';
-$page=isset($_GET['page'])?max(1,(int)$_GET['page']):1;
-$offset=($page-1)*$perPage;
-
-function h($s){return htmlspecialchars((string)$s,ENT_QUOTES,'UTF-8');}
-function money($v){return 'Rp '.number_format((float)$v,0,',','.');}
-function badgePayment($ps){
-  $ps=trim((string)$ps);
-  $map=['paid'=>['bg'=>'success','text'=>'success'],'unpaid'=>['bg'=>'danger','text'=>'danger'],'failed'=>['bg'=>'danger','text'=>'danger']];
-  $k=$map[$ps]??['bg'=>'secondary','text'=>'secondary'];
-  $label=$ps!==''?$ps:'-';
-  return '<span class="badge bg-'.$k['bg'].' bg-opacity-25 text-'.$k['text'].' border border-'.$k['text'].' border-opacity-50 px-3 py-2 rounded-pill" style="font-size:.78rem;">'.h(strtoupper($label)).'</span>';
-}
-function badgeOrder($st){
-  $st=trim((string)$st);
-  $map=['pending'=>['bg'=>'warning','text'=>'warning'],'accepted'=>['bg'=>'primary','text'=>'primary'],'preparing'=>['bg'=>'info','text'=>'info'],'ready'=>['bg'=>'success','text'=>'success'],'picked_up'=>['bg'=>'success','text'=>'success'],'delivering'=>['bg'=>'primary','text'=>'primary'],'completed'=>['bg'=>'success','text'=>'success'],'cancelled'=>['bg'=>'danger','text'=>'danger']];
-  $k=$map[$st]??['bg'=>'secondary','text'=>'secondary'];
-  $label=$st!==''?$st:'-';
-  return '<span class="badge bg-'.$k['bg'].' bg-opacity-25 text-'.$k['text'].' border border-'.$k['text'].' border-opacity-50 px-3 py-2 rounded-pill" style="font-size:.78rem;">'.h($label).'</span>';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-$writeBackParams=function() use($q,$status,$paymentStatus,$page){
-  $qs=http_build_query(['q'=>$q,'status'=>$status,'payment_status'=>$paymentStatus,'page'=>$page]);
-  return $qs!==''?'?'.$qs:'';
+// =========================================================================
+// 1. GERBANG VALIDASI AKSES (ADMIN VS PASIEN MANDIRI VIA QR)
+// =========================================================================
+$isAdmin   = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
+$isPatient = isset($_SESSION['patient_session_id']) && $_SESSION['patient_session_id'] > 0;
+$patient_session_id = $isPatient ? (int)$_SESSION['patient_session_id'] : 0;
+
+if (!$isAdmin && !$isPatient) {
+    header('Location: login.php');
+    exit;
+}
+
+// Konfigurasi Halaman & Variabel Dasar
+$perPage = 10;
+$allowedOrderStatuses = ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'completed', 'cancelled'];
+
+$action        = isset($_GET['action']) ? (string)$_GET['action'] : '';
+$q             = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
+$status        = isset($_GET['status']) ? trim((string)$_GET['status']) : '';
+$paymentStatus = isset($_GET['payment_status']) ? trim((string)$_GET['payment_status']) : '';
+$page          = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$offset        = ($page - 1) * $perPage;
+
+// Fungsi Helper untuk Sanitasi dan Format Mata Uang
+function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
+function money($v) { return 'Rp ' . number_format((float)$v, 0, ',', '.'); }
+
+function badgePayment($ps) {
+    $ps = trim((string)$ps);
+    $map = ['paid' => ['bg' => 'success', 'text' => 'success'], 'unpaid' => ['bg' => 'danger', 'text' => 'danger'], 'failed' => ['bg' => 'danger', 'text' => 'danger']];
+    $k = $map[$ps] ?? ['bg' => 'secondary', 'text' => 'secondary'];
+    $label = $ps !== '' ? $ps : '-';
+    return '<span class="badge bg-' . $k['bg'] . ' bg-opacity-25 text-' . $k['text'] . ' border border-' . $k['text'] . ' border-opacity-50 px-3 py-2 rounded-pill" style="font-size:.78rem;">' . h(strtoupper($label)) . '</span>';
+}
+
+function badgeOrder($st) {
+    $st = trim((string)$st);
+    $map = ['pending' => ['bg' => 'warning', 'text' => 'warning'], 'accepted' => ['bg' => 'primary', 'text' => 'primary'], 'preparing' => ['bg' => 'info', 'text' => 'info'], 'ready' => ['bg' => 'success', 'text' => 'success'], 'picked_up' => ['bg' => 'success', 'text' => 'success'], 'delivering' => ['bg' => 'primary', 'text' => 'primary'], 'completed' => ['bg' => 'success', 'text' => 'success'], 'cancelled' => ['bg' => 'danger', 'text' => 'danger']];
+    $k = $map[$st] ?? ['bg' => 'secondary', 'text' => 'secondary'];
+    $label = $st !== '' ? $st : '-';
+    return '<span class="badge bg-' . $k['bg'] . ' bg-opacity-25 text-' . $k['text'] . ' border border-' . $k['text'] . ' border-opacity-50 px-3 py-2 rounded-pill" style="font-size:.78rem;">' . h($label) . '</span>';
+}
+
+$writeBackParams = function() use ($q, $status, $paymentStatus, $page) {
+    $qs = http_build_query(['q' => $q, 'status' => $status, 'payment_status' => $paymentStatus, 'page' => $page]);
+    return $qs !== '' ? '?' . $qs : '';
 };
 
-if ($action==='update_status' && $_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['id'],$_POST['status'])) {
-  $orderId=(int)$_POST['id'];
-  $newStatus=trim((string)$_POST['status']);
-  $ok=false;
-  if ($orderId>0 && in_array($newStatus,$allowedOrderStatuses,true)) $ok=true;
-  if ($ok){
-    $stmt=$conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
-    $stmt->bind_param('si',$newStatus,$orderId);
-    $stmt->execute();
-  }
-  header('Location: orders.php'.$GLOBALS['writeBackParams']());
-  exit;
-}
-
-if ($action==='detail' && isset($_GET['id'])) {
-  $orderId=(int)$_GET['id'];
-  if ($orderId<=0){ http_response_code(400); echo 'Invalid order id'; exit; }
-  $stmt=$conn->prepare('SELECT id, order_number, patient_session_id, tenant_id, subtotal, discount, delivery_fee, grand_total, payment_status, status, created_at FROM orders WHERE id = ?');
-  $stmt->bind_param('i',$orderId);
-  $stmt->execute();
-  $res=$stmt->get_result();
-  $order=$res?$res->fetch_assoc():null;
-  if (!$order){ http_response_code(404); echo 'Order not found'; exit; }
-
-  $stmt2=$conn->prepare('SELECT oi.id, oi.product_id, oi.qty, oi.price, oi.notes, p.name AS product_name, oi.variant AS variant_name FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ? ORDER BY oi.id ASC');
-  $stmt2->bind_param('i',$orderId);
-  $stmt2->execute();
-  $items=[];$r2=$stmt2->get_result();
-  while($row=$r2?$r2->fetch_assoc():null){ $items[]=$row; }
-
-  $createdAt=$order['created_at']??'';
-  $createdLabel=$createdAt?date('d M Y H:i',strtotime((string)$createdAt)):'-';
-  $subtotal=$order['subtotal']??0;$discount=$order['discount']??0;$deliveryFee=$order['delivery_fee']??0;$grandTotal=$order['grand_total']??0;
-
-  echo '<div class="p-2">';
-  echo '<div class="row g-3">';
-  echo '<div class="col-md-6">';
-  echo '<div class="text-muted small">Nomor Pesanan</div><div class="fw-bold text-white" style="font-family:monospace; letter-spacing:.4px;">#'.h($order['order_number']??$order['id']).'</div>';
-  echo '</div>';
-  echo '<div class="col-md-6">';
-  echo '<div class="text-muted small">Tanggal Dibuat</div><div class="fw-semibold text-white">'.h($createdLabel).'</div>';
-  echo '</div>';
-  echo '<div class="col-md-6">';
-  echo '<div class="text-muted small">Patient Session ID</div><div class="fw-semibold text-white" style="font-family:monospace;">'.h($order['patient_session_id']??'-').'</div>';
-  echo '</div>';
-  echo '<div class="col-md-6">';
-  echo '<div class="text-muted small">Tenant ID</div><div class="fw-semibold text-white" style="font-family:monospace;">'.h($order['tenant_id']??'-').'</div>';
-  echo '</div>';
-  echo '<div class="col-md-6">';
-  echo '<div class="text-muted small">Payment Status</div><div>'.badgePayment((string)($order['payment_status']??'')).'</div>';
-  echo '</div>';
-  echo '<div class="col-md-6">';
-  echo '<div class="text-muted small">Status Pesanan</div><div>'.badgeOrder((string)($order['status']??'')).'</div>';
-  echo '</div>';
-  echo '<div class="col-12"><hr class="text-white" style="opacity:.12;"></div>';
-  echo '<div class="col-md-4"><div class="text-muted small">Subtotal</div><div class="fw-bold text-warning">'.money($subtotal).'</div></div>';
-  echo '<div class="col-md-4"><div class="text-muted small">Diskon</div><div class="fw-bold text-info">'.money($discount).'</div></div>';
-  echo '<div class="col-md-4"><div class="text-muted small">Ongkir</div><div class="fw-bold text-primary">'.money($deliveryFee).'</div></div>';
-  echo '<div class="col-12"><div class="text-muted small">Grand Total</div><div class="fw-bold text-success" style="font-size:1.25rem;">'.money($grandTotal).'</div></div>';
-  echo '<div class="col-12 mt-2">';
-  echo '<div class="text-uppercase text-white-50" style="font-weight:700; font-size:.8rem;">Daftar menu yang dipesan</div>';
-  echo '<div class="table-responsive mt-2">';
-  echo '<table class="table table-hover align-middle mb-0" style="background: transparent !important; color:#e5e7eb !important; border-color: rgba(148,163,184,.2) !important;">';
-  echo '<thead style="background: rgba(15,23,42,.65); border-bottom: 1px solid rgba(148,163,184,.25);">';
-  echo '<tr><th class="text-white py-3 px-2">Menu</th><th class="text-white py-3 px-2">Variant</th><th class="text-white text-center py-3">Qty</th><th class="text-white text-end py-3">Harga</th><th class="text-white text-end py-3">Subtotal Item</th><th class="text-white py-3">Catatan</th></tr>';
-  echo '</thead>';
-  echo '<tbody style="background: transparent !important;">';
-  if (!empty($items)){
-    foreach($items as $it){
-      $qty=(int)($it['qty']??0);
-      $price=(float)($it['price']??0);
-      $subtotalItem=$qty*$price;
-      $productName=(string)($it['product_name']??'-');
-      $variant=(string)($it['variant_name']??($it['variant']??'Original'));
-      $notes=trim((string)($it['notes']??''));
-      echo '<tr style="background: transparent !important; border-bottom: 1px solid rgba(148,163,184,.12) !important;">';
-      echo '<td class="fw-semibold text-white">'.h($productName).'</td>';
-      echo '<td class="text-white">'.h($variant).'</td>';
-      echo '<td class="text-center fw-semibold text-white">'.h($qty).'</td>';
-      echo '<td class="text-end text-white">'.h(money($price)).'</td>';
-      echo '<td class="text-end fw-semibold text-warning">'.h(money($subtotalItem)).'</td>';
-      echo '<td class="text-white-50 small">'.($notes!==''?h($notes):'-').'</td>';
-      echo '</tr>';
+// =========================================================================
+// 2. PROSES UPDATE STATUS PESANAN (KHUSUS ADMIN)
+// =========================================================================
+if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id'], $_POST['status'])) {
+    if (!$isAdmin) {
+        header('Location: orders.php');
+        exit;
     }
-  } else {
-    echo '<tr><td colspan="6" class="text-center text-white-50 py-3">Tidak ada item pesanan</td></tr>';
-  }
-  echo '</tbody></table></div></div>';
-  echo '</div></div>';
-  echo '</div>';
-  exit;
+    
+    $orderId = (int)$_POST['id'];
+    $newStatus = trim((string)$_POST['status']);
+    $ok = ($orderId > 0 && in_array($newStatus, $allowedOrderStatuses, true));
+    
+    if ($ok) {
+        $stmt = $conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
+        $stmt->bind_param('si', $newStatus, $orderId);
+        $stmt->execute();
+        
+        // Catat otomatis riwayat ke tabel order_status_histories
+        $user_id = (int)$_SESSION['user_id'];
+        $log_notes = mysqli_real_escape_string($conn, "Status pesanan diperbarui oleh Admin.");
+        $stmt_log = $conn->prepare('INSERT INTO order_status_histories (order_id, status, changed_by, notes, created_at) VALUES (?, ?, ?, ?, NOW())');
+        $stmt_log->bind_param('isis', $orderId, $newStatus, $user_id, $log_notes);
+        $stmt_log->execute();
+    }
+    header('Location: orders.php' . $writeBackParams());
+    exit;
 }
 
-$where=[];$bind=[];$types='';
-if($status!==''){$where[]='status = ?';$bind[]=$status;$types.='s';}
-if($paymentStatus!==''){$where[]='payment_status = ?';$bind[]=$paymentStatus;$types.='s';}
-if($q!==''){$where[]='(order_number LIKE ? OR patient_session_id LIKE ? OR tenant_id LIKE ?)';$like='%'.$q.'%';$bind[]=$like;$bind[]=$like;$bind[]=$like;$types.='sss';}
-$whereSql=$where?' WHERE '.implode(' AND ',$where):'';
+// =========================================================================
+// 3. RESPONS AJAX: RINCIAN DETAIL PESANAN DI MODAL (READ-ONLY)
+// =========================================================================
+if ($action === 'detail' && isset($_GET['id'])) {
+    $orderId = (int)$_GET['id'];
+    if ($orderId <= 0) { http_response_code(400); echo 'Invalid order id'; exit; }
+    
+    $stmt = $conn->prepare('SELECT id, order_number, patient_session_id, tenant_id, subtotal, discount, delivery_fee, grand_total, payment_status, status, created_at FROM orders WHERE id = ?');
+    $stmt->bind_param('i', $orderId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $order = $res ? $res->fetch_assoc() : null;
+    if (!$order) { http_response_code(404); echo 'Order not found'; exit; }
 
-$stmtCount=$conn->prepare('SELECT COUNT(*) AS total FROM orders'.$whereSql);
-if($bind){$stmtCount->bind_param($types,...$bind);} $stmtCount->execute();
-$resCount=$stmtCount->get_result();
-$totalRows=$resCount?(int)($resCount->fetch_assoc()['total']??0):0;
-$totalPages=max(1,(int)ceil($totalRows/$perPage));
-if($page>$totalPages) $page=$totalPages;
-$offset=($page-1)*$perPage;
+    // Proteksi data: Pasien tidak boleh mengintip pesanan milik ID sesi orang lain via manipulasi URL AJAX
+    if (!$isAdmin && (int)$order['patient_session_id'] !== $patient_session_id) {
+        http_response_code(403); echo 'Akses ditolak'; exit;
+    }
 
-$listTypes=$types.'ii';
-$listBind=$bind; $listBind[]=$perPage; $listBind[]=$offset;
-$stmtList=$conn->prepare('SELECT id, order_number, patient_session_id, tenant_id, subtotal, discount, delivery_fee, grand_total, payment_status, status, created_at FROM orders'.$whereSql.' ORDER BY id DESC LIMIT ? OFFSET ?');
-if($listBind){$stmtList->bind_param($listTypes,...$listBind);} 
-$stmtList->execute();
-$resList=$stmtList->get_result();
-$orders=[]; while($row=$resList?$resList->fetch_assoc():null){$orders[]=$row;}
+    $stmt2 = $conn->prepare('SELECT oi.id, oi.product_id, oi.qty, oi.price, oi.notes, p.name AS product_name, oi.variant AS variant_name FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ? ORDER BY oi.id ASC');
+    $stmt2->bind_param('i', $orderId);
+    $stmt2->execute();
+    $items = []; $r2 = $stmt2->get_result();
+    while ($row = $r2 ? $r2->fetch_assoc() : null) { $items[] = $row; }
 
-$qsBase=[]; if($q!=='') $qsBase['q']=$q; if($status!=='') $qsBase['status']=$status; if($paymentStatus!=='') $qsBase['payment_status']=$paymentStatus;
-function pageLink($page,$base){$base['page']=$page; return 'orders.php?'.http_build_query($base);} 
+    $createdAt = $order['created_at'] ?? '';
+    $createdLabel = $createdAt ? date('d M Y H:i', strtotime((string)$createdAt)) : '-';
+    $subtotal = $order['subtotal'] ?? 0; $discount = $order['discount'] ?? 0; $deliveryFee = $order['delivery_fee'] ?? 0; $grandTotal = $order['grand_total'] ?? 0;
+
+    echo '<div class="p-2">';
+    echo '<div class="row g-3">';
+    echo '<div class="col-md-6"><div class="text-muted small">Nomor Pesanan</div><div class="fw-bold text-white font-monospace">#' . h($order['order_number'] ?? $order['id']) . '</div></div>';
+    echo '<div class="col-md-6"><div class="text-muted small">Tanggal Dibuat</div><div class="fw-semibold text-white">' . h($createdLabel) . '</div></div>';
+    echo '<div class="col-md-6"><div class="text-muted small">Patient Session ID</div><div class="fw-semibold text-white font-monospace">' . h($order['patient_session_id'] ?? '-') . '</div></div>';
+    echo '<div class="col-md-6"><div class="text-muted small">Tenant ID</div><div class="fw-semibold text-white font-monospace">' . h($order['tenant_id'] ?? '-') . '</div></div>';
+    echo '<div class="col-md-6"><div class="text-muted small">Payment Status</div><div>' . badgePayment((string)($order['payment_status'] ?? '')) . '</div></div>';
+    echo '<div class="col-md-6"><div class="text-muted small">Status Pesanan</div><div>' . badgeOrder((string)($order['status'] ?? '')) . '</div></div>';
+    echo '<div class="col-12"><hr class="text-white" style="opacity:.12;"></div>';
+    echo '<div class="col-md-4"><div class="text-muted small">Subtotal</div><div class="fw-bold text-warning">' . money($subtotal) . '</div></div>';
+    echo '<div class="col-md-4"><div class="text-muted small">Diskon</div><div class="fw-bold text-info">' . money($discount) . '</div></div>';
+    echo '<div class="col-md-4"><div class="text-muted small">Ongkir</div><div class="fw-bold text-primary">' . money($deliveryFee) . '</div></div>';
+    echo '<div class="col-12"><div class="text-muted small">Grand Total</div><div class="fw-bold text-success" style="font-size:1.25rem;">' . money($grandTotal) . '</div></div>';
+    echo '<div class="col-12 mt-2">';
+    echo '<div class="text-uppercase text-white-50 font-weight-700" style="font-size:.8rem;">Daftar menu yang dipesan</div>';
+    echo '<div class="table-responsive mt-2">';
+    echo '<table class="table table-hover align-middle mb-0 table-transparent">';
+    echo '<thead><tr><th class="text-white py-3 px-2">Menu</th><th class="text-white py-3 px-2">Variant</th><th class="text-white text-center py-3">Qty</th><th class="text-white text-end py-3">Harga</th><th class="text-white text-end py-3">Subtotal Item</th><th class="text-white py-3">Catatan</th></tr></thead>';
+    echo '<tbody>';
+    if (!empty($items)) {
+        foreach ($items as $it) {
+            $qty = (int)($it['qty'] ?? 0); $price = (float)($it['price'] ?? 0); $subtotalItem = $qty * $price;
+            $productName = (string)($it['product_name'] ?? '-');
+            $variant = (string)($it['variant_name'] ?? 'Original');
+            $notes = trim((string)($it['notes'] ?? ''));
+            echo '<tr style="border-bottom: 1px solid rgba(148,163,184,.12) !important;">';
+            echo '<td class="fw-semibold text-white">' . h($productName) . '</td>';
+            echo '<td class="text-white">' . h($variant) . '</td>';
+            echo '<td class="text-center fw-semibold text-white">' . h($qty) . '</td>';
+            echo '<td class="text-end text-white">' . h(money($price)) . '</td>';
+            echo '<td class="text-end fw-semibold text-warning">' . h(money($subtotalItem)) . '</td>';
+            echo '<td class="text-white-50 small">' . ($notes !== '' ? h($notes) : '-') . '</td>';
+            echo '</tr>';
+        }
+    } else {
+        echo '<tr><td colspan="6" class="text-center text-white-50 py-3">Tidak ada item pesanan</td></tr>';
+    }
+    echo '</tbody></table></div></div></div></div></div>';
+    exit;
+}
+
+// =========================================================================
+// =========================================================================
+// 4. LOGIKA FILTER DATA DAN KEAMANAN PRIVASI (ADMIN VS PASIEN MANDIRI)
+// =========================================================================
+$where = [];
+$binds = [];
+$types = '';
+
+// KONDISI UTAMA: Jika user adalah pasien, KUNCI agar hanya melihat pesanan miliknya sendiri
+if (!$isAdmin && $isPatient) {
+    $where[] = "patient_session_id = ?";
+    $binds[] = $patient_session_id;
+    $types  .= 'i';
+}
+
+// Filter Kotak Pencarian Teks Global (Khusus Admin)
+if ($q !== '') {
+    $where[] = "(order_number LIKE ? OR patient_session_id LIKE ? OR tenant_id LIKE ?)";
+    $likeQuery = '%' . $q . '%';
+    $binds[] = $likeQuery; 
+    $binds[] = $likeQuery; 
+    $binds[] = $likeQuery;
+    $types  .= 'sss';
+}
+
+// Filter Status Dropdown
+if ($status !== '') { 
+    $where[] = "status = ?"; 
+    $binds[] = $status; 
+    $types  .= 's'; 
+}
+if ($paymentStatus !== '') { 
+    $where[] = "payment_status = ?"; 
+    $binds[] = $paymentStatus; 
+    $types  .= 's'; 
+}
+
+$whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
+
+// Hitung Pagination Total Records
+$countSql = "SELECT COUNT(*) AS total FROM orders $whereClause";
+$countStmt = $conn->prepare($countSql);
+if (!empty($binds)) { 
+    $countStmt->bind_param($types, ...$binds); 
+}
+$countStmt->execute();
+$totalRows = $countStmt->get_result()->fetch_assoc()['total'];
+$totalPages = ceil($totalRows / $perPage);
+
+// Eksekusi Ambil List Data Utama Orders
+$sql = "SELECT id, order_number, patient_session_id, tenant_id, subtotal, discount, delivery_fee, grand_total, payment_status, status, created_at 
+        FROM orders $whereClause ORDER BY id DESC LIMIT ? OFFSET ?";
+$stmt = $conn->prepare($sql);
+
+$finalTypes = $types . 'ii';
+$finalBinds = array_merge($binds, [$perPage, $offset]);
+
+// PERBAIKAN: Memastikan variabel menggunakan tanda $ secara lengkap
+$stmt->bind_param($finalTypes, ...$finalBinds);
+$stmt->execute();
+$result = $stmt->get_result();
+
+$orders = [];
+if ($result) {
+    while ($row = $result->fetch_assoc()) { 
+        $orders[] = $row; 
+    }
+}
 ?>
+
 <!DOCTYPE html>
 <html lang="id">
 <head>

@@ -1,21 +1,36 @@
 <?php
-//home.php
+// home.php
 include "db.php";
 
 // session_start sudah dipanggil di db.php
 
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
+// =========================================================================
+// PERBAIKAN UTAMA: Izinkan masuk jika dia Admin (user_id) ATAU Pasien (patient_session_id)
+// =========================================================================
+$isAdmin   = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
+$isPatient = isset($_SESSION['patient_session_id']) && $_SESSION['patient_session_id'] > 0;
+
+if (!$isAdmin && !$isPatient) {
+    // Jika bukan admin dan tidak memiliki sesi pasien aktif, alihkan ke login/index
     header("Location: index.php");
     exit;
 }
 
-$userName = $_SESSION['name'] ?? 'Pasien';
+// Menentukan nama sapaan di dashboard (Nama Admin atau Nama Pasien)
+$userName = $_SESSION['name'] ?? ($_SESSION['patient_name'] ?? 'Pasien');
 
 // --- TAMBAHKAN QUERY INI UNTUK MENGHITUNG KELUARAN JUMLAH ITEM AWAL ---
-$patient_session_id = $_SESSION['patient_session_id'] ?? 1;
-$countCartQuery = mysqli_query($conn, "SELECT SUM(ci.qty) AS total_items FROM cart_items ci JOIN carts c ON ci.cart_id = c.id WHERE c.patient_session_id = $patient_session_id");
-$countCartData = mysqli_fetch_assoc($countCartQuery);
-$initialCartCount = (int)($countCartData['total_items'] ?? 0);
+// Jika patient_session_id belum ada, set default 0 agar query tidak crash
+$patient_session_id = isset($_SESSION['patient_session_id']) ? intval($_SESSION['patient_session_id']) : 0;
+
+$initialCartCount = 0;
+if ($patient_session_id > 0) {
+    $countCartQuery = mysqli_query($conn, "SELECT SUM(ci.qty) AS total_items FROM cart_items ci JOIN carts c ON ci.cart_id = c.id WHERE c.patient_session_id = $patient_session_id");
+    if ($countCartQuery) {
+        $countCartData = mysqli_fetch_assoc($countCartQuery);
+        $initialCartCount = (int)($countCartData['total_items'] ?? 0);
+    }
+}
 // --------------------------------------------------------------------
 
 // AMBIL DATA UTAMA PRODUK UNTUK ETALASE HOME
