@@ -269,12 +269,15 @@ $grand_total = fetch_grand_total($conn, $cart_id);
   <title>Keranjang Belanja - RSI Food &amp; Mart</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
-  <style>
+<style>
     :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
-    body { background:var(--bg) !important; color:var(--text); }
-    .bottom-nav { position: fixed; left:0; right:0; bottom:0; z-index: 1035; background: rgba(15,23,42,.88); backdrop-filter: blur(10px); border-top: 1px solid rgba(148,163,184,.25); }
-    @media (min-width: 992px) { main.content-shift { margin-left: 280px; } .bottom-nav { display:none; } }
-  </style>
+    body, body.modal-open { background:var(--bg) !important; color:var(--text); overflow:auto !important; padding-right:0px !important; pointer-events:auto !important; }
+    .modal-backdrop, .modal-backdrop.show { display:none !important; opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+    .bottom-nav { position:fixed; left:0; right:0; bottom:0; z-index:1035; background:rgba(15,23,42,.88); backdrop-filter:blur(10px); border-top:1px solid rgba(148,163,184,.25); }
+    @media (min-width:992px) { main.content-shift { margin-left:280px; } .bottom-nav { display:none; } }
+    #modalEditPesanan .modal-content { background:rgba(15,23,42,0.96) !important; backdrop-filter:blur(16px); border:1px solid rgba(148,163,184,0.25); color:#e5e7eb; border-radius:20px; }
+</style>
+
 </head>
 <body>
 
@@ -530,28 +533,15 @@ $grand_total = fetch_grand_total($conn, $cart_id);
   </div>
 </div>
 
-<!-- MODAL: Edit Pesanan -->
-<style>
-  #modalEditPesanan .modal-content {
-    background: rgba(15, 23, 42, 0.96) !important;
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    color: #e5e7eb;
-    border-radius: 20px;
-  }
-</style>
-
 <div class="modal fade" id="modalEditPesanan" aria-labelledby="modalEditPesananLabel" role="dialog" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <form id="formEditPesanan" method="POST" action="carts.php?action=update_item" class="w-100">
       <input type="hidden" name="cart_key" id="edit_cart_key" value="">
-
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title fw-bold text-white" id="modalEditPesananLabel">Edit Detail Pesanan</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-
         <div class="modal-body p-4">
           <div class="row align-items-center mb-4">
             <div class="col-12">
@@ -559,8 +549,7 @@ $grand_total = fetch_grand_total($conn, $cart_id);
               <h3 class="fw-bold text-white m-0" id="edit_item_name">-</h3>
             </div>
           </div>
-
-          <div class="p-3 rounded-4 mb-4" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.12);">
+          <div class="p-3 rounded-4 mb-4" style="background:rgba(2,6,23,0.4); border:1px solid rgba(148,163,184,0.12);">
             <div class="row text-center text-sm-start">
               <div class="col-sm-6 mb-2 mb-sm-0">
                 <div class="text-white-50 small mb-1" style="opacity:.8;">Harga Satuan (base + addon)</div>
@@ -572,36 +561,27 @@ $grand_total = fetch_grand_total($conn, $cart_id);
               </div>
             </div>
           </div>
-
           <div class="mb-4">
             <label for="edit_qty" class="form-label text-white-50 small fw-medium mb-2" style="opacity:.85;">Jumlah Porsi Pesanan</label>
             <div class="d-flex align-items-center gap-2">
-              <button type="button" class="btn btn-dark border border-secondary border-opacity-25" id="btnQtyMinus" style="width:44px; height:40px; border-radius:10px;">
-                <i class="bi bi-dash-lg text-white"></i>
-              </button>
-              <input type="number" class="form-control text-center fw-bold fs-5 p-0" id="edit_qty" name="qty" min="1" step="1" value="1" readonly style="background: rgba(2, 6, 23, 0.4); border-radius: 10px; border: 1px solid rgba(148,163,184,0.25); color:#e5e7eb; width: 65px; height: 40px; box-shadow: none;">
-              <button type="button" class="btn btn-dark border border-secondary border-opacity-25" id="btnQtyPlus" style="width:44px; height:40px; border-radius:10px;">
-                <i class="bi bi-plus-lg text-white"></i>
-              </button>
+              <button type="button" class="btn btn-dark border border-secondary border-opacity-25" id="btnQtyMinus" style="width:44px; height:40px; border-radius:10px;"><i class="bi bi-dash-lg text-white"></i></button>
+              <input type="number" class="form-control text-center fw-bold fs-5 p-0" id="edit_qty" name="qty" min="1" step="1" value="1" readonly style="background:rgba(2,6,23,0.4); border-radius:10px; border:1px solid rgba(148,163,184,0.25); color:#e5e7eb; width:65px; height:40px; box-shadow:none;">
+              <button type="button" class="btn btn-dark border border-secondary border-opacity-25" id="btnQtyPlus" style="width:44px; height:40px; border-radius:10px;"><i class="bi bi-plus-lg text-white"></i></button>
             </div>
           </div>
-
           <div class="mb-4">
             <label for="edit_variant" class="form-label text-white-50 small fw-medium mb-2" style="opacity:.85;">Pilih Tingkat Varian / Opsi</label>
-            <select id="edit_variant" name="variant" class="form-select text-white border-secondary py-2 px-3" style="background: rgba(2, 6, 23, 0.4); border-radius: 10px; font-size: 0.92rem;"></select>
+            <select id="edit_variant" name="variant" class="form-select text-white border-secondary py-2 px-3" style="background:rgba(2,6,23,0.4); border-radius:10px; font-size:0.92rem;"></select>
           </div>
-
           <div class="mb-4">
             <label class="form-label text-white-50 small fw-medium mb-2" style="opacity:.85;">Pilih Tambahan Topping / Addons</label>
-            <div id="edit_addons_container" class="d-flex flex-column gap-2 p-2 rounded-3" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.12);"></div>
+            <div id="edit_addons_container" class="d-flex flex-column gap-2 p-2 rounded-3" style="background:rgba(2,6,23,0.4); border:1px solid rgba(148,163,184,0.12);"></div>
           </div>
-
           <div class="mb-2">
             <label for="edit_notes" class="form-label text-white-50 small fw-medium mb-2" style="opacity:.85;">Catatan Tambahan untuk Dapur (opsional)</label>
-            <input type="text" class="form-control py-2.5 px-3" id="edit_notes" name="notes" placeholder="Catatan..." style="background: rgba(2, 6, 23, 0.4); border-radius: 12px; border: 1px solid rgba(148,163,184,0.25); color:#e5e7eb; box-shadow: none; font-size: 0.92rem;">
+            <input type="text" class="form-control py-2.5 px-3" id="edit_notes" name="notes" placeholder="Catatan..." style="background:rgba(2,6,23,0.4); border-radius:12px; border:1px solid rgba(148,163,184,0.25); color:#e5e7eb; box-shadow:none; font-size:0.92rem;">
           </div>
         </div>
-
         <div class="modal-footer border-top border-secondary border-opacity-25 p-3 px-4">
           <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-3 fw-medium" data-bs-dismiss="modal">Batal</button>
           <button type="submit" class="btn btn-sm btn-success rounded-pill fw-medium px-4 shadow-sm">Simpan Perubahan</button>
@@ -613,17 +593,14 @@ $grand_total = fetch_grand_total($conn, $cart_id);
 
 <script>
   let __edit_state = null;
-
   function moneyToNumberId(str) {
     if (!str) return 0;
     return parseFloat(String(str).replace(/[^0-9]/g, '')) || 0;
   }
-
   function syncQtyButtons() {
     const qtyInput = document.getElementById('edit_qty');
     const minusBtn = document.getElementById('btnQtyMinus');
     if (!qtyInput || !minusBtn) return;
-
     const q = parseInt(qtyInput.value) || 1;
     if (q <= 1) {
       minusBtn.style.opacity = '0.35';
@@ -633,7 +610,6 @@ $grand_total = fetch_grand_total($conn, $cart_id);
       minusBtn.style.pointerEvents = 'auto';
     }
   }
-
   function computeSelectedAddonTotal() {
     let total = 0;
     document.querySelectorAll('.addon-checkbox-input:checked').forEach(cb => {
@@ -641,49 +617,34 @@ $grand_total = fetch_grand_total($conn, $cart_id);
     });
     return total;
   }
-
   function updateTotalsLive() {
     if (!__edit_state) return;
-
     const qtyInput = document.getElementById('edit_qty');
-    const unitPriceText = document.getElementById('edit_unit_price').innerText || 'Rp 0';
     const totalDisplay = document.getElementById('edit_item_total');
-
     if (!qtyInput || !totalDisplay) return;
-
     const qty = parseInt(qtyInput.value) || 1;
-
-    // unit_price di UI akan di-update base+selectedAddon
     const basePrice = __edit_state.base_price;
     const addonTotal = computeSelectedAddonTotal();
     const unit = basePrice + addonTotal;
-
     document.getElementById('edit_unit_price').innerText = 'Rp ' + unit.toLocaleString('id-ID');
     totalDisplay.innerText = 'Rp ' + (unit * qty).toLocaleString('id-ID');
-
     syncQtyButtons();
   }
-
   function openEditPesanan(item) {
     if (!item) return;
-
     __edit_state = {
       cart_item_id: item.cart_item_id,
       product_id: item.product_id,
       qty: item.qty || 1,
       variant: item.variant || 'Original',
       notes: item.notes || '',
-      // base_price_only dari DB (tanpa addon)
       base_price: parseFloat(item.base_price_only) || 0,
       selected_addon_ids: Array.isArray(item.selected_addon_ids) ? item.selected_addon_ids.map(x => parseInt(x)).filter(x => !isNaN(x)) : []
     };
-
     document.getElementById('edit_cart_key').value = item.cart_item_id;
     document.getElementById('edit_item_name').innerText = item.product_name || '-';
     document.getElementById('edit_qty').value = __edit_state.qty;
     document.getElementById('edit_notes').value = __edit_state.notes;
-
-    // Default variant
     const variantSelect = document.getElementById('edit_variant');
     variantSelect.innerHTML = '<option value="Original">Original (Bawaan)</option>';
     fetch(`get_variants.php?product_id=${__edit_state.product_id}&_cb=${Date.now()}`)
@@ -701,11 +662,8 @@ $grand_total = fetch_grand_total($conn, $cart_id);
         }
       })
       .catch(() => {});
-
-    // Addons list
     const addonsContainer = document.getElementById('edit_addons_container');
     addonsContainer.innerHTML = '<p class="small text-white-50 text-center m-0 py-2"><span class="spinner-border spinner-border-sm text-success me-2"></span>Memuat topping...</p>';
-
     fetch(`get_addon_items.php?product_id=${__edit_state.product_id}&_cb=${Date.now()}`)
       .then(res => res.json())
       .then(addons => {
@@ -715,15 +673,12 @@ $grand_total = fetch_grand_total($conn, $cart_id);
           updateTotalsLive();
           return;
         }
-
         const selectedIds = Array.isArray(__edit_state.selected_addon_ids) ? __edit_state.selected_addon_ids : [];
-
         addons.forEach(a => {
           const addonId = parseInt(a.id);
           const price = parseFloat(a.price) || 0;
           const safeName = a.item_name || '';
           const checked = selectedIds.includes(addonId);
-
           addonsContainer.innerHTML += `
             <div class="form-check d-flex align-items-center justify-content-between p-2 rounded-2 mx-2" style="background: rgba(2,6,23,.25); border: 1px solid rgba(148,163,184,.10);">
               <div>
@@ -734,27 +689,22 @@ $grand_total = fetch_grand_total($conn, $cart_id);
             </div>
           `;
         });
-
         document.querySelectorAll('.addon-checkbox-input').forEach(cb => {
           cb.addEventListener('change', updateTotalsLive);
         });
-
         updateTotalsLive();
       })
       .catch(() => {
         addonsContainer.innerHTML = '<p class="small text-danger text-center m-0 py-2">Gagal memuat daftar topping.</p>';
         updateTotalsLive();
       });
-
     syncQtyButtons();
     updateTotalsLive();
   }
-
   document.addEventListener('DOMContentLoaded', function() {
     const qtyInput = document.getElementById('edit_qty');
     const minusBtn = document.getElementById('btnQtyMinus');
     const plusBtn = document.getElementById('btnQtyPlus');
-
     if (minusBtn && plusBtn && qtyInput) {
       minusBtn.addEventListener('click', function(e) {
         e.preventDefault();
@@ -764,7 +714,6 @@ $grand_total = fetch_grand_total($conn, $cart_id);
           updateTotalsLive();
         }
       });
-
       plusBtn.addEventListener('click', function(e) {
         e.preventDefault();
         let q = parseInt(qtyInput.value) || 1;
@@ -772,10 +721,8 @@ $grand_total = fetch_grand_total($conn, $cart_id);
         updateTotalsLive();
       });
     }
-
     syncQtyButtons();
   });
-
   function prepareDelete(cartKey, productName) {
     const textTarget = document.getElementById('delete_item_text_target');
     if (textTarget) {
@@ -786,6 +733,22 @@ $grand_total = fetch_grand_total($conn, $cart_id);
       deleteBtn.href = `carts.php?action=delete&key=${cartKey}`;
     }
   }
+  function bersihkanMacet() {
+    document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+  }
+  document.addEventListener('hidden.bs.modal', bersihkanMacet);
+  setInterval(() => {
+    let adaModalAktif = false;
+    document.querySelectorAll('.modal').forEach(m => {
+      if (m.classList.contains('show')) adaModalAktif = true;
+    });
+    if (!adaModalAktif && document.querySelector('.modal-backdrop')) {
+      bersihkanMacet();
+    }
+  }, 300);
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
