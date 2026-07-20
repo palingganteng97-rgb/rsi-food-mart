@@ -10,7 +10,8 @@ const grid = document.getElementById('catalogGrid');
 function openDetailProduct(data) {
     // Mode global untuk membedakan tombol: tambah vs simpan perubahan
     // default: tambah ke keranjang
-window.__detailMode = window.__detailMode || 'add';
+    window.__detailMode = window.__detailMode || 'add';
+
 
     // default label & mode
     const cartBtn = document.getElementById('btn_detail_add_cart');
@@ -52,21 +53,20 @@ window.__detailMode = window.__detailMode || 'add';
     if (reviewsContainer) {
         reviewsContainer.innerHTML = '<div class="text-white-50 small"><div class="spinner-border spinner-border-sm text-warning me-2"></div>Memuat ulasan pasien...</div>';
         
-        fetch(`get_reviews.php?product_id=${data.id}`)
+fetch(`get_reviews.php?product_id=${data.id}`)
             .then(response => response.json())
-            .then(reviews => {
-                reviewsContainer.innerHTML = ''; // Bersihkan loading
-                
-                if (Array.isArray(reviews) && reviews.length > 0) {
-                    reviews.forEach(r => {
-                        // Membuat representasi visual bintang emas (★) dan abu-abu (☆)
+            .then(payload => {
+                reviewsContainer.innerHTML = '';
+
+                const latest = payload && Array.isArray(payload.reviews) ? payload.reviews : [];
+                if (latest.length > 0) {
+                    latest.forEach(r => {
                         let starsHtml = '';
                         const starCount = parseInt(r.rating);
                         for (let i = 1; i <= 5; i++) {
                             starsHtml += i <= starCount ? '★' : '☆';
                         }
 
-                        // Menyuntikkan template boks ulasan dengan tema premium gelap transparan
                         reviewsContainer.innerHTML += `
                             <div class="p-3 rounded-3" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.1);">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
@@ -78,7 +78,6 @@ window.__detailMode = window.__detailMode || 'add';
                         `;
                     });
                 } else {
-                    // Tampilan jika produk tersebut belum pernah diulas oleh pasien mana pun
                     reviewsContainer.innerHTML = '<div class="text-white-50 small opacity-50 text-center py-2">Belum ada ulasan untuk menu sehat ini.</div>';
                 }
             })

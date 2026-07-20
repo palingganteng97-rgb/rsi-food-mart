@@ -446,12 +446,12 @@ $grand_total = fetch_grand_total($conn, $cart_id);
 
         <form method="POST" action="checkout_process.php" id="formCheckout">
           <input type="hidden" name="payment_method_id" id="payment_method_id" value="">
-          <a href="#" class="btn btn-success w-100 rounded-3 py-2 fw-medium d-flex align-items-center justify-content-center gap-2"
-             data-bs-toggle="modal" data-bs-target="#modalPilihMetodePembayaran">
+          <button type="button" class="btn btn-success w-100 rounded-3 py-2 fw-medium d-flex align-items-center justify-content-center gap-2" 
+                  data-bs-toggle="modal" data-bs-target="#modalPilihMetodePembayaran">
               <i class="bi bi-wallet2"></i> Lanjutkan Pemesanan
-          </a>
+          </button>
         </form>
-
+        
         <!-- MODAL: Pilih Metode Pembayaran -->
         <div class="modal fade" id="modalPilihMetodePembayaran" tabindex="-1" aria-labelledby="modalPilihMetodePembayaranLabel" aria-hidden="true">
           <div class="modal-dialog modal-dialog-centered" style="max-width: 560px;">
@@ -519,11 +519,27 @@ $grand_total = fetch_grand_total($conn, $cart_id);
           }
 
           document.addEventListener('DOMContentLoaded', function() {
-            // set default metode pembayaran sesuai pilihan radio pertama
-            const radio = document.querySelector('input[name="pm_radio"]:checked');
+            const modalEl = document.getElementById('modalPilihMetodePembayaran');
+            if (!modalEl || typeof bootstrap === 'undefined') return;
+
+            // Gunakan Bootstrap Modal sepenuhnya (tanpa manual class/style/backdrop)
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+            // Default pilih radio pertama agar radio selalu bisa dipilih & terbaca
+            const radio = modalEl.querySelector('input[name="pm_radio"]:checked');
             if (radio) setPaymentMethod(radio.value);
+
+            // Pastikan backdrop tetap milik Bootstrap dan tidak dobel
+            modalEl.addEventListener('shown.bs.modal', () => {
+              // Tidak melakukan manipulasi manual backdrop/class/style
+            });
+
+            modalEl.addEventListener('hidden.bs.modal', () => {
+              // Tidak melakukan manipulasi manual show/hide
+            });
           });
         </script>
+
 
       </div>
     </div>

@@ -1,10 +1,15 @@
-- [x] Analisis `tenant_reviews.php` dan struktur query saat ini
-- [x] Ubah `tenant_reviews.php` menjadi halaman read-only: hapus handler CRUD (create/update/delete)
-- [x] Hapus UI form tambah/edit/hapus + modal edit
-- [ ] Ubah query READ agar menampilkan minimal: tenant, (opsional) produk, pasien/username, rating, isi review, (opsional) foto, tanggal
-- [x] Tambahkan fitur: pencarian, filter tenant, filter rating, filter tanggal, pagination
-- [x] Pastikan query aman (prepare/bind) dan tidak mengubah proses pasien memberikan review
-- [ ] Uji manual: reload halaman admin dan verifikasi data tampil, filter & pagination bekerja
+# RSI_FOOD&MART - Tenant Reviews (Admin) Read-only Viewer
 
-
+## Plan
+- [x] Inspect `tenant_reviews.php` (sebelumnya viewer-only tapi masih pakai tabel dan sumber data `tenant_reviews`).
+- [x] Identifikasi sumber insert review pasien: `submit_review.php` → `product_reviews`.
+- [ ] Update `tenant_reviews.php` agar:
+  - [ ] tidak menampilkan struktur tabel CRUD-style
+  - [ ] membaca review dari `product_reviews`
+  - [ ] join ke `products` → `tenants` untuk nama tenant + nama produk
+  - [ ] join ke `patient_sessions` untuk nama pasien (berdasarkan `patient_session_id`)
+  - [ ] tampilkan card/list feed seperti marketplace
+  - [ ] tampilkan foto review bila kolom tersedia (tanpa membuat kolom baru)
+  - [ ] tetap sediakan filter: pencarian, tenant_id, rating, date_from, date_to
+- [ ] Test manual di browser.
 
