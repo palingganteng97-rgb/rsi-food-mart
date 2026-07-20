@@ -113,7 +113,29 @@ $tenant_id    = intval($cart_items[0]['tenant_id'] ?? 1);
 $grand_total = 0;
 $processed_cart_items = []; 
 
+// Fail-safe: validasi produk aktif sebelum hitung total + insert order_items
+$activeProductsMap = [];
+$productIds = array_values(array_unique(array_map(fn($ci) => intval($ci['product_id'] ?? 0), $cart_items)));
+$productIds = array_values(array_filter($productIds, fn($pid) => $pid > 0));
+
+if (!empty($productIds)) {
+    $inStr = implode(',', array_map('intval', $productIds));
+    $resActive = mysqli_query($conn, "SELECT id FROM products WHERE deleted_at IS NULL AND id IN ($inStr)");
+    if ($resActive) {
+        while ($r = mysqli_fetch_assoc($resActive)) {
+            $activeProductsMap[(int)$r['id']] = true;
+        }
+    }
+}
+
 foreach ($cart_items as $item) {
+    $product_id_raw = intval($item['product_id'] ?? 0);
+    if ($product_id_raw <= 0) continue;
+    // Tolak produk terhapus
+    if (empty($activeProductsMap[$product_id_raw])) {
+        continue;
+    }
+
     $qty = intval($item['qty']);
     $base_price = parse_as_float($item['price']);
     $raw_notes = (string)($item['notes'] ?? '');
@@ -174,8 +196,11 @@ try {
 
     
     // Pindahkan setiap baris menu makanan ke 'order_items'
-    foreach ($processed_cart_items as $item) {
+foreach ($processed_cart_items as $item) {
         $product_id = intval($item['product_id']);
+        if (empty($activeProductsMap[$product_id])) {
+            continue;
+        }
         $qty        = intval($item['qty']);
         $price      = floatval($item['final_calculated_price']); 
         $notes      = mysqli_real_escape_string($conn, trim($item['notes'] ?? ''));

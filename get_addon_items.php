@@ -11,10 +11,11 @@ $addon_items = [];
 
 if ($product_id > 0) {
     // Kueri JOIN: Mengambil item topping langsung berdasarkan ID produk yang aktif
-    $query = "SELECT ai.id, ai.item_name, ai.price 
+$query = "SELECT ai.id, ai.item_name, ai.price
               FROM addon_items ai
               INNER JOIN product_addons pa ON ai.addon_id = pa.id
-              WHERE pa.product_id = $product_id";
+              INNER JOIN products p ON pa.product_id = p.id
+              WHERE pa.product_id = $product_id AND p.deleted_at IS NULL";
               
     $result = mysqli_query($conn, $query);
     

@@ -121,7 +121,7 @@ if (isset($_GET['action_delete'])) {
 // Ambil list produk untuk dropdown form input ulasan
 $products = [];
 try {
-    $product_result = mysqli_query($conn, "SELECT id, name FROM products ORDER BY name ASC");
+    $product_result = mysqli_query($conn, "SELECT id, name FROM products WHERE deleted_at IS NULL ORDER BY name ASC");
     if ($product_result) {
         $products = mysqli_fetch_all($product_result, MYSQLI_ASSOC);
     }

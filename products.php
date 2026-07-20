@@ -129,6 +129,19 @@ if (isset($_POST['action_update_product'])) {
 // ==========================================
 // 3. PROSES SOFT DELETE (HAPUS DATA PRODUK)
 // ==========================================
+if (isset($_GET['action_restore'])) {
+    $id = intval($_GET['action_restore']);
+
+    $query = "UPDATE products SET deleted_at = NULL, updated_at = NOW() WHERE id = $id";
+    if (mysqli_query($conn, $query)) {
+        header("Location: products.php?status=success_restore");
+        exit();
+    } else {
+        header("Location: products.php?status=error&msg=" . urlencode(mysqli_error($conn)));
+        exit();
+    }
+}
+
 if (isset($_GET['action_delete'])) {
     $id = intval($_GET['action_delete']);
 
@@ -164,7 +177,7 @@ $sql = "SELECT p.*, t.name AS tenant_name, c.name AS category_name, b.name AS br
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN brands b ON p.brand_id = b.id
         LEFT JOIN units u ON p.unit_id = u.id
-        WHERE p.deleted_at IS NULL 
+        WHERE p.deleted_at IS NULL
         ORDER BY p.id DESC";
 
 $fetchQuery = mysqli_query($conn, $sql);
@@ -241,6 +254,7 @@ if ($fetchQuery) {
                     if ($status == 'success_insert') echo "Data produk berhasil ditambahkan!";
                     elseif ($status == 'success_update') echo "Data produk berhasil diperbarui!";
                     elseif ($status == 'success_delete') echo "Data produk berhasil dihapus!";
+                    elseif ($status == 'success_restore') echo "Produk berhasil direstore!";
                     else echo "Operasi gagal: " . htmlspecialchars($msg);
                     ?>
                 </strong>
@@ -271,12 +285,17 @@ if ($fetchQuery) {
                 <th class="py-3 text-end text-white" style="background: transparent !important; border: none !important; width: 150px !important;">Harga Jual</th>
                 <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px !important;">Stok</th>
                 <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 120px !important;">Status</th>
+                <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px !important;">Created At</th>
+                <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px !important;">Updated At</th>
+                <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px !important;">Deleted At</th>
+                <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 140px !important;">Status Data</th>
                 <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 140px !important;">Aksi</th>
             </tr>
         </thead>
         <tbody style="background: transparent !important;">
             <?php if (!empty($listProducts)): foreach ($listProducts as $row): ?>
-                <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
+                <?php $isDeleted = !empty($row['deleted_at']); ?>
+                <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem; <?= $isDeleted ? 'opacity: 0.55;' : '' ?>">
                     <!-- Kolom ID -->
                     <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $row['id'] ?></td>
                     
@@ -326,23 +345,65 @@ if ($fetchQuery) {
                             <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">Nonaktif</span>
                         <?php endif; ?>
                     </td>
-                    
-                    <!-- PERBAIKAN UTAMA: Memastikan tag penutup <td> menutup kolom aksi secara mandiri tanpa bocor -->
+
+                    <!-- Kolom Audit -->
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <span class="text-white-50" style="font-size: 0.8rem;"><?= htmlspecialchars($row['created_at'] ?? '-') ?></span>
+                    </td>
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <span class="text-white-50" style="font-size: 0.8rem;"><?= htmlspecialchars($row['updated_at'] ?? '-') ?></span>
+                    </td>
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <?php if (!empty($row['deleted_at'])): ?>
+                            <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">Terhapus</span>
+                            <div class="text-white-50" style="font-size: 0.75rem; margin-top: 0.25rem;"><?= htmlspecialchars($row['deleted_at']) ?></div>
+                        <?php else: ?>
+                            <span class="text-white-50" style="font-size: 0.8rem;">-</span>
+                        <?php endif; ?>
+                    </td>
+
+                    <!-- Kolom Status Data (Recycle Bin) -->
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <?php if (!empty($row['deleted_at'])): ?>
+                            <span class="badge bg-secondary-subtle text-white border border-secondary border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">Terhapus</span>
+                        <?php else: ?>
+                            <span class="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">Aktif</span>
+                        <?php endif; ?>
+                    </td>
+
+                    <!-- Kolom Aksi -->
                     <td class="text-center" style="background: transparent !important; border: none !important;">
                         <div class="d-flex justify-content-center gap-1">
-                            <!-- Tombol Edit -->
-                            <button type="button" class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit Produk" 
-                                    onclick='openEditProduct(<?= json_encode($row) ?>)'>
-                                <i class="bi bi-pencil-square"></i>
-                            </button>
-                            
-                            <!-- Tombol Hapus -->
-                            <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Hapus Produk"
-                                    data-bs-toggle="modal" 
-                                    data-bs-target="#modalConfirmDelete" 
-                                    onclick="document.getElementById('delete_target_name').innerText = '<?php echo addslashes($row['name']); ?>'; document.getElementById('btnConfirmDeleteAction').setAttribute('href', 'products.php?action_delete=<?= $row['id'] ?>')">
-                                <i class="bi bi-trash-fill"></i>
-                            </button>
+                            <?php if (!empty($row['deleted_at'])): ?>
+                                <!-- Produk terhapus: disable Edit/Hapus, tampilkan Restore -->
+                                <button type="button" class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit Produk" disabled style="opacity:.4; cursor:not-allowed;">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+
+                                <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Hapus Produk" disabled style="opacity:.4; cursor:not-allowed;">
+                                    <i class="bi bi-trash-fill"></i>
+                                </button>
+
+                                <a class="btn btn-sm btn-outline-info border-0 rounded-2 text-info" 
+                                   title="Restore Produk"
+                                   href="products.php?action_restore=<?= $row['id'] ?>">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </a>
+                            <?php else: ?>
+                                <!-- Tombol Edit -->
+                                <button type="button" class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit Produk" 
+                                        onclick='openEditProduct(<?= json_encode($row) ?>)'>
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                                
+                                <!-- Tombol Hapus -->
+                                <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Hapus Produk"
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#modalConfirmDelete" 
+                                        onclick="document.getElementById('delete_target_name').innerText = '<?php echo addslashes($row['name']); ?>'; document.getElementById('btnConfirmDeleteAction').setAttribute('href', 'products.php?action_delete=<?= $row['id'] ?>')">
+                                    <i class="bi bi-trash-fill"></i>
+                                </button>
+                            <?php endif; ?>
                         </div>
                     </td>
                 </tr>

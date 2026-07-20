@@ -256,15 +256,42 @@ fetch(`get_reviews.php?product_id=${data.id}`)
         
         // 3. Ambil catatan ketikan kustom
         const userNotes = notesInput ? notesInput.value.trim() : "";
-        
-        tambahKeKeranjang(data.id, finalProductName, data.base_price, data.image, userNotes);
-        
+
+        // Untuk tombol dari MODAL: tetap gunakan tambahKeKeranjang, tapi masukkan varian & topping
+        // lewat payload yang dibangun di bawah.
+        const variantSelectLocal = document.getElementById('detail_product_variant_select');
+        const variantIdModal = variantSelectLocal && variantSelectLocal.value ? variantSelectLocal.value : '';
+
+        const addonsIdsModal = [];
+        document.querySelectorAll('.addon-checkbox:checked').forEach(cb => addonsIdsModal.push(cb.value));
+
+        const formData = new FormData();
+        formData.append('id', data.id);
+        formData.append('name', finalProductName);
+        formData.append('price', data.base_price);
+        formData.append('image', data.image);
+        formData.append('notes', userNotes);
+        if (variantIdModal) formData.append('variant', variantIdModal);
+        addonsIdsModal.forEach(aid => formData.append('addons[]', aid));
+
+        fetch('api_cart.php?action=add', {
+            method: 'POST',
+            body: formData
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res && res.success) updateCartBadgeDisplay(res.total_items);
+        })
+        .catch(err => console.error('add from modal error:', err));
+
+
         const modalEl = document.getElementById('modalDetailProduct');
         if (modalEl) {
             const instance = bootstrap.Modal.getInstance(modalEl);
             if (instance) instance.hide();
         }
     };
+
 
     if (!detailProductModalInstance) {
         detailProductModalInstance = new bootstrap.Modal(document.getElementById('modalDetailProduct'));
@@ -332,28 +359,19 @@ function resetFilters(){
 }
 
 function tambahKeKeranjang(id, name, price, image, notes) { 
-    // no-op: keeps legacy global name used by inline onclick
+    // Fungsi ini dipakai oleh tombol '+' di card (inline onclick di home.php)
+    // Agar konsisten untuk semua produk, JANGAN bergantung pada DOM modal detail.
+    const userNotes = notes ? String(notes) : '';
 
-    const userNotes = notes ? notes : '';
-    
-    // ambil metadata varian & addons dari UI (agar bisa di-edit kembali)
-    const variantSelectLocal = document.getElementById('detail_product_variant_select');
-    const variantId = variantSelectLocal && variantSelectLocal.value ? variantSelectLocal.value : '';
-
-    const addonsIds = [];
-    document.querySelectorAll('.addon-checkbox:checked').forEach(cb => {
-        addonsIds.push(cb.value);
-    });
-    
     const formData = new FormData();
     formData.append('id', id);
     formData.append('name', name);
     formData.append('price', price);
     formData.append('image', image);
     formData.append('notes', userNotes);
-    if (variantId) formData.append('variant', variantId);
-    // kirim addons sebagai array id
-    addonsIds.forEach(aid => formData.append('addons[]', aid));
+
+    // Pastikan payload tetap valid meskipun modal belum pernah dibuka.
+    // Untuk tombol card: default tanpa varian & topping.
 
     fetch('api_cart.php?action=add', {
         method: 'POST',
@@ -361,12 +379,15 @@ function tambahKeKeranjang(id, name, price, image, notes) {
     })
     .then(response => response.json())
     .then(data => {
-        if (data.success) {
+        if (data && data.success) {
             updateCartBadgeDisplay(data.total_items);
+        } else {
+            console.error('Failed add to cart:', data);
         }
     })
-    .catch(err => console.error(err));
+    .catch(err => console.error('add to cart error:', err));
 }
+
 
 function updateCartBadgeDisplay(totalItems) {
     const badgeEl = document.getElementById('totalCartItemsCount'); 

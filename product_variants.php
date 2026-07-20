@@ -77,9 +77,19 @@ if ($action == 'delete' && isset($_GET['id'])) {
 }
 
 // Ambil list produk untuk dropdown form
-$product_query = "SELECT id, name FROM products ORDER BY name ASC";
+$product_query = "SELECT id, name FROM products WHERE deleted_at IS NULL ORDER BY name ASC";
+// DEBUG: logging eksekusi query dan hasil
+error_log('[product_variants.php][DEBUG] Executing product dropdown query. action=' . $action . ' uri=' . ($_SERVER['REQUEST_URI'] ?? '')); 
+// DEBUG: protect from accidental re-render side-effects
+static $debugOnce = false;
+if ($debugOnce) {
+    error_log('[product_variants.php][DEBUG][WARN] product_variants.php logic executed again in same request (unexpected).');
+} else {
+    $debugOnce = true;
+}
 $product_result = mysqli_query($conn, $product_query);
 $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : [];
+error_log('[product_variants.php][DEBUG] product dropdown rows=' . count($products));
 ?>
 
 <!DOCTYPE html>
@@ -285,9 +295,40 @@ $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : 
 </div>
 
 <script>
+    // DEBUG counters
+    window.__debugVariant = window.__debugVariant || {
+        openTambahVariant: 0,
+        openEditVariant: 0,
+        shownModal: 0,
+        renderOptionCountAtShow: []
+    };
+
+    function countVariantOptions() {
+        const sel = document.getElementById('variant_product_id');
+        if (!sel) return 0;
+        return sel.querySelectorAll('option').length;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const modalEl = document.getElementById('modalVariant');
+        if (!modalEl) return;
+
+        modalEl.addEventListener('shown.bs.modal', () => {
+            window.__debugVariant.shownModal++;
+            const countNow = countVariantOptions();
+            window.__debugVariant.renderOptionCountAtShow.push(countNow);
+            console.log('[DEBUG][modalVariant shown] countOption=', countNow, ' shownModal=', window.__debugVariant.shownModal);
+        });
+
+        console.log('[DEBUG][DOMContentLoaded] initial option count in #variant_product_id =', countVariantOptions());
+    });
+
     function openTambahVariant() {
+        window.__debugVariant.openTambahVariant++;
         const form = document.getElementById('formVariant');
         const submitBtn = document.getElementById('btnSubmitVariant');
+
+        console.log('[DEBUG][openTambahVariant] called=', window.__debugVariant.openTambahVariant, 'optionCountBefore=', countVariantOptions());
         
         if(form) form.action = "product_variants.php?action=create";
         if(submitBtn) {
@@ -299,12 +340,17 @@ $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : 
         document.getElementById('variant_product_id').value = "";
         document.getElementById('variant_name').value = "";
         document.getElementById('modalVariantLabel').innerText = "Tambah Varian";
+
+        console.log('[DEBUG][openTambahVariant] optionCountAfterReset=', countVariantOptions());
     }
 
     // PERBAIKAN MUTLAK: Menginisialisasi modal secara langsung saat tombol diklik
     function openEditVariant(id, productId, name) {
+        window.__debugVariant.openEditVariant++;
         const form = document.getElementById('formVariant');
         const submitBtn = document.getElementById('btnSubmitVariant');
+        
+        console.log('[DEBUG][openEditVariant] called=', window.__debugVariant.openEditVariant, 'optionCountBefore=', countVariantOptions());
         
         if(form) form.action = "product_variants.php?action=update";
         if(submitBtn) {
@@ -322,6 +368,8 @@ $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : 
         const modalElement = document.getElementById('modalVariant');
         const instance = bootstrap.Modal.getOrCreateInstance(modalElement);
         instance.show();
+
+        console.log('[DEBUG][openEditVariant] after show call optionCountNow=', countVariantOptions());
     }
 </script>
 

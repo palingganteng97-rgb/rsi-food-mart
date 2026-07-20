@@ -79,7 +79,7 @@ if ($action == 'delete' && isset($_GET['id'])) {
 }
 
 // Ambil list produk untuk dropdown form
-$product_query = "SELECT id, name FROM products ORDER BY name ASC";
+$product_query = "SELECT id, name FROM products WHERE deleted_at IS NULL ORDER BY name ASC";
 $product_result = mysqli_query($conn, $product_query);
 $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : [];
 ?>
