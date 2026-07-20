@@ -370,7 +370,7 @@ for($p=$start;$p<=$end;$p++){
 </main>
 
 <div class="modal fade" id="modalOrderDetail" tabindex="-1" aria-hidden="true">
-<div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" style="max-width:1140px;">
+<div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" style="max-width:1140px;" data-bs-backdrop="true" data-bs-keyboard="true">
 <div class="modal-content border-0 rounded-4 text-white shadow-lg" style="background:#0b1223; border:1px solid rgba(148,163,184,.15) !important;">
 <div class="modal-header border-secondary border-opacity-25">
 <div class="d-flex align-items-center gap-2">
