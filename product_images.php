@@ -195,7 +195,14 @@ if ($fetchQuery) {
     <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
         
         <!-- HEADER TABEL & TOMBOL TAMBAH GAMBAR -->
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
+    <!-- CLEAN URL PARAM AFTER PAGE LOAD agar notifikasi tidak muncul saat refresh -->
+    <script>
+    if (window.location.search.includes('status=')) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    </script>
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
             <div>
                 <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Galeri Gambar Produk</h2>
             </div>
@@ -369,45 +376,57 @@ if ($fetchQuery) {
 </div>
 
 <script>
-function openTambahGallery() {
-    document.getElementById('modalGalleryLabel').innerText = 'Tambah Gambar Baru';
-    document.getElementById('gallery_id').value = '';
-    document.getElementById('gallery_product_id').value = '';
-    document.getElementById('gallery_image_file').value = '';
-    document.getElementById('gallery_image_file').setAttribute('required', 'required');
-    document.getElementById('gallery_is_primary').value = '0';
-    
-    const btnSubmit = document.getElementById('btnSubmitGallery');
-    if (btnSubmit) {
-        btnSubmit.setAttribute('name', 'action_add_image');
-        btnSubmit.className = "btn btn-sm btn-success rounded-3 px-3 py-2 fw-medium";
-        btnSubmit.innerText = "Simpan Data";
-    }
-}
-
-function openEditGallery(data) {
-    if (data) {
-        document.getElementById('modalGalleryLabel').innerText = 'Ubah Gambar Galeri';
-        document.getElementById('gallery_id').value = data.id;
-        document.getElementById('gallery_product_id').value = data.product_id;
+    function openTambahGallery() {
+        document.getElementById('modalGalleryLabel').innerText = 'Tambah Gambar Baru';
+        document.getElementById('gallery_id').value = '';
+        document.getElementById('gallery_product_id').value = '';
         document.getElementById('gallery_image_file').value = '';
-        document.getElementById('gallery_image_file').removeAttribute('required');
-        document.getElementById('gallery_is_primary').value = data.is_primary;
-        
+        document.getElementById('gallery_image_file').setAttribute('required', 'required');
+        document.getElementById('gallery_is_primary').value = '0';
         const btnSubmit = document.getElementById('btnSubmitGallery');
         if (btnSubmit) {
-            btnSubmit.setAttribute('name', 'action_update_image');
-            btnSubmit.className = "btn btn-sm btn-warning text-dark rounded-3 px-3 py-2 fw-semibold";
-            btnSubmit.innerText = "Simpan Perubahan";
-        }
-        
-        const modalEl = document.getElementById('modalGallery');
-        if (modalEl) {
-            const instance = bootstrap.Modal.getOrCreateInstance(modalEl);
-            instance.show();
+            btnSubmit.setAttribute('name', 'action_add_image');
+            btnSubmit.className = "btn btn-sm btn-success rounded-3 px-3 py-2 fw-medium";
+            btnSubmit.innerText = "Simpan Data";
         }
     }
-}
+    function openEditGallery(data) {
+        if (data) {
+            document.getElementById('modalGalleryLabel').innerText = 'Ubah Gambar Galeri';
+            document.getElementById('gallery_id').value = data.id;
+            document.getElementById('gallery_product_id').value = data.product_id;
+            document.getElementById('gallery_image_file').value = '';
+            document.getElementById('gallery_image_file').removeAttribute('required');
+            document.getElementById('gallery_is_primary').value = data.is_primary;
+            const btnSubmit = document.getElementById('btnSubmitGallery');
+            if (btnSubmit) {
+                btnSubmit.setAttribute('name', 'action_update_image');
+                btnSubmit.className = "btn btn-sm btn-warning text-dark rounded-3 px-3 py-2 fw-semibold";
+                btnSubmit.innerText = "Simpan Perubahan";
+            }
+            const modalEl = document.getElementById('modalGallery');
+            if (modalEl) {
+                const instance = bootstrap.Modal.getOrCreateInstance(modalEl);
+                instance.show();
+            }
+        }
+    }
+    function bersihkanMacet() {
+        document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+    }
+    document.addEventListener('hidden.bs.modal', bersihkanMacet);
+    setInterval(() => {
+        let adaModalAktif = false;
+        document.querySelectorAll('.modal').forEach(m => {
+            if (m.classList.contains('show')) adaModalAktif = true;
+        });
+        if (!adaModalAktif && document.querySelector('.modal-backdrop')) {
+            bersihkanMacet();
+        }
+    }, 300);
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
