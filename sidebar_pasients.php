@@ -13,8 +13,7 @@ parse_str(parse_url($currentUri, PHP_URL_QUERY) ?? '', $queryParams);
 $currentTenantId = $queryParams['tenant_id'] ?? '';
 
 $menu = [
-'home.php' => [ 'href' => 'home.php', 'label' => 'Etalase', 'icon' => 'bi-shop' ],
-
+    'home.php' => ['href' => 'home.php', 'label' => 'Etalase', 'icon' => 'bi-shop'],
 ];
 
   // =========================================================================
