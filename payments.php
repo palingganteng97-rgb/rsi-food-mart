@@ -15,13 +15,19 @@ if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         // Mulai transaksi
         mysqli_begin_transaction($conn);
         try {
-            // Ambil order_id dari tabel payments
-            $getOrder = $conn->prepare("SELECT order_id FROM payments WHERE id = ? LIMIT 1");
+            // Ambil order_id dan cek status orders
+            $getOrder = $conn->prepare("SELECT p.order_id, o.status AS order_status FROM payments p LEFT JOIN orders o ON p.order_id = o.id WHERE p.id = ? LIMIT 1");
             $getOrder->bind_param("i", $payment_id);
             $getOrder->execute();
             $orderResult = $getOrder->get_result();
             $orderRow = $orderResult->fetch_assoc();
             $order_id = intval($orderRow['order_id'] ?? 0);
+            $order_status = strtolower(trim($orderRow['order_status'] ?? ''));
+
+            // Cegah update jika pesanan sudah dibatalkan
+            if ($order_status === 'cancelled') {
+                throw new Exception('Pesanan sudah dibatalkan. Tidak dapat mengubah status pembayaran.');
+            }
 
             // Update status di tabel payments
             $stmt = $conn->prepare("UPDATE payments SET status = ? WHERE id = ?");
@@ -63,7 +69,7 @@ $search = isset($_GET['search']) ? trim((string)$_GET['search']) : '';
 $filter_status = isset($_GET['status_filter']) ? trim((string)$_GET['status_filter']) : '';
 
 // Query dasar dengan JOIN ke tabel orders dan payment_methods
-$sql = "SELECT p.*, o.order_number, pm.name AS method_name, pm.provider 
+$sql = "SELECT p.*, o.order_number, o.status AS order_status, pm.name AS method_name, pm.provider 
         FROM payments p
         LEFT JOIN orders o ON p.order_id = o.id
         LEFT JOIN payment_methods pm ON p.payment_method_id = pm.id
@@ -206,6 +212,15 @@ $msg = isset($_GET['msg']) ? (string)$_GET['msg'] : '';
                 <td class="text-white-50" style="background: transparent !important; background-color: transparent !important; border: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;"><?= htmlspecialchars($methodLabel !== '' ? $methodLabel : '-') ?></td>
                 <td class="text-center" style="background: transparent !important; background-color: transparent !important; border: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;"><?= $badgeHtml ?></td>
                 <td class="text-center" style="background: transparent !important; background-color: transparent !important; border: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;">
+                  <?php 
+                    $orderStatusPayment = strtolower(trim($row['order_status'] ?? ''));
+                    $isCancelled = ($orderStatusPayment === 'cancelled');
+                  ?>
+                  <?php if ($isCancelled): ?>
+                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-3 py-2 rounded-pill" style="font-size:0.78rem;">
+                      <i class="bi bi-lock-fill me-1"></i>ORDER CANCELLED
+                    </span>
+                  <?php else: ?>
                   <form method="POST" action="payments.php?action=update_status" class="d-flex flex-column flex-md-row gap-2 justify-content-center align-items-center" style="pointer-events:auto; background: transparent !important; background-color: transparent !important;">
                     <input type="hidden" name="id" value="<?= (int)($row['id'] ?? 0) ?>" />
                     <select name="status" class="form-select form-select-sm" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important; min-width: 150px;">
@@ -215,6 +230,7 @@ $msg = isset($_GET['msg']) ? (string)$_GET['msg'] : '';
                     </select>
                     <button type="submit" class="btn btn-sm btn-success px-3 fw-medium">Update</button>
                   </form>
+                  <?php endif; ?>
                 </td>
               </tr>
             <?php endforeach; ?>

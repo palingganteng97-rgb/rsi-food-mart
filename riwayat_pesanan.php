@@ -35,7 +35,7 @@ $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 if ($order_id > 0) {
     // Ambil data orders — pastikan hanya milik session pasien ini
     $order = null;
-    $stmtOrder = $conn->prepare("SELECT id, order_number, grand_total, payment_status, status, created_at FROM orders WHERE id = ? AND patient_session_id = ? LIMIT 1");
+    $stmtOrder = $conn->prepare("SELECT id, order_number, grand_total, payment_status, status, created_at, cancel_reason FROM orders WHERE id = ? AND patient_session_id = ? LIMIT 1");
     if ($stmtOrder) {
         $stmtOrder->bind_param('ii', $order_id, $patient_session_id);
         $stmtOrder->execute();
@@ -147,6 +147,50 @@ if ($order_id > 0) {
         $totalQty += intval($it['qty'] ?? 0);
     }
 
+    // =========================================================================
+    // PROSES BATALKAN PESANAN (hanya jika status masih PENDING)
+    // =========================================================================
+    $cancelSuccess = isset($_GET['cancelled']) && $_GET['cancelled'] === '1';
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_order']) && $_POST['cancel_order'] === '1') {
+        // Pastikan order masih bisa dibatalkan (hanya jika status pesanan masih pending)
+        $canCancel = false;
+        $orderStatusLower = strtolower($orderStatus ?? '');
+
+        if ($orderStatusLower === 'pending') {
+            $canCancel = true;
+        }
+
+        // Ambil alasan pembatalan dari form
+        $alasanCancel = isset($_POST['alasan_cancel']) ? trim($_POST['alasan_cancel']) : '';
+
+        if ($canCancel && $alasanCancel !== '') {
+            $stmtCancel = $conn->prepare("UPDATE orders SET status = 'cancelled', cancel_reason = ? WHERE id = ? AND patient_session_id = ?");
+            if ($stmtCancel) {
+                $stmtCancel->bind_param('sii', $alasanCancel, $order_id, $patient_session_id);
+                $stmtCancel->execute();
+
+                // INSERT ke tabel order_status_histories untuk mencatat log pembatalan
+                $stmtHist = $conn->prepare("INSERT INTO order_status_histories (order_id, status, changed_by, notes) VALUES (?, 'cancelled', NULL, ?)");
+                if ($stmtHist) {
+                    $stmtHist->bind_param('is', $order_id, $alasanCancel);
+                    $stmtHist->execute();
+                    $stmtHist->close();
+                }
+
+                $stmtCancel->close();
+
+                // Redirect (PRG) untuk mencegah resubmission form
+                header("Location: riwayat_pesanan.php?id=" . $order_id . "&cancelled=1&reason=" . urlencode($alasanCancel));
+                exit;
+            }
+        } else {
+            // Jika tidak bisa dibatalkan atau alasan kosong, redirect tanpa parameter sukses
+            header("Location: riwayat_pesanan.php?id=" . $order_id . "&error=cannot_cancel");
+            exit;
+        }
+    }
+
     // Tampilkan badge status
     function statusBadge($status, $type = 'payment') {
         $status = strtoupper($status);
@@ -181,11 +225,36 @@ if ($order_id > 0) {
 
     <main class="page-body content-shift">
         <div class="container">
-            <div class="mb-4">
+        <div class="mb-4">
                 <a href="riwayat_pesanan.php" class="btn btn-outline-light btn-sm rounded-pill px-3" style="border: 1px solid rgba(148, 163, 184, 0.3); background: rgba(255, 255, 255, 0.05);">
                     <i class="bi bi-arrow-left me-1"></i> Kembali ke Riwayat
                 </a>
             </div>
+
+            <?php if ($cancelSuccess):
+                $cancelReason = isset($_GET['reason']) ? urldecode($_GET['reason']) : '';
+            ?>
+            <div class="alert alert-success alert-dismissible fade show rounded-4 border-0 shadow-sm" role="alert" style="max-width: 580px; margin: 0 auto 1rem auto; background: rgba(34, 197, 94, 0.2); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3) !important;">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-check-circle-fill fs-5"></i>
+                    <span class="fw-semibold">Pesanan berhasil dibatalkan.</span>
+                </div>
+                <?php if ($cancelReason !== ''): ?>
+                <div class="mt-2" style="border-top: 1px solid rgba(34,197,94,0.2); padding-top: 8px;">
+                    <small><i class="bi bi-chat-quote me-1"></i>Alasan: <em><?php echo h($cancelReason); ?></em></small>
+                </div>
+                <?php endif; ?>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            <?php elseif (isset($_GET['error']) && $_GET['error'] === 'cannot_cancel'): ?>
+            <div class="alert alert-warning alert-dismissible fade show rounded-4 border-0 shadow-sm" role="alert" style="max-width: 580px; margin: 0 auto 1rem auto; background: rgba(255, 193, 7, 0.2); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.3) !important;">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                    <span class="fw-semibold">Pesanan tidak dapat dibatalkan karena status sudah berubah.</span>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            <?php endif; ?>
 
             <div class="card mx-auto border-0 p-4 p-md-5 rounded-4 shadow-lg" style="max-width: 580px; background: rgba(30, 41, 59, 0.35); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.15);">
                 
@@ -223,6 +292,12 @@ if ($order_id > 0) {
                         <span class="text-white-50 small">Status Pesanan</span>
                         <span class="badge <?php echo statusBadge($orderStatus, 'order'); ?> px-3 py-1 rounded-pill"><?php echo h(ucfirst($orderStatus)); ?></span>
                     </div>
+                    <?php if ($isCancelled && !empty($order['cancel_reason'])): ?>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-white-50 small">Alasan Pembatalan</span>
+                        <span class="fw-semibold text-white-50 text-end small" style="max-width: 60%;"><?php echo h($order['cancel_reason']); ?></span>
+                    </div>
+                    <?php endif; ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-white-50 small">Metode Pembayaran</span>
                         <span class="fw-semibold text-white"><?php echo h($payment_method_name); ?></span>
@@ -260,16 +335,111 @@ if ($order_id > 0) {
                 <?php endif; ?>
 
                 <div class="d-flex gap-2 mt-3">
+                    <?php
+                    $payStatusUpper = strtoupper($paymentStatus ?? '');
+                    $orderStatusLower = strtolower($orderStatus ?? '');
+                    $canCancel = ($orderStatusLower === 'pending');
+                    $isCancelled = ($orderStatusLower === 'cancelled');
+                    ?>
+
+                    <?php if ($canCancel): ?>
+                    <!-- Tombol Batalkan Pesanan (aktif, hanya jika status masih PENDING) -->
+                    <button type="button" class="btn btn-danger rounded-pill px-4 fw-bold flex-fill shadow-sm" data-bs-toggle="modal" data-bs-target="#cancelModal">
+                        <i class="bi bi-x-circle me-2"></i>Batalkan Pesanan
+                    </button>
+                    <?php elseif ($isCancelled): ?>
+                    <!-- Tombol Pesanan Dibatalkan (disabled, jika status CANCELLED) -->
+                    <button type="button" class="btn btn-secondary rounded-pill px-4 fw-bold flex-fill shadow-sm" disabled style="opacity: 0.6; cursor: not-allowed;">
+                        <i class="bi bi-x-circle me-2"></i>Pesanan Dibatalkan
+                    </button>
+                    <?php endif; ?>
+
                     <a href="home.php" class="btn btn-warning rounded-pill px-4 fw-bold flex-fill shadow-sm">
                         <i class="bi bi-shop me-2"></i>Kembali ke Etalase
-                    </a>
-                    <a href="refund_patients.php" class="btn btn-outline-light rounded-pill px-3 fw-medium">
-                        <i class="bi bi-arrow-return-left me-1"></i>Refund
                     </a>
                 </div>
             </div>
         </div>
     </main>
+
+    <!-- Modal Konfirmasi Batalkan Pesanan -->
+    <div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 rounded-4 text-white shadow-lg" style="background: #0b1223; border: 1px solid rgba(148, 163, 184, 0.15) !important;">
+                <div class="modal-header border-secondary border-opacity-25">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-exclamation-triangle-fill fs-4 text-danger"></i>
+                        <h5 class="modal-title fw-bold m-0" id="cancelModalLabel">Konfirmasi Pembatalan</h5>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST" id="cancelForm" onsubmit="return validateCancelReason()">
+                    <div class="modal-body py-4">
+                        <div class="text-center mb-3">
+                            <i class="bi bi-x-circle-fill text-danger display-4 d-block mb-3"></i>
+                            <p class="fw-semibold mb-1">Apakah Anda yakin ingin membatalkan pesanan ini?</p>
+                            <p class="text-white-50 small mb-3">Tindakan ini tidak dapat dibatalkan. Pesanan dengan nomor <strong class="text-white">#<?php echo h($order['order_number'] ?? '-'); ?></strong> akan dibatalkan.</p>
+                        </div>
+                        <hr style="border-color: rgba(148,163,184,0.15);">
+                        <div class="mb-0">
+                            <label for="alasan_cancel" class="form-label text-white-50 small fw-semibold">
+                                <i class="bi bi-pencil-square me-1"></i>Alasan Pembatalan <span class="text-danger">*</span>
+                            </label>
+                            <textarea name="alasan_cancel" id="alasan_cancel" class="form-control bg-dark bg-opacity-25 text-white border-secondary border-opacity-50 rounded-3" rows="3" placeholder="Tuliskan alasan mengapa Anda membatalkan pesanan ini..." required style="resize: vertical;"></textarea>
+                            <div id="alasanError" class="text-danger small mt-1 d-none">
+                                <i class="bi bi-exclamation-circle me-1"></i>Alasan pembatalan wajib diisi!
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-secondary border-opacity-25 d-flex gap-2">
+                        <button type="button" class="btn btn-outline-light rounded-pill px-4 fw-medium" data-bs-dismiss="modal">
+                            <i class="bi bi-arrow-left me-1"></i>Kembali
+                        </button>
+                        <input type="hidden" name="cancel_order" value="1" />
+                        <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm" id="btnConfirmCancel">
+                            <i class="bi bi-check2-circle me-1"></i>Ya, Batalkan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Validasi JavaScript: alasan pembatalan tidak boleh kosong
+    function validateCancelReason() {
+        var alasan = document.getElementById('alasan_cancel');
+        var errorDiv = document.getElementById('alasanError');
+        if (alasan.value.trim() === '') {
+            alasan.classList.add('is-invalid');
+            errorDiv.classList.remove('d-none');
+            // Fokus ke textarea
+            alasan.focus();
+            return false;
+        }
+        alasan.classList.remove('is-invalid');
+        errorDiv.classList.add('d-none');
+        return true;
+    }
+
+    // Reset error saat modal ditutup
+    document.addEventListener('DOMContentLoaded', function() {
+        var cancelModalEl = document.getElementById('cancelModal');
+        if (cancelModalEl) {
+            cancelModalEl.addEventListener('hidden.bs.modal', function() {
+                var alasan = document.getElementById('alasan_cancel');
+                var errorDiv = document.getElementById('alasanError');
+                if (alasan) {
+                    alasan.classList.remove('is-invalid');
+                    alasan.value = '';
+                }
+                if (errorDiv) {
+                    errorDiv.classList.add('d-none');
+                }
+            });
+        }
+    });
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     </body>

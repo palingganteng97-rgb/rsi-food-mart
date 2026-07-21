@@ -102,7 +102,7 @@ if ($action === 'detail' && isset($_GET['id'])) {
         http_response_code(403); echo 'Akses ditolak'; exit;
     }
 
-    $stmt2 = $conn->prepare('SELECT oi.id, oi.product_id, oi.qty, oi.price, oi.notes, p.name AS product_name, oi.variant AS variant_name FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ? ORDER BY oi.id ASC');
+    $stmt2 = $conn->prepare('SELECT oi.id, oi.product_id, oi.qty, oi.price, oi.notes, p.name AS product_name FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ? ORDER BY oi.id ASC');
     $stmt2->bind_param('i', $orderId);
     $stmt2->execute();
     $items = []; $r2 = $stmt2->get_result();
@@ -135,8 +135,13 @@ if ($action === 'detail' && isset($_GET['id'])) {
         foreach ($items as $it) {
             $qty = (int)($it['qty'] ?? 0); $price = (float)($it['price'] ?? 0); $subtotalItem = $qty * $price;
             $productName = (string)($it['product_name'] ?? '-');
-            $variant = (string)($it['variant_name'] ?? 'Original');
-            $notes = trim((string)($it['notes'] ?? ''));
+            $rawNotes = trim((string)($it['notes'] ?? ''));
+            // Parse varian dari field notes (format: "Varian: NamaVarian|...")
+            $variant = 'Original';
+            if (preg_match('/Varian:\s*([^|\n]+)/i', $rawNotes, $m)) {
+                $variant = trim($m[1]);
+            }
+            $notes = $rawNotes;
             echo '<tr style="border-bottom: 1px solid rgba(148,163,184,.12) !important;">';
             echo '<td class="fw-semibold text-white">' . h($productName) . '</td>';
             echo '<td class="text-white">' . h($variant) . '</td>';
@@ -243,6 +248,9 @@ body{background:var(--bg) !important;color:var(--text);}
 .text-white*{color:#fff !important;}
 #ordersTableWrap::-webkit-scrollbar {display: none}
 #ordersTableWrap {-ms-overflow-style: none;scrollbar-width: none;}
+/* Hide scrollbar on modal body "Detail Pesanan" — tetap bisa di-scroll */
+#modalOrderDetail .modal-body::-webkit-scrollbar {display: none}
+#modalOrderDetail .modal-body {-ms-overflow-style: none;scrollbar-width: none;}
 </style>
 
 </head>
@@ -317,12 +325,13 @@ body{background:var(--bg) !important;color:var(--text);}
 <!-- Tambahkan pointer-events: auto agar input/tombol di dalam tabel tidak macet saat diklik -->
 <div class="d-flex flex-column flex-md-row gap-2 justify-content-center align-items-center" style="pointer-events: auto;">
 <button type="button" class="btn btn-sm btn-outline-light rounded-3" data-bs-toggle="modal" data-bs-target="#modalOrderDetail" data-order-id="<?php echo h($o['id']); ?>"><i class="bi bi-eye"></i></button>
+<?php $isCancelled = ((string)$o['status'] === 'cancelled'); ?>
 <form method="POST" action="orders.php?<?php echo h(http_build_query(['q'=>$q,'status'=>$status,'payment_status'=>$paymentStatus,'page'=>$page,'action'=>'update_status'])); ?>" class="d-flex gap-1 align-items-center">
 <input type="hidden" name="id" value="<?php echo h($o['id']); ?>" />
-<select name="status" class="form-select form-select-sm bg-dark bg-opacity-25 text-white border-secondary border-opacity-50" style="min-width:160px; color-scheme:dark;">
+<select name="status" class="form-select form-select-sm bg-dark bg-opacity-25 text-white border-secondary border-opacity-50" style="min-width:160px; color-scheme:dark;" <?php echo $isCancelled ? 'disabled' : ''; ?>>
 <?php foreach($allowedOrderStatuses as $st){ $sel=((string)$o['status']===$st)?'selected':''; echo '<option value="'.h($st).'" '.$sel.'>'.h($st).'</option>'; } ?>
 </select>
-<button type="submit" class="btn btn-sm btn-success rounded-3 px-3"><i class="bi bi-check2-circle"></i></button>
+<button type="submit" class="btn btn-sm btn-success rounded-3 px-3" <?php echo $isCancelled ? 'disabled style="opacity:0.4; pointer-events:none;"' : ''; ?>><i class="bi bi-check2-circle"></i></button>
 </form>
 </div>
 </td>
