@@ -1,40 +1,28 @@
-# TODO - Soft Delete Consistency (Recycle Bin)
+# FIX CHECKOUT FLOW - COMPLETED
 
-## Step 1 (Admin UI)
-- Update `products.php`:
-  - [x] Show ALL products (aktif + terhapus)
-  - [x] Add columns: Created At, Updated At, Deleted At, Status Data
-  - [x] Badge: Aktif / Terhapus
-  - [x] Row styling for deleted products
-  - [x] Disable Edit & Hapus when deleted
-  - [x] Add Restore button for deleted products
-  - [x] Implement backend action `action_restore`. 
+## Changes Made:
 
+### 1. checkout_process.php (FIXED)
+- Added INSERT into `payments` table (order_id, payment_method_id, amount, transaction_number, status='PENDING')
+- orders.payment_status remains 'unpaid' (valid enum value)
+- orders.status = 'pending'
+- After COMMIT: DELETE cart_items, then DELETE carts if no items remain
+- Redirect to `payment_success.php?id=ORDER_ID` instead of `payments.php`
+- Added detailed error messages with mysqli_error() for all INSERT failures
+- All operations wrapped in BEGIN/COMMIT/ROLLBACK transaction
 
-## Step 2 (Admin dropdown relation)
-- Update `product_variants.php` and `product_addons.php`:
-  - Dropdown products should include ALL products (no `deleted_at IS NULL` filter).
+### 2. carts.php (FIXED)
+- "Lanjut" button now calls `submitCheckoutWithSelectedMethod()` which submits the form POST to `checkout_process.php`
+- Removed direct redirect to `payment_success.php`
+- Proper form submission with payment_method_id
 
-## Step 3 (Operational AJAX filters)
-- Update `get_variants.php`:
-  - [x] Only return variants whose product is active (`products.deleted_at IS NULL`).
-- Update `get_addon_items.php`:
-  - [x] Only return addon items whose parent product is active.
+### 3. payment_success.php (FIXED)
+- Now accepts `order_id` from URL parameter `id`
+- Dynamically reads orders, order_items, and payments from database
+- Displays order number, payment status, order status, payment method, items, and total
+- Redirects to home.php if no valid order_id or order not found
+- Only shows data - no database writes
 
-
-## Step 4 (Operational cart & checkout safety)
-- Update `api_cart.php`:
-  - [x] When adding cart item, reject if product is soft-deleted.
-  - [x] When fetching cart items, exclude soft-deleted products.
-- Update `checkout_process.php`:
-  - [x] Before writing `order_items`, validate every cart item’s product is active.
-  - [x] If any item is deleted, skip them and recalc totals (fail-safe).
-
-
-## Step 5 (Verification)
-- Manual testing checklist:
-  - Admin products.php shows deleted products and can restore.
-  - Home & detail modal never allow deleted products.
-  - Dropdown varian/topping from modal never include deleted products.
-  - Adding to cart and checkout reject deleted products.
+### 4. Cleanup
+- REMINDER: Delete `_debug_schema.php` after testing
 

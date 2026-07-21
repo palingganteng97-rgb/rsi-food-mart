@@ -132,34 +132,64 @@ try {
     $status         = 'pending';
     $payment_status = 'unpaid';
     
-    // Sinkronisasi penuh dengan struktur tabel 'orders' dari gambar HeidiSQL Anda
+    // INSERT ke tabel orders
     $insert_order_query = "INSERT INTO orders (order_number, patient_session_id, tenant_id, grand_total, payment_status, status, created_at) 
                            VALUES ('$order_number', $patient_session_id, $tenant_id, $grand_total, '$payment_status', '$status', NOW())";
     if (!mysqli_query($conn, $insert_order_query)) {
-        throw new Exception("Gagal membuat data transaksi orders: " . mysqli_error($conn));
+        throw new Exception("Gagal INSERT orders: " . mysqli_error($conn));
     }
     $new_order_id = mysqli_insert_id($conn);
+    
+    // INSERT ke tabel order_items
     foreach ($processed_cart_items as $item) {
         $product_id = intval($item['product_id']);
         $qty = intval($item['qty']);
         $final_price = parse_as_float($item['final_calculated_price']);
         $notes = mysqli_real_escape_string($conn, $item['notes'] ?? '');
         
-        // Memastikan tidak menyertakan kolom 'created_at' di order_items karena tidak terdaftar di DB
         $insert_item_query = "INSERT INTO order_items (order_id, product_id, qty, price, notes) 
                               VALUES ($new_order_id, $product_id, $qty, $final_price, '$notes')";
         if (!mysqli_query($conn, $insert_item_query)) {
-            throw new Exception("Gagal menyimpan item pesanan: " . mysqli_error($conn));
+            throw new Exception("Gagal INSERT order_items: " . mysqli_error($conn));
         }
     }
-    mysqli_query($conn, "DELETE FROM cart_items WHERE cart_id = $main_cart_id");
+    
+    // INSERT ke tabel payments
+    $transaction_number = "TXN-" . date('Ymd') . "-" . rand(10000, 99999);
+    $payment_status_db = 'PENDING';
+    $insert_payment_query = "INSERT INTO payments (order_id, payment_method_id, amount, transaction_number, status) 
+                             VALUES ($new_order_id, $payment_method_id, $grand_total, '$transaction_number', '$payment_status_db')";
+    if (!mysqli_query($conn, $insert_payment_query)) {
+        throw new Exception("Gagal INSERT payments: " . mysqli_error($conn));
+    }
+    
+    // Hapus cart_items setelah semua INSERT berhasil
+    $delete_items = mysqli_query($conn, "DELETE FROM cart_items WHERE cart_id = $main_cart_id");
+    if (!$delete_items) {
+        throw new Exception("Gagal DELETE cart_items: " . mysqli_error($conn));
+    }
+    
+    // Cek apakah carts masih punya item, jika tidak hapus juga
+    $check_remaining = mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM cart_items WHERE cart_id = $main_cart_id");
+    $remaining_count = 0;
+    if ($check_remaining) {
+        $rem_row = mysqli_fetch_assoc($check_remaining);
+        $remaining_count = intval($rem_row['cnt'] ?? 0);
+    }
+    if ($remaining_count === 0) {
+        mysqli_query($conn, "DELETE FROM carts WHERE id = $main_cart_id");
+    }
+    
     mysqli_commit($conn);
-    header("Location: payments.php?status=success_create");
+    
+    // Redirect ke payment_success.php dengan order_id
+    header("Location: payment_success.php?id=" . $new_order_id);
     exit();
 } catch (Exception $e) {
     mysqli_rollback($conn);
     echo "<h1>Terjadi Error Saat Simpan Transaksi:</h1>";
     echo "<p>" . h($e->getMessage()) . "</p>";
+    echo "<hr><pre>Detail error telah dicatat. Silakan periksa log.</pre>";
     exit();
 }
 ?>

@@ -496,7 +496,7 @@ $grand_total = fetch_grand_total($conn, $cart_id);
               <div class="modal-footer border-0 pt-0 d-flex gap-2">
                 <button type="button" class="btn btn-sm rounded-pill px-4 fw-medium text-white border-0" data-bs-dismiss="modal" style="background:#1f2937; box-shadow:none;">Batal</button>
                 <button type="button" class="btn btn-sm btn-success rounded-pill px-4 fw-medium shadow-sm"
-                        onclick="submitCheckoutWithSelectedMethod()" <?php echo count($pm) === 0 ? 'disabled' : ''; ?> >
+                        onclick="submitCheckoutWithSelectedMethod()">
                   Lanjut
                 </button>
               </div>
@@ -749,6 +749,19 @@ $grand_total = fetch_grand_total($conn, $cart_id);
       bersihkanMacet();
     }
   }, 300);
+
+  // FUNGSI UNTUK PROSES CHECKOUT PASIEN VIA FORM POST
+  function submitCheckoutWithSelectedMethod() {
+    const el = document.getElementById('payment_method_id');
+    if (!el || !el.value) {
+      alert('Pilih metode pembayaran terlebih dahulu.');
+      return;
+    }
+    const form = document.getElementById('formCheckout');
+    if (form) {
+      form.submit();
+    }
+  }
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

@@ -2,3 +2,13 @@
 {"log_id":"cartlog_6a5d8c07b7b9e2.81490089","compiled_notes_used":"","select_found":false,"select_row":null}
 {"log_id":"cartlog_6a5ecce8e33a84.95740109","action":"add","method":"POST","cart_id":4,"product_id":1,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":15000}
 {"log_id":"cartlog_6a5ecce8e33a84.95740109","compiled_notes_used":"","select_found":false,"select_row":null}
+{"log_id":"cartlog_6a5ece1fc93b50.70339845","action":"add","method":"POST","cart_id":4,"product_id":1,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":15000}
+{"log_id":"cartlog_6a5ece1fc93b50.70339845","compiled_notes_used":"","select_found":false,"select_row":null}
+{"log_id":"cartlog_6a5ece5d3c04e8.45508211","action":"add","method":"POST","cart_id":4,"product_id":1,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":15000}
+{"log_id":"cartlog_6a5ece5d3c04e8.45508211","compiled_notes_used":"","select_found":false,"select_row":null}
+{"log_id":"cartlog_6a5eceeaa93282.46218850","action":"add","method":"POST","cart_id":4,"product_id":1,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":15000}
+{"log_id":"cartlog_6a5eceeaa93282.46218850","compiled_notes_used":"","select_found":true,"select_row":{"id":5,"qty":1}}
+{"log_id":"cartlog_6a5ecf4fe3c338.58010595","action":"add","method":"POST","cart_id":4,"product_id":1,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":15000}
+{"log_id":"cartlog_6a5ecf4fe3c338.58010595","compiled_notes_used":"","select_found":false,"select_row":null}
+{"log_id":"cartlog_6a5ecfad039db8.10027417","action":"add","method":"POST","cart_id":4,"product_id":1,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":15000}
+{"log_id":"cartlog_6a5ecfad039db8.10027417","compiled_notes_used":"","select_found":true,"select_row":{"id":6,"qty":1}}
