@@ -135,6 +135,17 @@
                             
                             <div class="mt-4 pt-4" style="border-top: 1px solid rgba(148, 163, 184, 0.15);">
                                 <h5 class="fw-bold text-white mb-3 d-flex align-items-center gap-2">
+                                    <i class="bi bi-shop text-warning"></i> ⭐ Rating Tenant
+                                </h5>
+                                <div id="detail_tenant_rating_summary" class="mb-3">
+                                    <div class="text-white-50 small"><div class="spinner-border spinner-border-sm text-warning me-2"></div>Memuat rating tenant...</div>
+                                </div>
+                                <div id="detail_tenant_reviews_list" class="d-flex flex-column gap-3 mb-3">
+                                </div>
+                            </div>
+
+                            <div class="mt-4 pt-4" style="border-top: 1px solid rgba(148, 163, 184, 0.15);">
+                                <h5 class="fw-bold text-white mb-3 d-flex align-items-center gap-2">
                                     <i class="bi bi-chat-left-heart-fill text-warning"></i> Ulasan & Testimoni Pasien
                                 </h5>
                                 <div id="detail_product_reviews_container" class="d-flex flex-column gap-3">

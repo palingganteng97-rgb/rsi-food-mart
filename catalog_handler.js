@@ -87,6 +87,91 @@ fetch(`get_reviews.php?product_id=${data.id}`)
             });
     }
 
+    // ================================================================
+    // FETCH TENANT REVIEWS (⭐ Rating Tenant)
+    // ================================================================
+    const tenantRatingSummary = document.getElementById('detail_tenant_rating_summary');
+    const tenantReviewsList = document.getElementById('detail_tenant_reviews_list');
+    
+    if (data.tenant_id && tenantRatingSummary && tenantReviewsList) {
+        tenantRatingSummary.innerHTML = '<div class="text-white-50 small"><div class="spinner-border spinner-border-sm text-warning me-2"></div>Memuat rating tenant...</div>';
+        tenantReviewsList.innerHTML = '';
+        
+        fetch(`get_tenant_reviews.php?tenant_id=${data.tenant_id}`)
+            .then(response => response.json())
+            .then(payload => {
+                const avgRating = parseFloat(payload.avg_rating || 0);
+                const totalReviews = parseInt(payload.review_count || 0);
+                const reviews = payload && Array.isArray(payload.reviews) ? payload.reviews : [];
+                
+                // --- Ringkasan Rating ---
+                if (totalReviews > 0) {
+                    // Generate bintang penuh, setengah, kosong
+                    let starsHtml = '';
+                    const fullStars = Math.floor(avgRating);
+                    const halfStar = (avgRating - fullStars) >= 0.5;
+                    const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
+                    
+                    for (let i = 1; i <= fullStars; i++) {
+                        starsHtml += '<i class="bi bi-star-fill text-warning"></i>';
+                    }
+                    if (halfStar) {
+                        starsHtml += '<i class="bi bi-star-half text-warning"></i>';
+                    }
+                    for (let i = 1; i <= emptyStars; i++) {
+                        starsHtml += '<i class="bi bi-star text-white-50" style="opacity:0.3;"></i>';
+                    }
+                    
+                    tenantRatingSummary.innerHTML = `
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="text-warning d-flex gap-0" style="letter-spacing: 2px; font-size: 1.1rem;">${starsHtml}</span>
+                            <span class="text-white fw-bold" style="font-size: 1.1rem;">${avgRating.toFixed(1)}</span>
+                            <span class="text-white-50 small">• ${totalReviews} Ulasan</span>
+                        </div>
+                    `;
+                    
+                    // --- Daftar 5 Review Terbaru ---
+                    tenantReviewsList.innerHTML = '';
+                    reviews.forEach(r => {
+                        let reviewStarsHtml = '';
+                        const starCount = parseInt(r.rating);
+                        for (let i = 1; i <= 5; i++) {
+                            reviewStarsHtml += i <= starCount ? '<i class="bi bi-star-fill text-warning"></i>' : '<i class="bi bi-star text-white-50" style="opacity:0.3;"></i>';
+                        }
+                        
+                        const reviewText = r.review && r.review.trim() !== '' 
+                            ? `"${r.review}"` 
+                            : '<span class="text-white-50 fst-italic">Tidak ada komentar.</span>';
+                        
+                        const patientName = r.patient_name || 'Pasien';
+                        
+                        tenantReviewsList.innerHTML += `
+                            <div class="p-3 rounded-3" style="background: rgba(2, 6, 23, 0.4); border: 1px solid rgba(148, 163, 184, 0.1);">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-warning fw-bold d-flex gap-0" style="letter-spacing: 1px; font-size: 0.9rem;">${reviewStarsHtml}</span>
+                                    <span class="text-muted small" style="font-size: 0.75rem;">${patientName}</span>
+                                </div>
+                                <p class="text-light-50 m-0 small" style="line-height: 1.5;">${reviewText}</p>
+                            </div>
+                        `;
+                    });
+                } else {
+                    tenantRatingSummary.innerHTML = `
+                        <div class="text-white-50 small opacity-50 text-center py-1">
+                            <i class="bi bi-star me-1"></i> Belum ada ulasan tenant.
+                        </div>
+                    `;
+                    tenantReviewsList.innerHTML = '';
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching tenant reviews:', err);
+                if (tenantRatingSummary) {
+                    tenantRatingSummary.innerHTML = '<div class="text-danger small">Gagal memuat rating tenant.</div>';
+                }
+            });
+    }
+
     const addonsContainer = document.getElementById('detail_product_addons_container');
     if (addonsContainer) {
         addonsContainer.innerHTML = '<div class="text-white-50 small"><div class="spinner-border spinner-border-sm text-success me-2"></div>Memuat topping...</div>';
