@@ -14,6 +14,8 @@ $currentTenantId = $queryParams['tenant_id'] ?? '';
 
 $menu = [
     'home.php' => ['href' => 'home.php', 'label' => 'Etalase', 'icon' => 'bi-shop'],
+    'riwayat_pesanan.php' => ['href' => 'riwayat_pesanan.php', 'label' => 'Riwayat Pesanan', 'icon' => 'bi-credit-card-2-front'],
+    'refund_patients.php' => ['href' => 'refund_patients.php', 'label' => 'Refund', 'icon' => 'bi-arrow-return-left'],
 ];
 
   // =========================================================================
@@ -173,8 +175,8 @@ $menu = [
     <div class="sidebar-scroll-container py-3">
       <div class="navmenu">
         <?php foreach ($menu as $key => $item): ?>
-          <!-- FILTER MOBILE: Hanya izinkan key 'dashboard.php' dan 'profile.php' -->
-          <?php if (!in_array($key, ['dashboard.php', 'profile.php'])) { continue; } ?>
+          <!-- FILTER MOBILE: Hanya izinkan menu pasien -->
+          <?php if (!in_array($key, ['home.php', 'payment_success.php', 'refund_patients.php'])) { continue; } ?>
 
           <?php if (isset($item['sub'])): $isSubActive = array_key_exists($currentFile, $item['sub']); ?>
             <div class="w-100 mb-1 <?= $item['class'] ?? ''; ?>">

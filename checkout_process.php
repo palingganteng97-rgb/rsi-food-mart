@@ -182,8 +182,8 @@ try {
     
     mysqli_commit($conn);
     
-    // Redirect ke payment_success.php dengan order_id
-    header("Location: payment_success.php?id=" . $new_order_id);
+    // Redirect ke riwayat_pesanan.php dengan order_id untuk melihat detail pesanan
+    header("Location: riwayat_pesanan.php?id=" . $new_order_id);
     exit();
 } catch (Exception $e) {
     mysqli_rollback($conn);

@@ -12,12 +12,47 @@ if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $new_status = trim($_POST['status'] ?? 'SUCCESS');
 
     if ($payment_id > 0) {
-        $stmt = $conn->prepare("UPDATE payments SET status = ? WHERE id = ?");
-        $stmt->bind_param("si", $new_status, $payment_id);
-        if ($stmt->execute()) {
+        // Mulai transaksi
+        mysqli_begin_transaction($conn);
+        try {
+            // Ambil order_id dari tabel payments
+            $getOrder = $conn->prepare("SELECT order_id FROM payments WHERE id = ? LIMIT 1");
+            $getOrder->bind_param("i", $payment_id);
+            $getOrder->execute();
+            $orderResult = $getOrder->get_result();
+            $orderRow = $orderResult->fetch_assoc();
+            $order_id = intval($orderRow['order_id'] ?? 0);
+
+            // Update status di tabel payments
+            $stmt = $conn->prepare("UPDATE payments SET status = ? WHERE id = ?");
+            $stmt->bind_param("si", $new_status, $payment_id);
+            if (!$stmt->execute()) {
+                throw new Exception($stmt->error);
+            }
+
+            // Sinkronisasi status pembayaran ke tabel orders
+            if ($order_id > 0) {
+                // Mapping status payments ke payment_status di orders
+                $orderPaymentStatus = 'unpaid'; // default
+                if (strtoupper($new_status) === 'SUCCESS') {
+                    $orderPaymentStatus = 'paid';
+                } elseif (strtoupper($new_status) === 'FAILED') {
+                    $orderPaymentStatus = 'failed';
+                }
+                // Selain itu (PENDING/dll) tetap 'unpaid'
+
+                $stmtOrder = $conn->prepare("UPDATE orders SET payment_status = ? WHERE id = ?");
+                $stmtOrder->bind_param("si", $orderPaymentStatus, $order_id);
+                if (!$stmtOrder->execute()) {
+                    throw new Exception($stmtOrder->error);
+                }
+            }
+
+            mysqli_commit($conn);
             header("Location: payments.php?status=success_update");
-        } else {
-            header("Location: payments.php?status=error&msg=" . urlencode($stmt->error));
+        } catch (Exception $e) {
+            mysqli_rollback($conn);
+            header("Location: payments.php?status=error&msg=" . urlencode($e->getMessage()));
         }
         exit();
     }
