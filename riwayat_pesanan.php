@@ -147,6 +147,11 @@ if ($order_id > 0) {
         $totalQty += intval($it['qty'] ?? 0);
     }
 
+    // DEFINISI AWAL $isCancelled — berdasarkan status order dari database
+    // Digunakan di blok info order (cancel_reason) SEBELUM tombol aksi
+    $orderStatusLower = strtolower($orderStatus ?? '');
+    $isCancelled = ($orderStatusLower === 'cancelled');
+
     // =========================================================================
     // PROSES BATALKAN PESANAN (hanya jika status masih PENDING)
     // =========================================================================
@@ -216,7 +221,25 @@ if ($order_id > 0) {
         <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
         <style>
             :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
-            body { background:var(--bg) !important; color:var(--text); }
+            body { background:var(--bg) !important; color:#ffffff !important; }
+            /* Paksa semua teks di halaman detail menjadi putih terang */
+            body, main, .container, .card, .modal, .alert, p, span, div, strong, em, small, label, h1, h2, h3, h4, h5, h6 {
+                color: #ffffff !important;
+            }
+            /* Kecuali teks yang sengaja dibuat muted/abu-abu */
+            .text-white-50, .text-muted, .text-secondary { color: #94a3b8 !important; }
+            /* Teks sukses, warning, danger tetap pakai warna aslinya */
+            .text-success { color: #22c55e !important; }
+            .text-warning { color: #f59e0b !important; }
+            .text-danger { color: #ef4444 !important; }
+            .text-info { color: #38bdf8 !important; }
+            /* Alert pada mode gelap */
+            .alert { background: rgba(30, 30, 36, 0.9) !important; color: #ffffff !important; }
+            .alert-success { color: #22c55e !important; }
+            .alert-warning { color: #f59e0b !important; }
+            .alert-danger { color: #ef4444 !important; }
+            /* Tombol outline light */
+            .btn-outline-light { color: #ffffff !important; border-color: rgba(255,255,255,0.3) !important; }
         </style>
     </head>
     <body class="bg-dark text-white" style="min-height: 100vh; padding: 2rem 0;">
