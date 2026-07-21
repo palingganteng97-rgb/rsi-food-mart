@@ -83,8 +83,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review'])) {
             } else {
                 // Simpan review
                 $stmtInsert = $conn->prepare("
-                    INSERT INTO product_reviews (product_id, patient_session_id, rating, review, created_at)
-                    VALUES (?, ?, ?, ?, NOW())
+                    INSERT INTO product_reviews (product_id, patient_session_id, rating, review)
+                    VALUES (?, ?, ?, ?)
                 ");
                 $stmtInsert->bind_param('iiis', $product_id, $patient_session_id, $rating, $review);
                 if ($stmtInsert->execute()) {
@@ -140,7 +140,7 @@ $sql = "
     LEFT JOIN product_reviews pr ON pr.product_id = oi.product_id AND pr.patient_session_id = ?
     WHERE o.patient_session_id = ?
       AND (LOWER(o.status) = 'completed' OR LOWER(o.status) = 'delivered' OR LOWER(o.status) = 'selesai')
-    ORDER BY o.created_at DESC, oi.id ASC
+    ORDER BY pr.id DESC
 ";
 
 $stmt = $conn->prepare($sql);
