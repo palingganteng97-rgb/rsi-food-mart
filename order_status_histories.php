@@ -15,7 +15,12 @@ $status = isset($_GET['status']) ? $_GET['status'] : "";
 $msg    = isset($_GET['msg']) ? $_GET['msg'] : "";
 
 // Query JOIN ke tabel users/staff untuk mengambil nama pengubah status
-$query = "SELECT osh.*, u.name AS changed_by_name 
+// Kolom changed_by bisa berisi numeric (user_id) atau string seperti 'Customer'
+$query = "SELECT osh.*, 
+          CASE 
+              WHEN osh.changed_by REGEXP '^[0-9]+$' THEN u.name 
+              ELSE osh.changed_by 
+          END AS changed_by_name 
           FROM order_status_histories osh
           LEFT JOIN users u ON osh.changed_by = u.id 
           ORDER BY osh.id DESC";

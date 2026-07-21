@@ -171,7 +171,7 @@ if ($order_id > 0) {
                 $stmtCancel->execute();
 
                 // INSERT ke tabel order_status_histories untuk mencatat log pembatalan
-                $stmtHist = $conn->prepare("INSERT INTO order_status_histories (order_id, status, changed_by, notes) VALUES (?, 'cancelled', NULL, ?)");
+                $stmtHist = $conn->prepare("INSERT INTO order_status_histories (order_id, status, changed_by, notes, created_at) VALUES (?, 'cancelled', 'Customer', ?, NOW())");
                 if ($stmtHist) {
                     $stmtHist->bind_param('is', $order_id, $alasanCancel);
                     $stmtHist->execute();
