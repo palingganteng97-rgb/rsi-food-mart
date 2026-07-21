@@ -55,7 +55,7 @@ $writeBackParams = function() use ($q, $status, $paymentStatus, $page) {
 };
 
 // =========================================================================
-// 2. PROSES UPDATE STATUS PESANAN (KHUSUS ADMIN)
+// 2. PROSES UPDATE STATUS PESANAN (KHUSUS ADMIN) — OTOMATIS BUAT/UBAH DELIVERY
 // =========================================================================
 if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id'], $_POST['status'])) {
     if (!$isAdmin) {
@@ -68,16 +68,111 @@ if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST' && isse
     $ok = ($orderId > 0 && in_array($newStatus, $allowedOrderStatuses, true));
     
     if ($ok) {
-        $stmt = $conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
-        $stmt->bind_param('si', $newStatus, $orderId);
-        $stmt->execute();
-        
-        // Catat otomatis riwayat ke tabel order_status_histories
         $user_id = (int)$_SESSION['user_id'];
         $log_notes = mysqli_real_escape_string($conn, "Status pesanan diperbarui oleh Admin.");
-        $stmt_log = $conn->prepare('INSERT INTO order_status_histories (order_id, status, changed_by, notes, created_at) VALUES (?, ?, ?, ?, NOW())');
-        $stmt_log->bind_param('isis', $orderId, $newStatus, $user_id, $log_notes);
-        $stmt_log->execute();
+        
+        // Gunakan TRANSACTION untuk menjaga konsistensi data
+        mysqli_begin_transaction($conn);
+        try {
+            // 1. Update status order
+            $stmt = $conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
+            $stmt->bind_param('si', $newStatus, $orderId);
+            if (!$stmt->execute()) {
+                throw new Exception("Gagal update status order: " . $stmt->error);
+            }
+            
+            // 2. Cek data order untuk verifikasi foreign key
+            $orderData = null;
+            $chkOrder = $conn->prepare("SELECT id, tenant_id, patient_session_id FROM orders WHERE id = ?");
+            $chkOrder->bind_param("i", $orderId);
+            $chkOrder->execute();
+            $resOrder = $chkOrder->get_result();
+            if ($resOrder && $resOrder->num_rows > 0) {
+                $orderData = $resOrder->fetch_assoc();
+            }
+            $chkOrder->close();
+            
+            if (!$orderData) {
+                throw new Exception("Order ID $orderId tidak ditemukan.");
+            }
+            
+            // ============================================================
+            // OTOMATIS KELOLA DELIVERY BERDASARKAN STATUS ORDER
+            // ============================================================
+            
+            // Map status order ke status delivery
+            $deliveryStatusMap = [
+                'accepted'   => 'PENDING',
+                'preparing'  => 'PENDING',
+                'ready'      => 'PENDING',
+                'picked_up'  => 'ON_PROGRESS',
+                'delivering' => 'ON_PROGRESS',
+                'completed'  => 'DELIVERED',
+            ];
+            
+            // Cek apakah sudah ada delivery untuk order ini
+            $existingDel = null;
+            $chkDel = $conn->prepare("SELECT id, status FROM deliveries WHERE order_id = ? LIMIT 1");
+            $chkDel->bind_param("i", $orderId);
+            $chkDel->execute();
+            $resDel = $chkDel->get_result();
+            if ($resDel && $resDel->num_rows > 0) {
+                $existingDel = $resDel->fetch_assoc();
+            }
+            $chkDel->close();
+            
+            // Jika status masuk ke tahap pengantaran, buat atau update delivery
+            if (isset($deliveryStatusMap[$newStatus])) {
+                $delStatus = $deliveryStatusMap[$newStatus];
+                
+                if ($existingDel) {
+                    // UPDATE delivery yang sudah ada
+                    $updateDel = $conn->prepare("UPDATE deliveries SET status = ? WHERE id = ?");
+                    $updateDel->bind_param("si", $delStatus, $existingDel['id']);
+                    if (!$updateDel->execute()) {
+                        throw new Exception("Gagal update delivery: " . $updateDel->error);
+                    }
+                    $updateDel->close();
+                } else {
+                    // BUAT delivery baru
+                    // PERHATIAN: kolom courier_id di database adalah NOT NULL, tidak boleh NULL
+                    // Ambil kurier pertama yang tersedia sebagai default
+                    $defaultCourierId = 0;
+                    $courierQuery = $conn->query("SELECT id FROM couriers ORDER BY id ASC LIMIT 1");
+                    if ($courierQuery && $courierQuery->num_rows > 0) {
+                        $courierRow = $courierQuery->fetch_assoc();
+                        $defaultCourierId = (int)$courierRow['id'];
+                    }
+                    
+                    if ($defaultCourierId <= 0) {
+                        throw new Exception("Tidak dapat membuat delivery: tidak ada kurier terdaftar di tabel couriers. Silakan tambah kurier terlebih dahulu.");
+                    }
+                    
+                    $insertDel = $conn->prepare("INSERT INTO deliveries (order_id, courier_id, status, created_at) VALUES (?, ?, ?, NOW())");
+                    $insertDel->bind_param("iis", $orderId, $defaultCourierId, $delStatus);
+                    if (!$insertDel->execute()) {
+                        throw new Exception("Gagal insert delivery: " . $insertDel->error);
+                    }
+                    $insertDel->close();
+                }
+            }
+            
+            // 3. Catat riwayat status ke tabel order_status_histories
+            $stmt_log = $conn->prepare('INSERT INTO order_status_histories (order_id, status, changed_by, notes, created_at) VALUES (?, ?, ?, ?, NOW())');
+            $stmt_log->bind_param('isis', $orderId, $newStatus, $user_id, $log_notes);
+            if (!$stmt_log->execute()) {
+                throw new Exception("Gagal insert history: " . $stmt_log->error);
+            }
+            
+            mysqli_commit($conn);
+        } catch (Exception $e) {
+            mysqli_rollback($conn);
+            // Log error
+            error_log("Delivery auto-create error: " . $e->getMessage());
+            // Redirect dengan pesan error
+            header('Location: orders.php?status=error&msg=' . urlencode($e->getMessage()));
+            exit;
+        }
     }
     header('Location: orders.php' . $writeBackParams());
     exit;

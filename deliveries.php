@@ -7,7 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $action = isset($_GET['action']) ? trim((string)$_GET['action']) : '';
 
-// 1. PROSES TAMBAH DATA (CREATE)
+// 1. PROSES TAMBAH DATA (CREATE) — DENGAN VALIDASI FK & TRANSACTION
 if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $order_id      = intval($_POST['order_id'] ?? 0);
     $courier_id    = intval($_POST['courier_id'] ?? 0);
@@ -16,20 +16,73 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $delivery_time = !empty($_POST['delivery_time']) ? $_POST['delivery_time'] : null;
     $proof_photo   = trim($_POST['proof_photo'] ?? '');
 
-    if ($order_id > 0 && $courier_id > 0) {
+    $errors = [];
+    if ($order_id <= 0) {
+        $errors[] = 'order_id tidak valid';
+    }
+    if ($courier_id <= 0) {
+        $errors[] = 'courier_id tidak valid';
+    }
+
+    // Validasi Foreign Key: order_id harus ada di tabel orders
+    if ($order_id > 0) {
+        $chkOrder = $conn->prepare("SELECT id FROM orders WHERE id = ?");
+        $chkOrder->bind_param("i", $order_id);
+        $chkOrder->execute();
+        if ($chkOrder->get_result()->num_rows === 0) {
+            $errors[] = "order_id ($order_id) tidak ditemukan di tabel orders. Foreign Key violation.";
+        }
+        $chkOrder->close();
+    }
+
+    // Validasi Foreign Key: courier_id harus ada di tabel couriers
+    if ($courier_id > 0) {
+        $chkCourier = $conn->prepare("SELECT id FROM couriers WHERE id = ?");
+        $chkCourier->bind_param("i", $courier_id);
+        $chkCourier->execute();
+        if ($chkCourier->get_result()->num_rows === 0) {
+            $errors[] = "courier_id ($courier_id) tidak ditemukan di tabel couriers. Foreign Key violation.";
+        }
+        $chkCourier->close();
+    }
+
+    // Cegah duplikasi: cek apakah sudah ada delivery untuk order_id ini
+    if ($order_id > 0) {
+        $chkDup = $conn->prepare("SELECT id FROM deliveries WHERE order_id = ? LIMIT 1");
+        $chkDup->bind_param("i", $order_id);
+        $chkDup->execute();
+        if ($chkDup->get_result()->num_rows > 0) {
+            $errors[] = "Delivery untuk order_id ($order_id) sudah ada. Tidak boleh duplikat.";
+        }
+        $chkDup->close();
+    }
+
+    if (!empty($errors)) {
+        $errMsg = implode(' | ', $errors);
+        header("Location: deliveries.php?status=error&msg=" . urlencode($errMsg));
+        exit();
+    }
+
+    // Gunakan TRANSACTION agar data konsisten
+    mysqli_begin_transaction($conn);
+    try {
         $stmt = $conn->prepare("INSERT INTO deliveries (order_id, courier_id, status, pickup_time, delivery_time, proof_photo) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->bind_param("iissss", $order_id, $courier_id, $status, $pickup_time, $delivery_time, $proof_photo);
         
-        if ($stmt->execute()) {
-            header("Location: deliveries.php?status=success_create");
-        } else {
-            header("Location: deliveries.php?status=error&msg=" . urlencode($stmt->error));
+        if (!$stmt->execute()) {
+            throw new Exception("SQL INSERT error: " . $stmt->error);
         }
-        exit();
+        
+        mysqli_commit($conn);
+        header("Location: deliveries.php?status=success_create");
+    } catch (Exception $e) {
+        mysqli_rollback($conn);
+        header("Location: deliveries.php?status=error&msg=" . urlencode($e->getMessage()));
     }
+    exit();
 }
 
-// 2. PROSES UBAH DATA (UPDATE)
+// 2. PROSES UBAH DATA (UPDATE) — DENGAN VALIDASI FK & TRANSACTION
 if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $id            = intval($_POST['id'] ?? 0);
     $order_id      = intval($_POST['order_id'] ?? 0);
@@ -39,34 +92,123 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $delivery_time = !empty($_POST['delivery_time']) ? $_POST['delivery_time'] : null;
     $proof_photo   = trim($_POST['proof_photo'] ?? '');
 
-    if ($id > 0 && $order_id > 0 && $courier_id > 0) {
+    $errors = [];
+    if ($id <= 0) {
+        $errors[] = 'id delivery tidak valid';
+    }
+    if ($order_id <= 0) {
+        $errors[] = 'order_id tidak valid';
+    }
+    if ($courier_id <= 0) {
+        $errors[] = 'courier_id tidak valid';
+    }
+
+    // Validasi Foreign Key
+    if ($order_id > 0) {
+        $chkOrder = $conn->prepare("SELECT id FROM orders WHERE id = ?");
+        $chkOrder->bind_param("i", $order_id);
+        $chkOrder->execute();
+        if ($chkOrder->get_result()->num_rows === 0) {
+            $errors[] = "order_id ($order_id) tidak ditemukan di tabel orders. Foreign Key violation.";
+        }
+        $chkOrder->close();
+    }
+    if ($courier_id > 0) {
+        $chkCourier = $conn->prepare("SELECT id FROM couriers WHERE id = ?");
+        $chkCourier->bind_param("i", $courier_id);
+        $chkCourier->execute();
+        if ($chkCourier->get_result()->num_rows === 0) {
+            $errors[] = "courier_id ($courier_id) tidak ditemukan di tabel couriers. Foreign Key violation.";
+        }
+        $chkCourier->close();
+    }
+    // Cek apakah record delivery dengan id ini ada
+    if ($id > 0) {
+        $chkDel = $conn->prepare("SELECT id FROM deliveries WHERE id = ?");
+        $chkDel->bind_param("i", $id);
+        $chkDel->execute();
+        if ($chkDel->get_result()->num_rows === 0) {
+            $errors[] = "Delivery dengan id ($id) tidak ditemukan.";
+        }
+        $chkDel->close();
+    }
+
+    if (!empty($errors)) {
+        $errMsg = implode(' | ', $errors);
+        header("Location: deliveries.php?status=error&msg=" . urlencode($errMsg));
+        exit();
+    }
+
+    // Gunakan TRANSACTION
+    mysqli_begin_transaction($conn);
+    try {
         $stmt = $conn->prepare("UPDATE deliveries SET order_id = ?, courier_id = ?, status = ?, pickup_time = ?, delivery_time = ?, proof_photo = ? WHERE id = ?");
         $stmt->bind_param("iissssi", $order_id, $courier_id, $status, $pickup_time, $delivery_time, $proof_photo, $id);
         
-        if ($stmt->execute()) {
-            header("Location: deliveries.php?status=success_update");
-        } else {
-            header("Location: deliveries.php?status=error&msg=" . urlencode($stmt->error));
+        if (!$stmt->execute()) {
+            throw new Exception("SQL UPDATE error: " . $stmt->error);
         }
-        exit();
+        
+        mysqli_commit($conn);
+        header("Location: deliveries.php?status=success_update");
+    } catch (Exception $e) {
+        mysqli_rollback($conn);
+        header("Location: deliveries.php?status=error&msg=" . urlencode($e->getMessage()));
     }
+    exit();
 }
 
-// 3. PROSES HAPUS DATA (DELETE)
+// 3. PROSES HAPUS DATA (DELETE) — DENGAN TRANSACTION
 if ($action === 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id'] ?? 0);
 
+    $errors = [];
+    if ($id <= 0) {
+        $errors[] = 'id delivery tidak valid';
+    }
+
+    // Cek apakah record delivery dengan id ini ada
     if ($id > 0) {
-        $stmt = $conn->prepare("DELETE FROM deliveries WHERE id = ?");
-        $stmt->bind_param("i", $id);
-        
-        if ($stmt->execute()) {
-            header("Location: deliveries.php?status=success_delete");
-        } else {
-            header("Location: deliveries.php?status=error&msg=" . urlencode($stmt->error));
+        $chkDel = $conn->prepare("SELECT id FROM deliveries WHERE id = ?");
+        $chkDel->bind_param("i", $id);
+        $chkDel->execute();
+        $chkRes = $chkDel->get_result();
+        if ($chkRes->num_rows === 0) {
+            $errors[] = "Delivery dengan id ($id) tidak ditemukan.";
         }
+        $chkDel->close();
+    }
+
+    if (!empty($errors)) {
+        $errMsg = implode(' | ', $errors);
+        header("Location: deliveries.php?status=error&msg=" . urlencode($errMsg));
         exit();
     }
+
+    // Gunakan TRANSACTION
+    mysqli_begin_transaction($conn);
+    try {
+        // Hapus data tracking terkait terlebih dahulu (FK constraint)
+        $delTrack = $conn->prepare("DELETE FROM delivery_tracking WHERE delivery_id = ?");
+        $delTrack->bind_param("i", $id);
+        $delTrack->execute();
+        $delTrack->close();
+
+        // Hapus delivery
+        $stmt = $conn->prepare("DELETE FROM deliveries WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        if (!$stmt->execute()) {
+            throw new Exception("SQL DELETE error: " . $stmt->error);
+        }
+        $stmt->close();
+
+        mysqli_commit($conn);
+        header("Location: deliveries.php?status=success_delete");
+    } catch (Exception $e) {
+        mysqli_rollback($conn);
+        header("Location: deliveries.php?status=error&msg=" . urlencode($e->getMessage()));
+    }
+    exit();
 }
 
 // 4. PROSES READ DATA DENGAN JOIN (Untuk Relasi Nama Kurir & Invoice Pesanan)
@@ -124,6 +266,53 @@ if ($courierRes) {
     #dragScrollDeliveryContainer table th, #dragScrollDeliveryContainer table td { border-left: none !important; border-right: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; }
     .text-white-element { user-select: none; }
     @media (min-width: 992px) { main.content-shift { margin-left: 280px; } }
+    
+    /* PERBAIKAN 1: Background baris tabel abu-abu gelap transparan */
+    #dragScrollDeliveryContainer table tbody tr { background: rgba(31, 41, 55, 0.5) !important; transition: background 0.15s ease; }
+    #dragScrollDeliveryContainer table tbody tr:hover { background: rgba(31, 41, 55, 0.8) !important; }
+    #dragScrollDeliveryContainer table tbody tr td { background: transparent !important; color: #e5e7eb !important; }
+    #dragScrollDeliveryContainer table tbody tr:nth-child(even) { background: rgba(31, 41, 55, 0.3) !important; }
+    #dragScrollDeliveryContainer table tbody tr:nth-child(even):hover { background: rgba(31, 41, 55, 0.7) !important; }
+    
+    /* PERBAIKAN 2: Semua label form di dalam modal berwarna putih */
+    #modalDelivery .form-label,
+    #modalHapusDelivery .form-label {
+      color: #ffffff !important;
+    }
+    
+    /* PERBAIKAN 3: Input datetime-local — teks putih, ikon kalender kontras */
+    input[type="datetime-local"] {
+      color-scheme: dark !important;
+    }
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+      filter: invert(1) brightness(200%) contrast(100%) !important;
+      cursor: pointer !important;
+      opacity: 1 !important;
+    }
+    input[type="datetime-local"]::-webkit-datetime-edit {
+      color: #e5e7eb !important;
+    }
+    input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
+      color: #e5e7eb !important;
+    }
+    input[type="datetime-local"]::-webkit-datetime-edit-text {
+      color: #94a3b8 !important;
+    }
+    input[type="datetime-local"]::-webkit-datetime-edit-month-field,
+    input[type="datetime-local"]::-webkit-datetime-edit-day-field,
+    input[type="datetime-local"]::-webkit-datetime-edit-year-field,
+    input[type="datetime-local"]::-webkit-datetime-edit-hour-field,
+    input[type="datetime-local"]::-webkit-datetime-edit-minute-field {
+      color: #e5e7eb !important;
+      background: transparent !important;
+    }
+    input[type="datetime-local"]:focus {
+      color: #e5e7eb !important;
+    }
+    /* Fallback untuk Firefox */
+    input[type="datetime-local"] {
+      color: #e5e7eb !important;
+    }
   </style>
 </head>
 <body>
@@ -229,7 +418,7 @@ if ($courierRes) {
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
     </div>
 
-    <form id="formDelivery" action="deliveries.php" method="POST">
+    <form id="formDelivery" action="proses_tambah_pengiriman.php" method="POST" enctype="multipart/form-data">
         <input type="hidden" name="action" id="delivery-action" value="create">
         <input type="hidden" name="id" id="delivery-id" value="">
 
@@ -256,8 +445,13 @@ if ($courierRes) {
             </div>
 
             <div class="col-md-12">
-            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Status</label>
-            <input type="text" class="form-control" name="status" id="delivery-status" placeholder="Contoh: PENDING, ON_PROGRESS, DELIVERED" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
+            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Status <span class="text-danger">*</span></label>
+            <select class="form-select" name="status" id="delivery-status" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                <option value="" disabled selected>-- Pilih Status --</option>
+                <option value="PENDING">Pending</option>
+                <option value="ON_PROGRESS">Dalam Perjalanan</option>
+                <option value="DELIVERED">Sampai Tujuan</option>
+            </select>
             </div>
 
             <div class="col-md-6">
@@ -272,7 +466,7 @@ if ($courierRes) {
 
             <div class="col-md-12">
             <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Proof Photo</label>
-            <input type="text" class="form-control" name="proof_photo" id="delivery-proof-photo" placeholder="Nama file / path foto" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
+            <input type="file" class="form-control" name="proof_photo" id="delivery-proof-photo" accept=".jpg,.jpeg,.png" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
             </div>
         </div>
         </div>
@@ -376,6 +570,18 @@ function openHapusDelivery(id, orderNumber) {
         txtOrderInfo.innerText = orderNumber;
     }
 }
+
+// Hapus query string ?status=...&msg=... dari URL bar tanpa refresh halaman
+// Mencegah parameter status/error tertinggal saat user refresh (F5)
+(function() {
+    const currentUrl = new URL(window.location.href);
+    if (currentUrl.searchParams.has('status') || currentUrl.searchParams.has('msg')) {
+        // Buat URL bersih tanpa query string
+        const cleanUrl = window.location.protocol + '//' + window.location.host + window.location.pathname;
+        // Ganti URL di address bar tanpa reload halaman
+        window.history.replaceState({}, '', cleanUrl);
+    }
+})();
 </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

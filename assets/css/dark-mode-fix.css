@@ -1,0 +1,93 @@
+/* ============================================================
+   DARK MODE TEXT COLOR FIX - Global Override
+   Memperbaiki warna teks hitam/gelap di halaman dark mode
+   RSI FOOD & MART
+   ============================================================ */
+
+/* === 1. TEKS UTAMA GLOBAL === */
+body,
+body * {
+    color: #f3f4f6 !important; /* Abu-abu terang default untuk semua teks */
+}
+
+/* Heading - lebih terang/putih untuk visibilitas maksimal */
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6,
+h1 *, h2 *, h3 *, h4 *, h5 *, h6 * {
+    color: #ffffff !important;
+}
+
+/* === 2. ELEMEN FORM (input, select, textarea, option) === */
+input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"],
+input[type="file"],
+select,
+textarea {
+    color: #f3f4f6 !important;
+    background-color: rgba(2, 6, 23, 0.4) !important;
+    border-color: rgba(148, 163, 184, 0.25) !important;
+}
+
+/* Dropdown option - Pastikan teks terang dengan background gelap */
+select option {
+    color: #f3f4f6 !important;
+    background-color: #1e293b !important;
+}
+
+/* Saat option di-hover/selected di dropdown */
+select option:hover,
+select option:checked,
+select option:focus,
+select option:active {
+    background-color: #334155 !important;
+    color: #ffffff !important;
+}
+
+/* Checkbox dan radio */
+input[type="checkbox"],
+input[type="radio"] {
+    accent-color: #22c55e !important;
+}
+
+/* Placeholder pada form */
+input::placeholder,
+textarea::placeholder,
+select::placeholder {
+    color: #94a3b8 !important;
+    opacity: 0.8 !important;
+}
+
+/* Input readonly atau disabled */
+input:disabled,
+select:disabled,
+textarea:disabled {
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+}
+
+/* === 3. MODAL BOOTSTRAP === */
+.modal-content,
+.modal-header,
+.modal-body,
+.modal-footer {
+    color: #f3f4f6 !important;
+}
+
+.modal-content *,
+.modal-header *,
+.modal-body *,
+.modal-footer * {
+    color: #f3f4f6 !important;
+}
+
+.modal-title {
+    color: #ffffff !important;

@@ -16,6 +16,8 @@ $menu = [
     'home.php' => ['href' => 'home.php', 'label' => 'Etalase', 'icon' => 'bi-shop'],
     'riwayat_pesanan.php' => ['href' => 'riwayat_pesanan.php', 'label' => 'Riwayat Pesanan', 'icon' => 'bi-credit-card-2-front'],
     'refund_patients.php' => ['href' => 'refund_patients.php', 'label' => 'Refund', 'icon' => 'bi-arrow-return-left'],
+    'product_review_patients.php' => ['href' => 'product_review_patients.php', 'label' => 'Ulasan Produk', 'icon' => 'bi-star'],
+    'tenant_review_patients.php' => ['href' => 'tenant_review_patients.php', 'label' => 'Ulasan Tenant', 'icon' => 'bi-star-half']
 ];
 
   // =========================================================================
