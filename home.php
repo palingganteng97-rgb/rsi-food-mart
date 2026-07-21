@@ -60,7 +60,7 @@ if ($fetchQuery) {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
 <style>
-    :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
+    :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; --sidebar-w: 0px; }
     body { background:var(--bg) !important; color:var(--text); }
     .content-bg { background: transparent; }
     .search-box { background: rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.25); border-radius: 18px; }
@@ -78,45 +78,22 @@ if ($fetchQuery) {
     #dragScrollUserContainer table, #dragScrollContainer table, .drag-scroll-container table { border-collapse: collapse !important; border: none !important; }
     #dragScrollUserContainer table th, #dragScrollUserContainer table td, #dragScrollContainer table th, #dragScrollContainer table td, .drag-scroll-container table th, .drag-scroll-container table td { border-left: none !important; border-right: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; }
     .text-white-element { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
-    
     .modal-dialog { max-width: 450px !important; }
     .modal-body::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
     .modal-body { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow: hidden !important; }
-    
     .bi-clock-history, .text-white-icon { color: #ffffff !important; opacity: 1 !important; filter: drop-shadow(0 0 1px rgba(255,255,255,0.2)); }
-    input[type="time"]::-webkit-calendar-picker-indicator,
-    input[type="date"]::-webkit-calendar-picker-indicator {filter: invert(1) brightness(100%) contrast(100%) !important;cursor: pointer;}
-    /* Standalone pasien: bottom nav tetap tampil, tapi sesuaikan agar tidak ikut margin sidebar */
-    :root { --sidebar-w: 0px; }
-
-    @media (min-width: 992px) { 
-        .bottom-nav { display:none; } /* tetap sesuai desain lama */
-    }
-
+    input[type="time"]::-webkit-calendar-picker-indicator, input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1) brightness(100%) contrast(100%) !important; cursor: pointer; }
+    @media (min-width: 992px) { .bottom-nav { display:none; } }
     .bottom-nav-fixed { margin-left: 0 !important; }
-
-    /* ========================================================
-       TAMBAHAN BARU: ANIMASI KARTU MELUNCUR TERBANG KE KERANJANG
-       ======================================================== */
-    .flying-cart-item {
-        position: fixed;
-        z-index: 9999;
-        top: 0;
-        left: 0;
-        pointer-events: none; /* Mencegah elemen mengganggu interaksi klik user */
-        object-fit: cover;
-        border-radius: 14px;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-        transition: all 0.75s cubic-bezier(0.25, 1, 0.5, 1);
-        opacity: 1;
-    }
+    .flying-cart-item { position: fixed; z-index: 9999; top: 0; left: 0; pointer-events: none; object-fit: cover; border-radius: 14px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4); transition: all 0.75s cubic-bezier(0.25, 1, 0.5, 1); opacity: 1; }
 </style>
-
 
 </head>
 <body>
 
-<main class="page-body">
+<?php include "sidebar_pasients.php"; ?>
+
+<main class="page-body content-shift">
     <div class="container py-3">
         <!-- HEADER ETALASE MENU -->
         <div class="d-flex align-items-center justify-content-between mb-3">
@@ -238,7 +215,6 @@ if ($fetchQuery) {
 <?php include 'detail_product_modal.php'; ?>
 
 <?php include "bottom_nav.php"; ?>
-
 
 <!-- Hubungkan ke file eksternal JavaScript catalog handler -->
 <script src="catalog_handler.js?v=1.1"></script>
