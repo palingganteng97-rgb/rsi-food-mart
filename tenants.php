@@ -143,7 +143,7 @@ $tenantsData = [];
 $sql = "SELECT id, name, type, description, logo, phone, email, preparation_time, status, created_at, updated_at 
         FROM tenants 
         WHERE deleted_at IS NULL 
-        ORDER BY id DESC";
+        ORDER BY id ASC";
 $fetchQuery = $conn->query($sql);
 if ($fetchQuery) {
     while ($row = $fetchQuery->fetch_assoc()) {
@@ -163,7 +163,8 @@ if ($fetchQuery) {
 
 <style>
     :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
-    body { background:var(--bg) !important; color:var(--text); }
+    body, body.modal-open { background:var(--bg) !important; color:var(--text); overflow:auto !important; padding-right:0px !important; pointer-events:auto !important; }
+    .modal-backdrop, .modal-backdrop.show { display:none !important; opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
     .content-bg { background: transparent; }
     .search-box { background: rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.25); border-radius: 18px; }
     .diet-pill { border:1px solid rgba(34,197,94,.35); background: rgba(34,197,94,.08); color:#86efac; }
@@ -195,7 +196,7 @@ if ($fetchQuery) {
   <?php require __DIR__ . '/sidebar.php'; ?>
 
 <main class="content-shift p-4">
-  <div class="container-fluid rounded-4 p-4 text-white" style="background: transparent !important; border: none !important; box-shadow: none !important;">
+  <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
     
     <!-- HEADER TABEL & TOMBOL TAMBAH TENANT -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
@@ -223,45 +224,30 @@ if ($fetchQuery) {
       </div>
     <?php endif; ?>
 
-    <!-- TABEL LIST DATA TENANTS (GELAP TRANSPARAN MENYATU) -->
-    <div class="table-responsive" id="dragScrollStockContainer" style="overflow-x: auto; cursor: grab; scrollbar-width: none; -ms-overflow-style: none;">
-      <style>
-          #dragScrollStockContainer::-webkit-scrollbar { display: none; }
-          .table-custom-hover tbody tr:hover { background: rgba(148, 163, 184, 0.08) !important; transition: background 0.15s ease-in-out; }
-          /* Menghapus paksa background putih bawaan bootstrap agar tidak menimpa tema transparan */
-          .table-custom-clean th, .table-custom-clean td { color: #ffffff !important; background: transparent !important; }
-      </style>
-      
-      <!-- PERBAIKAN: Mengganti class .table menjadi .table-custom-clean kustom untuk membuang warna putih solid -->
-      <table class="table-custom-clean table-custom-hover align-middle mb-0" style="width: 100%; background: rgba(30, 41, 59, 0.45) !important; border-collapse: collapse !important; min-width: 1100px; user-select: none; border-radius: 12px; overflow: hidden;">
-        <thead style="font-size: 0.85rem; background: rgba(15, 23, 42, 0.6) !important;">
-            <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
-              <th class="py-3 px-4 text-center">ID</th>
-              <th class="py-3">Nama Tenant</th>
-              <th class="py-3 text-center">Tipe</th>
-              <th class="py-3">Kontak &amp; Email</th>
-              <th class="py-3 text-center">Persiapan</th>
-              <th class="py-3 text-center">Status</th>
-              <th class="py-3 text-center" style="width: 120px;">Aksi</th>
+    <!-- STRUKTUR TABEL LIST DATA TENANTS (DRAG SCROLL & TRANSPARAN) -->
+    <div id="dragScrollStockContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
+      <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1100px; user-select: none; border-collapse: collapse !important;">
+        <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
+            <tr>
+              <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;">ID</th>
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Nama Tenant</th>
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Tipe</th>
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Kontak &amp; Email</th>
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Persiapan</th>
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Status</th>
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Aksi</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody style="background: transparent !important;">
           <?php
-          // PERBAIKAN: Menggunakan DESC agar tata letak baris ID 1 berada di bawah dan ID 2 di atas sesuai screenshot
-          $sql = "SELECT id, name, type, description, logo, phone, email, preparation_time, status, created_at, updated_at 
-                  FROM tenants 
-                  WHERE deleted_at IS NULL 
-                  ORDER BY id DESC";
-          $fetchQuery = $conn->query($sql);
-          
-          if ($fetchQuery && $fetchQuery->num_rows > 0) {
-              while ($tenantRow = $fetchQuery->fetch_assoc()) {
+          if (!empty($tenantsData)) {
+              foreach ($tenantsData as $tenantRow) {
                   $statusBadge = ($tenantRow['status'] == 1) ? 'bg-success' : 'bg-secondary';
                   $statusText = ($tenantRow['status'] == 1) ? 'Aktif' : 'Non-Aktif';
                   ?>
-                  <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; font-size: 0.9rem;">
-                    <td class="text-center fw-semibold" style="color: #94a3b8 !important;"><?= $tenantRow['id'] ?></td>
-                    <td class="fw-bold">
+                  <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
+                    <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $tenantRow['id'] ?></td>
+                    <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;">
                         <div class="d-flex align-items-center gap-2">
                             <i class="bi bi-shop text-white-50"></i>
                             <div>
@@ -270,21 +256,21 @@ if ($fetchQuery) {
                             </div>
                         </div>
                     </td>
-                    <td class="text-center text-uppercase fw-semibold"><span class="badge bg-dark border border-secondary text-light"><?= htmlspecialchars($tenantRow['type']) ?></span></td>
-                    <td>
+                    <td class="text-center fw-medium" style="background: transparent !important; border: none !important; color: #cbd5e1 !important;"><span class="badge bg-dark border border-secondary text-light"><?= htmlspecialchars($tenantRow['type']) ?></span></td>
+                    <td style="background: transparent !important; border: none !important;">
                         <span class="d-block fw-medium"><i class="bi bi-telephone me-1 text-white-50"></i><?= htmlspecialchars($tenantRow['phone'] ?: '-') ?></span>
                         <span class="d-block small text-white-50"><i class="bi bi-envelope me-1"></i><?= htmlspecialchars($tenantRow['email'] ?: '-') ?></span>
                     </td>
-                    <td class="text-center fw-bold text-warning"><?= $tenantRow['preparation_time'] ?> Menit</td>
-                    <td class="text-center">
+                    <td class="text-center fw-bold text-warning" style="background: transparent !important; border: none !important;"><?= $tenantRow['preparation_time'] ?> Menit</td>
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
                         <span class="badge <?= $statusBadge ?> rounded-2 px-2.5 py-1.5 fw-bold" style="font-size: 0.75rem; color: #fff !important;"><?= $statusText ?></span>
                     </td>
-                    <td class="text-center">
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
                       <div class="d-inline-flex gap-2">
-                        <button type="button" class="btn btn-sm btn-outline-warning rounded-2" title="Edit Tenant" onclick="openEditTenant(<?= htmlspecialchars(json_encode($tenantRow)) ?>)">
+                        <button type="button" class="btn btn-sm btn-outline-warning border-0 rounded-2 text-warning" title="Edit Tenant" onclick="openEditTenant(<?= htmlspecialchars(json_encode($tenantRow)) ?>)">
                           <i class="bi bi-pencil-square"></i>
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-danger rounded-2" title="Hapus Tenant" onclick="triggerDeleteTenant('tenants.php?action_delete=<?= $tenantRow['id']; ?>', '<?= addslashes($tenantRow['name']); ?>')">
+                        <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Hapus Tenant" onclick="triggerDeleteTenant('tenants.php?action_delete=<?= $tenantRow['id']; ?>', '<?= addslashes($tenantRow['name']); ?>')">
                           <i class="bi bi-trash3-fill"></i>
                         </button>
                       </div>
@@ -293,7 +279,10 @@ if ($fetchQuery) {
                   <?php
               }
           } else {
-              echo '<tr><td colspan="7" class="text-center py-5 fw-bold text-muted">Belum ada data tenant terdaftar di database.</td></tr>';
+              echo '<tr><td colspan="7" class="text-center py-5 text-muted" style="background: transparent !important; border: none !important;">
+                      <i class="bi bi-folder-x d-block mb-2" style="font-size: 2rem; color: rgba(148, 163, 184, 0.4);"></i>
+                      Belum ada data tenant terdaftar di database.
+                    </td></tr>';
           }
           ?>
         </tbody>
@@ -434,6 +423,23 @@ function getTenantModal() {
     }
     return tenantModalInstance;
 }
+
+function bersihkanMacet() {
+    document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+}
+document.addEventListener('hidden.bs.modal', bersihkanMacet);
+setInterval(() => {
+    let adaModalAktif = false;
+    document.querySelectorAll('.modal').forEach(m => {
+        if (m.classList.contains('show')) adaModalAktif = true;
+    });
+    if (!adaModalAktif && document.querySelector('.modal-backdrop')) {
+        bersihkanMacet();
+    }
+}, 300);
 
 document.addEventListener('DOMContentLoaded', function() {
     if (window.history.replaceState && window.location.search !== '') {

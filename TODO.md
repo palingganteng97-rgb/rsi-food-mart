@@ -1,37 +1,14 @@
-# TODO - Perbaikan Sistem
+# TODO - Perbaikan Tampilan tenants.php
 
-## Status: ✅ Selesai / ⏳ Dalam Proses / ❌ Belum
+## Steps
 
-### 1. LOGIN ✅
-- [x] `login.php`: Baca `$_SESSION['flash_error']` sebagai `$error`
-- [x] `index.php`: Seragamkan pesan error menjadi "Username / Email dan password salah, silahkan coba lagi"
+- [x] 1. Change container-fluid card styling to match `tenant_operating_hours.php`
+- [x] 2. Replace table classes from custom `table-custom-clean` to standard `table table-hover`
+- [x] 3. Update table `<thead>` to match reference styling (text-uppercase, proper colors)
+- [x] 4. Remove extra `<style>` block for `.table-custom-hover` / `.table-custom-clean`
+- [x] 5. Use pre-fetched `$tenantsData` in tbody loop instead of re-querying
+- [x] 6. Change `ORDER BY id DESC` to `ORDER BY id ASC` in both queries
+- [x] 7. Update responsive wrapper classes to match reference
 
-### 2. ROLES ✅
-- [x] `roles.php`: Perbaiki JS populateEditRoleModal (edit_role_id → edit-role-id)
-- [x] `roles.php`: Ubah name input form (id → edit_id, name → update_name)
-- [x] `roles.php`: Tambah validasi duplicate name (case insensitive, exclude current)
-- [x] `roles.php`: Perbaiki tombol delete ($row → $roleRow)
-
-### 3. PERMISSIONS ✅
-- [x] `permissions.php`: Validasi duplicate module_name (trim, strtolower)
-- [x] `permissions.php`: Update validasi exclude record sendiri
-- [x] `permissions.php`: Ganti query raw ke prepared statement
-
-### 4. ROLE PERMISSIONS ✅
-- [x] `role_permissions.php`: Backend handler action_save_row
-- [x] `role_permissions.php`: Checkbox auto-tercentang dari database
-- [x] `role_permissions.php`: Simpan relasi tanpa duplicate
-
-### 5. TENANT ✅
-- [x] `tenants.php`: Pindahkan field Email & Waktu Persiapan ke dalam modal-body (sebelumnya di bawah footer)
-- [x] `tenants.php`: Hapus position:absolute dari footer modal
-- [x] `tenants.php`: Perbaiki urutan field: Nama → Email → Phone → Alamat → Waktu Persiapan
-- [x] `tenants.php`: Pastikan Edit juga menggunakan urutan yang sama
-
-### Final Check ✅
-- [x] `user.php`: Perbaiki $row → $userRow pada tombol delete
-- [x] Cek tidak ada error JavaScript - Duplikat modal `modalDeletePermission` sudah dihapus
-- [x] Cek tidak ada error PHP - Semua query menggunakan prepared statement
-- [x] Cek tidak ada error SQL - Prepared statement mencegah SQL injection
-- [x] Cek semua modal dapat dibuka/tutup normal - Footer modal tenant sudah tidak absolute
+## Done ✓
 
