@@ -1,15 +1,20 @@
 <?php
-include "db.php"; 
-include "notification_helper.php";
+// tenant_holidays.php
+include "db.php"; // Memanggil koneksi database ($conn) & session_start()
 
+// Proteksi Halaman: Jika sesi user_id kosong, tendang kembali ke login.php
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
+// Menangkap notifikasi dari session untuk dicocokkan dengan alert komponen HTML Anda
 $status = $_GET['status'] ?? '';
 $msg = $_GET['msg'] ?? '';
 
+// =========================================================================
+// 1. CRUD: LOGIKA INSERT DATA LIBUR TENANT BARU (DARI INPUT DATE DUA KOLOM)
+// =========================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_add_holiday'])) {
     $tenantId  = (int)($_POST['tenant_id'] ?? 0);
     $startDate = trim($_POST['start_date'] ?? '');
@@ -22,21 +27,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_add_holiday'])
     }
 
     try {
-        $tenantQuery = $conn->prepare("SELECT name FROM tenants WHERE id = ? LIMIT 1");
-        $tenantQuery->bind_param("i", $tenantId);
-        $tenantQuery->execute();
-        $tenantRes = $tenantQuery->get_result()->fetch_assoc();
-        $tenantName = $tenantRes ? $tenantRes['name'] : "ID " . $tenantId;
-        $tenantQuery->close();
-
         $insertStmt = $conn->prepare("INSERT INTO tenant_holidays (tenant_id, holiday_date, description) VALUES (?, ?, ?)");
         
+        // Melakukan perulangan (looping) hari dari tanggal mulai sampai tanggal selesai
         $currentTimestamp = strtotime($startDate);
         $endTimestamp     = strtotime($endDate);
 
         while ($currentTimestamp <= $endTimestamp) {
             $date = date('Y-m-d', $currentTimestamp);
 
+            // Validasi: Cegah duplikasi tanggal libur yang sama persis untuk tenant tersebut
             $queryCheck = "SELECT id FROM tenant_holidays WHERE tenant_id = ? AND holiday_date = ?";
             $stmtCheck = $conn->prepare($queryCheck);
             $stmtCheck->bind_param("is", $tenantId, $date);
@@ -49,11 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_add_holiday'])
             }
             $stmtCheck->close();
             
+            // Maju 1 hari berikutnya
             $currentTimestamp = strtotime("+1 day", $currentTimestamp);
         }
         
-        createNotification('admin', (int)$_SESSION['user_id'], 'Hari Libur Tenant', "Jadwal libur baru untuk tenant '$tenantName' berhasil dikonfigurasi", 'tenant_holidays.php');
-
         header("Location: tenant_holidays.php?status=success_insert");
         exit;
     } catch (Throwable $e) {
@@ -62,6 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_add_holiday'])
     }
 }
 
+// =========================================================================
+// 2. CRUD: LOGIKA UPDATE DATA LIBUR TENANT (DARI INPUT DATE DUA KOLOM)
+// =========================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_holiday'])) {
     $targetId  = (int)($_POST['id'] ?? 0);
     $tenantId  = (int)($_POST['tenant_id'] ?? 0);
@@ -75,13 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_holiday
     }
 
     try {
-        $tenantQuery = $conn->prepare("SELECT name FROM tenants WHERE id = ? LIMIT 1");
-        $tenantQuery->bind_param("i", $tenantId);
-        $tenantQuery->execute();
-        $tenantRes = $tenantQuery->get_result()->fetch_assoc();
-        $tenantName = $tenantRes ? $tenantRes['name'] : "ID " . $tenantId;
-        $tenantQuery->close();
-
+        // Langkah A: Cari tahu konfigurasi deskripsi/keterangan lama kelompok data ini sebelum dihapus
         $queryFindOld = "SELECT tenant_id, description FROM tenant_holidays WHERE id = ?";
         $stmtFind = $conn->prepare($queryFindOld);
         $stmtFind->bind_param("i", $targetId);
@@ -93,6 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_holiday
             $oldTenantId = $resOld['tenant_id'];
             $oldDesc     = $resOld['description'];
 
+            // Langkah B: Hapus kelompok data libur lama yang memiliki relasi tenant dan keterangan yang sama
             $queryDeleteGroup = "DELETE FROM tenant_holidays WHERE tenant_id = ? AND description = ?";
             $stmtDel = $conn->prepare($queryDeleteGroup);
             $stmtDel->bind_param("is", $oldTenantId, $oldDesc);
@@ -100,6 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_holiday
             $stmtDel->close();
         }
 
+        // Langkah C: Masukkan kembali baris-baris tanggal baru hasil editan range input
         $insertStmt = $conn->prepare("INSERT INTO tenant_holidays (tenant_id, holiday_date, description) VALUES (?, ?, ?)");
         
         $currentTimestamp = strtotime($startDate);
@@ -122,8 +120,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_holiday
             $currentTimestamp = strtotime("+1 day", $currentTimestamp);
         }
         
-        createNotification('admin', (int)$_SESSION['user_id'], 'Hari Libur Diperbarui', "Jadwal libur tenant '$tenantName' berhasil disesuaikan", 'tenant_holidays.php');
-
         header("Location: tenant_holidays.php?status=success_update");
         exit;
     } catch (Throwable $e) {
@@ -132,12 +128,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_holiday
     }
 }
 
+// =========================================================================
+// 3. CRUD: LOGIKA DELETE DATA LIBUR TENANT (HAPUS PERMANEN KELOMPOK)
+// =========================================================================
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
     $deleteId = (int)$_GET['id'];
 
     if ($deleteId > 0) {
         try {
-            $queryFindOld = "SELECT th.tenant_id, th.description, t.name AS tenant_name FROM tenant_holidays th LEFT JOIN tenants t ON th.tenant_id = t.id WHERE th.id = ? LIMIT 1";
+            // Mengambil info relasi data terlebih dahulu agar bisa menghapus satu kelompok grup liburan sekaligus
+            $queryFindOld = "SELECT tenant_id, description FROM tenant_holidays WHERE id = ?";
             $stmtFind = $conn->prepare($queryFindOld);
             $stmtFind->bind_param("i", $deleteId);
             $stmtFind->execute();
@@ -147,13 +147,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
             if ($resOld) {
                 $oldTenantId = $resOld['tenant_id'];
                 $oldDesc     = $resOld['description'];
-                $tenantName  = $resOld['tenant_name'] ?? "ID " . $oldTenantId;
 
                 $deleteStmt = $conn->prepare("DELETE FROM tenant_holidays WHERE tenant_id = ? AND description = ?");
                 $deleteStmt->bind_param("is", $oldTenantId, $oldDesc);
                 
                 if ($deleteStmt->execute()) {
-                    createNotification('admin', (int)$_SESSION['user_id'], 'Hari Libur Dihapus', "Jadwal libur grup untuk tenant '$tenantName' berhasil dihapus dari sistem", 'tenant_holidays.php');
                     header("Location: tenant_holidays.php?status=success_delete");
                     exit;
                 } else {
@@ -169,10 +167,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
     }
 }
 
+// =========================================================================
+// 4. READ DATA: AMBIL DATA LIBUR (JOIN NAMA TENANT) & LIST DATA TENANTS
+// =========================================================================
 $listHolidays = [];
 $listActiveTenants = [];
 
 try {
+    // Meringkas deretan tanggal libur yang bermotif/berketerangan sama menjadi 1 baris menggunakan GROUP_CONCAT
     $queryRead = "SELECT MAX(th.id) AS id, th.tenant_id, th.description, t.name AS tenant_name,
                   GROUP_CONCAT(th.holiday_date ORDER BY th.holiday_date ASC) AS array_dates 
                   FROM tenant_holidays th 
@@ -187,6 +189,7 @@ try {
         }
     }
 
+    // Mengambil opsi data tenant untuk dimasukkan ke dalam elemen select option form modal input
     $queryTenants = "SELECT id, name FROM tenants WHERE deleted_at IS NULL ORDER BY name ASC";
     $resultTenants = $conn->query($queryTenants);
     if ($resultTenants) {
@@ -195,6 +198,7 @@ try {
         }
     }
 } catch (Throwable $e) {
+    // Mencegah crash patah halaman jika kueri bermasalah
 }
 ?>
 

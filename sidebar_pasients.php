@@ -16,8 +16,6 @@ $menu = [
     'home.php' => ['href' => 'home.php', 'label' => 'Etalase', 'icon' => 'bi-shop'],
     'riwayat_pesanan.php' => ['href' => 'riwayat_pesanan.php', 'label' => 'Riwayat Pesanan', 'icon' => 'bi-credit-card-2-front'],
     'refund_patients.php' => ['href' => 'refund_patients.php', 'label' => 'Refund', 'icon' => 'bi-arrow-return-left'],
-    'product_review_patients.php' => ['href' => 'product_review_patients.php', 'label' => 'Ulasan Produk', 'icon' => 'bi-star'],
-    'tenant_review_patients.php' => ['href' => 'tenant_review_patients.php', 'label' => 'Ulasan Tenant', 'icon' => 'bi-star-half']
 ];
 
   // =========================================================================
@@ -98,10 +96,8 @@ $menu = [
         <div class="text-white-50" style="font-size:.78rem;">Pemesanan Makanan Sehat</div>
       </div>
     </div>
-    <div class="d-flex align-items-center gap-2">
-      <!-- NOTIFICATION BELL (Mobile) - akan diisi oleh notifications.js -->
-      <div class="mobile-notification-bell"></div>
-      <i class="bi bi-moon-stars fs-4 text-white-50"></i>
+    <div class="text-white-50" style="width:38px; text-align:right;">
+      <i class="bi bi-moon-stars fs-4"></i>
     </div>
   </div>
 </nav>
@@ -118,8 +114,6 @@ $menu = [
         <div class="fw-bold" style="letter-spacing:.2px;">RSI FOOD &amp; MART</div>
         <div class="text-white-50" style="font-size:.82rem;">Pemesanan Makanan Sehat</div>
       </div>
-      <!-- NOTIFICATION BELL (Desktop) -->
-      <div class="desktop-notification-bell ms-auto" style="margin-right: 4px;"></div>
     </div>
     <div class="sidebar-scroll-container">
       <div class="navmenu mt-1">
@@ -251,7 +245,6 @@ $menu = [
     </div>
 </div>
 
-<script src="notifications.js?v=1.0"></script>
 <script>
   (function(){
     const current = (window.location.pathname || '').split('/').pop();

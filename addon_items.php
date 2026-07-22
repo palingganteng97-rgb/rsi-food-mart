@@ -1,7 +1,6 @@
 <?php
 // addon_items.php
 include 'db.php'; 
-include 'notification_helper.php'; // INTEGRASI: Menyertakan fungsi pembuat notifikasi
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -40,15 +39,6 @@ if ($action == 'create' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!empty($addon_id) && !empty($item_name)) {
         $query = "INSERT INTO addon_items (addon_id, item_name, price) VALUES ($addon_id, '$item_name', $price)";
         if (mysqli_query($conn, $query)) {
-            // INTEGRASI: Membuat notifikasi setelah berhasil tambah data
-            createNotification(
-                'admin', 
-                (int)$_SESSION['user_id'], 
-                'Addon Baru Ditambahkan', 
-                "Item addon '$item_name' dengan harga Rp " . number_format($price) . " berhasil ditambahkan", 
-                'addon_items.php'
-            );
-
             header("Location: addon_items.php?status=success_add");
             exit;
         } else {
@@ -69,15 +59,6 @@ if ($action == 'update' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!empty($id) && !empty($addon_id) && !empty($item_name)) {
         $query = "UPDATE addon_items SET addon_id = $addon_id, item_name = '$item_name', price = $price WHERE id = $id";
         if (mysqli_query($conn, $query)) {
-            // INTEGRASI: Membuat notifikasi setelah berhasil ubah data
-            createNotification(
-                'admin', 
-                (int)$_SESSION['user_id'], 
-                'Addon Diperbarui', 
-                "Item addon '$item_name' (ID: $id) berhasil diperbarui", 
-                'addon_items.php'
-            );
-
             header("Location: addon_items.php?status=success_edit");
             exit;
         } else {
@@ -90,23 +71,8 @@ if ($action == 'update' && $_SERVER['REQUEST_METHOD'] == 'POST') {
 // 4. Hapus Data Item Topping (Delete)
 if ($action == 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
-    
-    // Opsional: Ambil nama item terlebih dahulu untuk isi pesan notifikasi yang informatif sebelum dihapus
-    $name_query = mysqli_query($conn, "SELECT item_name FROM addon_items WHERE id = $id");
-    $item_data  = mysqli_fetch_assoc($name_query);
-    $saved_name = $item_data ? $item_data['item_name'] : "ID " . $id;
-
     $query = "DELETE FROM addon_items WHERE id = $id";
     if (mysqli_query($conn, $query)) {
-        // INTEGRASI: Membuat notifikasi setelah berhasil hapus data
-        createNotification(
-            'admin', 
-            (int)$_SESSION['user_id'], 
-            'Addon Dihapus', 
-            "Item addon '$saved_name' berhasil dihapus dari sistem", 
-            'addon_items.php'
-        );
-
         header("Location: addon_items.php?status=success_delete");
         exit;
     } else {

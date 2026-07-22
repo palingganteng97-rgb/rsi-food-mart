@@ -1,46 +1,51 @@
 <?php
 include 'db.php';
-include 'notification_helper.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// 1. PROSES KLIK TOMBOL KONFIRMASI STATUS (Aksi Admin jika ada perubahan manual)
 $action = isset($_GET['action']) ? trim((string)$_GET['action']) : '';
 if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $payment_id = intval($_POST['id'] ?? 0);
     $new_status = trim($_POST['status'] ?? 'SUCCESS');
 
     if ($payment_id > 0) {
+        // Mulai transaksi
         mysqli_begin_transaction($conn);
         try {
-            $getOrder = $conn->prepare("SELECT p.order_id, o.order_number, o.status AS order_status, p.amount FROM payments p LEFT JOIN orders o ON p.order_id = o.id WHERE p.id = ? LIMIT 1");
+            // Ambil order_id dan cek status orders
+            $getOrder = $conn->prepare("SELECT p.order_id, o.status AS order_status FROM payments p LEFT JOIN orders o ON p.order_id = o.id WHERE p.id = ? LIMIT 1");
             $getOrder->bind_param("i", $payment_id);
             $getOrder->execute();
             $orderResult = $getOrder->get_result();
             $orderRow = $orderResult->fetch_assoc();
             $order_id = intval($orderRow['order_id'] ?? 0);
-            $order_number = $orderRow['order_number'] ?? "ID " . $order_id;
-            $amount = floatval($orderRow['amount'] ?? 0);
             $order_status = strtolower(trim($orderRow['order_status'] ?? ''));
 
+            // Cegah update jika pesanan sudah dibatalkan
             if ($order_status === 'cancelled') {
                 throw new Exception('Pesanan sudah dibatalkan. Tidak dapat mengubah status pembayaran.');
             }
 
+            // Update status di tabel payments
             $stmt = $conn->prepare("UPDATE payments SET status = ? WHERE id = ?");
             $stmt->bind_param("si", $new_status, $payment_id);
             if (!$stmt->execute()) {
                 throw new Exception($stmt->error);
             }
 
+            // Sinkronisasi status pembayaran ke tabel orders
             if ($order_id > 0) {
-                $orderPaymentStatus = 'unpaid'; 
+                // Mapping status payments ke payment_status di orders
+                $orderPaymentStatus = 'unpaid'; // default
                 if (strtoupper($new_status) === 'SUCCESS') {
                     $orderPaymentStatus = 'paid';
                 } elseif (strtoupper($new_status) === 'FAILED') {
                     $orderPaymentStatus = 'failed';
                 }
+                // Selain itu (PENDING/dll) tetap 'unpaid'
 
                 $stmtOrder = $conn->prepare("UPDATE orders SET payment_status = ? WHERE id = ?");
                 $stmtOrder->bind_param("si", $orderPaymentStatus, $order_id);
@@ -48,14 +53,6 @@ if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new Exception($stmtOrder->error);
                 }
             }
-
-            createNotification(
-                'admin', 
-                (int)$_SESSION['user_id'], 
-                'Pembayaran Diperbarui', 
-                "Status pembayaran untuk Pesanan #$order_number sebesar Rp " . number_format($amount) . " diubah menjadi $new_status", 
-                'payments.php'
-            );
 
             mysqli_commit($conn);
             header("Location: payments.php?status=success_update");
@@ -67,20 +64,24 @@ if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// 2. LOGIKA FILTER PENCARIAN & STATUS (Untuk Form Admin)
 $search = isset($_GET['search']) ? trim((string)$_GET['search']) : '';
 $filter_status = isset($_GET['status_filter']) ? trim((string)$_GET['status_filter']) : '';
 
+// Query dasar dengan JOIN ke tabel orders dan payment_methods
 $sql = "SELECT p.*, o.order_number, o.status AS order_status, pm.name AS method_name, pm.provider 
         FROM payments p
         LEFT JOIN orders o ON p.order_id = o.id
         LEFT JOIN payment_methods pm ON p.payment_method_id = pm.id
         WHERE 1=1";
 
+// Tambah kondisi jika admin mencari nomor invoice/transaksi
 if ($search !== '') {
     $search_clean = mysqli_real_escape_string($conn, $search);
     $sql .= " AND (o.order_number LIKE '%$search_clean%' OR p.transaction_number LIKE '%$search_clean%')";
 }
 
+// Tambah kondisi jika admin memfilter berdasarkan status (SUCCESS/PENDING/FAILED)
 if ($filter_status !== '') {
     $status_clean = mysqli_real_escape_string($conn, $filter_status);
     $sql .= " AND p.status = '$status_clean'";
@@ -88,6 +89,7 @@ if ($filter_status !== '') {
 
 $sql .= " ORDER BY p.id DESC";
 
+// 3. EKSEKUSI DATA LIST UNTUK DIULANG DI TABEL HTML
 $payments = [];
 $result = $conn->query($sql);
 if ($result) {
@@ -96,6 +98,7 @@ if ($result) {
     }
 }
 
+// Menangkap status alert dari redirect checkout_process.php
 $msg_status = isset($_GET['status']) ? (string)$_GET['status'] : '';
 $msg = isset($_GET['msg']) ? (string)$_GET['msg'] : '';
 ?>

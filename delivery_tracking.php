@@ -1,6 +1,5 @@
 <?php
 include 'db.php';
-include 'notification_helper.php'; // INTEGRASI: Menyertakan fungsi pembuat notifikasi
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -20,28 +19,10 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("idds", $delivery_id, $latitude, $longitude, $tracking_status);
         
         if ($stmt->execute()) {
-            // INTEGRASI: Ambil nomor pesanan terkait untuk detail pesan notifikasi
-            $infoQuery = $conn->prepare("SELECT o.order_number FROM deliveries d LEFT JOIN orders o ON d.order_id = o.id WHERE d.id = ? LIMIT 1");
-            $infoQuery->bind_param("i", $delivery_id);
-            $infoQuery->execute();
-            $infoRes = $infoQuery->get_result()->fetch_assoc();
-            $orderNumber = $infoRes ? $infoRes['order_number'] : "Delivery ID " . $delivery_id;
-            $infoQuery->close();
-
-            // INTEGRASI: Membuat entri log notifikasi pelacakan baru
-            createNotification(
-                'admin', 
-                (int)$_SESSION['user_id'], 
-                'Log Tracking Ditambahkan', 
-                "Titik koordinat baru ditambahkan untuk Pesanan #$orderNumber dengan status: $tracking_status", 
-                'delivery_tracking.php'
-            );
-
             header("Location: delivery_tracking.php?status=success_create");
         } else {
             header("Location: delivery_tracking.php?status=error&msg=" . urlencode($stmt->error));
         }
-        $stmt->close();
         exit();
     }
 }
@@ -59,28 +40,10 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("iddsi", $delivery_id, $latitude, $longitude, $tracking_status, $id);
         
         if ($stmt->execute()) {
-            // INTEGRASI: Ambil nomor pesanan terkait untuk detail pesan notifikasi
-            $infoQuery = $conn->prepare("SELECT o.order_number FROM deliveries d LEFT JOIN orders o ON d.order_id = o.id WHERE d.id = ? LIMIT 1");
-            $infoQuery->bind_param("i", $delivery_id);
-            $infoQuery->execute();
-            $infoRes = $infoQuery->get_result()->fetch_assoc();
-            $orderNumber = $infoRes ? $infoRes['order_number'] : "Delivery ID " . $delivery_id;
-            $infoQuery->close();
-
-            // INTEGRASI: Membuat entri log notifikasi perubahan data pelacakan
-            createNotification(
-                'admin', 
-                (int)$_SESSION['user_id'], 
-                'Log Tracking Diperbarui', 
-                "Log pelacakan ID $id untuk Pesanan #$orderNumber berhasil diperbarui", 
-                'delivery_tracking.php'
-            );
-
             header("Location: delivery_tracking.php?status=success_update");
         } else {
             header("Location: delivery_tracking.php?status=error&msg=" . urlencode($stmt->error));
         }
-        $stmt->close();
         exit();
     }
 }
@@ -90,32 +53,14 @@ if ($action === 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id'] ?? 0);
 
     if ($id > 0) {
-        // INTEGRASI: Ambil nomor pesanan terkait sebelum log pelacakan dihapus dari database
-        $infoQuery = $conn->prepare("SELECT o.order_number FROM delivery_tracking dt LEFT JOIN deliveries d ON dt.delivery_id = d.id LEFT JOIN orders o ON d.order_id = o.id WHERE dt.id = ? LIMIT 1");
-        $infoQuery->bind_param("i", $id);
-        $infoQuery->execute();
-        $infoRes = $infoQuery->get_result()->fetch_assoc();
-        $orderNumber = $infoRes ? $infoRes['order_number'] : "Unknown";
-        $infoQuery->close();
-
         $stmt = $conn->prepare("DELETE FROM delivery_tracking WHERE id = ?");
         $stmt->bind_param("i", $id);
         
         if ($stmt->execute()) {
-            // INTEGRASI: Membuat entri log notifikasi penghapusan pelacakan
-            createNotification(
-                'admin', 
-                (int)$_SESSION['user_id'], 
-                'Log Tracking Dihapus', 
-                "Log pelacakan ID $id untuk Pesanan #$orderNumber berhasil dihapus dari sistem", 
-                'delivery_tracking.php'
-            );
-
             header("Location: delivery_tracking.php?status=success_delete");
         } else {
             header("Location: delivery_tracking.php?status=error&msg=" . urlencode($stmt->error));
         }
-        $stmt->close();
         exit();
     }
 }

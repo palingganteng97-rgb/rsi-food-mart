@@ -1,6 +1,5 @@
 <?php
 include 'db.php';
-include 'notification_helper.php'; // INTEGRASI: Menyertakan fungsi pembuat notifikasi
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -20,8 +19,6 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("ssi", $name, $phone, $status);
         
         if ($stmt->execute()) {
-            // INTEGRASI: Membuat notifikasi setelah berhasil tambah kurir
-            createNotification('admin', (int)$_SESSION['user_id'], 'Kurir Baru', "Kurir $name berhasil ditambahkan", 'couriers.php');
             header("Location: couriers.php?status=success_create");
         } else {
             header("Location: couriers.php?status=error&msg=" . urlencode($stmt->error));
@@ -42,8 +39,6 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("ssii", $name, $phone, $status, $id);
         
         if ($stmt->execute()) {
-            // INTEGRASI: Membuat notifikasi setelah berhasil mengubah kurir
-            createNotification('admin', (int)$_SESSION['user_id'], 'Kurir Diperbarui', "Data kurir $name berhasil diperbarui", 'couriers.php');
             header("Location: couriers.php?status=success_update");
         } else {
             header("Location: couriers.php?status=error&msg=" . urlencode($stmt->error));
@@ -57,20 +52,10 @@ if ($action === 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id'] ?? 0);
 
     if ($id > 0) {
-        // INTEGRASI: Ambil nama kurir terlebih dahulu sebelum datanya dihapus
-        $nameQuery = $conn->prepare("SELECT name FROM couriers WHERE id = ? LIMIT 1");
-        $nameQuery->bind_param("i", $id);
-        $nameQuery->execute();
-        $nameResult = $nameQuery->get_result()->fetch_assoc();
-        $savedName = $nameResult ? $nameResult['name'] : "ID " . $id;
-        $nameQuery->close();
-
         $stmt = $conn->prepare("DELETE FROM couriers WHERE id = ?");
         $stmt->bind_param("i", $id);
         
         if ($stmt->execute()) {
-            // INTEGRASI: Membuat notifikasi setelah berhasil menghapus kurir
-            createNotification('admin', (int)$_SESSION['user_id'], 'Kurir Dihapus', "Kurir '$savedName' berhasil dihapus", 'couriers.php');
             header("Location: couriers.php?status=success_delete");
         } else {
             header("Location: couriers.php?status=error&msg=" . urlencode($stmt->error));

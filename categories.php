@@ -1,107 +1,95 @@
-<?php 
-include 'db.php'; 
-include 'notification_helper.php'; 
+<?php
+include 'db.php';
 
-if (session_status() === PHP_SESSION_NONE) { 
-    session_start(); 
-} 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-if (!isset($_SESSION['user_id'])) { 
-    header("Location: login.php"); 
-    exit(); 
-} 
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit();
+}
 
-// PROSES TAMBAH KATEGORI
-if (isset($_POST['action_create_category'])) {
-    $tenant_id = isset($_POST['tenant_id']) ? (int)$_POST['tenant_id'] : 0; 
-    $name = mysqli_real_escape_string($conn, trim($_POST['name'] ?? ''));
+if (isset($_POST['action_add_category'])) {
+    $name      = mysqli_real_escape_string($conn, trim($_POST['name'] ?? ''));
+    $tenant_id = isset($_POST['tenant_id']) ? (int)$_POST['tenant_id'] : 0;
 
-    if ($tenant_id > 0 && !empty($name)) { 
-        $checkTenant = mysqli_query($conn, "SELECT id FROM tenants WHERE id = $tenant_id"); 
-        if (mysqli_num_rows($checkTenant) > 0) { 
-            $query = "INSERT INTO categories (tenant_id, name) VALUES ($tenant_id, '$name')"; 
-            
+    if ($tenant_id > 0 && !empty($name)) {
+        $checkTenant = mysqli_query($conn, "SELECT id FROM tenants WHERE id = $tenant_id");
+        if (mysqli_num_rows($checkTenant) > 0) {
+            $query = "INSERT INTO categories (tenant_id, name) VALUES ($tenant_id, '$name')";
             if (mysqli_query($conn, $query)) {
-                // SINKRONISASI HELPER: Menambahkan parameter tipe data casting dan link redirect 'categories.php'
-                createNotification('admin', (int)$_SESSION['user_id'], 'Kategori Ditambahkan', "Kategori $name berhasil ditambahkan", 'categories.php');
-                echo "<script>alert('Kategori berhasil disimpan!'); window.location='categories.php';</script>"; 
-                exit(); 
+                echo "<script>alert('Kategori baru berhasil ditambahkan!'); window.location='categories.php';</script>";
+                exit();
             } else {
-                echo "<script>alert('Gagal menyimpan: " . mysqli_real_escape_string($conn, mysqli_error($conn)) . "'); window.location='categories.php';</script>"; 
-                exit(); 
+                echo "<script>alert('Gagal menyimpan: " . mysqli_real_escape_string($conn, mysqli_error($conn)) . "'); window.location='categories.php';</script>";
+                exit();
             }
-        } else { 
-            echo "<script>alert('ID Tenant tidak terdaftar!'); window.location='categories.php';</script>"; 
-            exit(); 
-        } 
-    } else { 
-        echo "<script>alert('Tenant dan Nama kategori wajib diisi!'); window.location='categories.php';</script>"; 
-        exit(); 
-    } 
-} 
+        } else {
+            echo "<script>alert('ID Tenant tidak terdaftar!'); window.location='categories.php';</script>";
+            exit();
+        }
+    } else {
+        echo "<script>alert('Tenant dan Nama kategori wajib diisi!'); window.location='categories.php';</script>";
+        exit();
+    }
+}
 
-// PROSES UPDATE KATEGORI
-if (isset($_POST['action_update_category'])) { 
-    $id = (int)($_POST['id'] ?? 0); 
-    $name = mysqli_real_escape_string($conn, trim($_POST['name'] ?? '')); 
-    $tenant_id = isset($_POST['tenant_id']) ? (int)$_POST['tenant_id'] : 0; 
+if (isset($_POST['action_update_category'])) {
+    $id        = (int)($_POST['id'] ?? 0);
+    $name      = mysqli_real_escape_string($conn, trim($_POST['name'] ?? ''));
+    $tenant_id = isset($_POST['tenant_id']) ? (int)$_POST['tenant_id'] : 0;
 
-    if ($id > 0 && $tenant_id > 0 && !empty($name)) { 
-        $query = "UPDATE categories SET tenant_id = $tenant_id, name = '$name' WHERE id = $id"; 
-        if (mysqli_query($conn, $query)) { 
-            // SINKRONISASI HELPER: Menambahkan parameter tipe data casting dan link redirect 'categories.php'
-            createNotification('admin', (int)$_SESSION['user_id'], 'Kategori Diperbarui', "Kategori $name berhasil diperbarui", 'categories.php');
-            echo "<script>alert('Kategori berhasil diperbarui!'); window.location='categories.php';</script>"; 
-            exit(); 
-        } else { 
-            echo "<script>alert('Gagal memperbarui: " . mysqli_real_escape_string($conn, mysqli_error($conn)) . "'); window.location='categories.php';</script>"; 
-            exit(); 
-        } 
-    } else { 
-        echo "<script>alert('Data input ubah tidak valid!'); window.location='categories.php';</script>"; 
-        exit(); 
-    } 
-} 
+    if ($id > 0 && $tenant_id > 0 && !empty($name)) {
+        $query = "UPDATE categories SET tenant_id = $tenant_id, name = '$name' WHERE id = $id";
+        if (mysqli_query($conn, $query)) {
+            echo "<script>alert('Kategori berhasil diperbarui!'); window.location='categories.php';</script>";
+            exit();
+        } else {
+            echo "<script>alert('Gagal memperbarui: " . mysqli_real_escape_string($conn, mysqli_error($conn)) . "'); window.location='categories.php';</script>";
+            exit();
+        }
+    } else {
+        echo "<script>alert('Data input ubah tidak valid!'); window.location='categories.php';</script>";
+        exit();
+    }
+}
 
-// PROSES HAPUS KATEGORI
-if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) { 
-    $id = (int)$_GET['id']; 
-    if ($id > 0) { 
-        // Mengambil nama kategori terlebih dahulu untuk dicatat di isi notifikasi sebelum dihapus
-        $name_query = mysqli_query($conn, "SELECT name FROM categories WHERE id = $id");
-        $category_data = mysqli_fetch_assoc($name_query);
-        $saved_name = $category_data ? $category_data['name'] : "ID " . $id;
+if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
+    $id = (int)$_GET['id'];
 
-        $query = "DELETE FROM categories WHERE id = $id"; 
-        if (mysqli_query($conn, $query)) { 
-            // SINKRONISASI HELPER: Menambahkan parameter tipe data casting, nama teks asli kategori, dan link redirect 'categories.php'
-            createNotification('admin', (int)$_SESSION['user_id'], 'Kategori Dihapus', "Kategori '$saved_name' berhasil dihapus", 'categories.php');
-            echo "<script>alert('Kategori berhasil dihapus!'); window.location='categories.php';</script>"; 
-            exit(); 
-        } else { 
-            echo "<script>alert('Gagal menghapus data!'); window.location='categories.php';</script>"; 
-            exit(); 
-        } 
-    } 
-} 
+    if ($id > 0) {
+        $query = "DELETE FROM categories WHERE id = $id";
+        if (mysqli_query($conn, $query)) {
+            echo "<script>alert('Kategori berhasil dihapus!'); window.location='categories.php';</script>";
+            exit();
+        } else {
+            echo "<script>alert('Gagal menghapus data!'); window.location='categories.php';</script>";
+            exit();
+        }
+    }
+}
 
-// TAMPILKAN DATA KATEGORI & TENANT
-$listCategories = []; 
-$query_select = "SELECT categories.*, tenants.name AS tenant_name FROM categories INNER JOIN tenants ON categories.tenant_id = tenants.id ORDER BY categories.id ASC"; 
-$result = mysqli_query($conn, $query_select); 
-if ($result) { 
-    while ($row = mysqli_fetch_assoc($result)) { 
-        $listCategories[] = $row; 
-    } 
-} 
+$listCategories = [];
+$query_select = "SELECT categories.*, tenants.name AS tenant_name 
+                 FROM categories 
+                 INNER JOIN tenants ON categories.tenant_id = tenants.id 
+                 ORDER BY categories.id ASC";
 
-$listActiveTenants = []; 
-$query_tenant = mysqli_query($conn, "SELECT id, name FROM tenants ORDER BY name ASC"); 
-if ($query_tenant) { 
-    while ($row_t = mysqli_fetch_assoc($query_tenant)) { 
-        $listActiveTenants[] = $row_t; 
-    } 
-} 
+$result = mysqli_query($conn, $query_select);
+if ($result) {
+    while ($row = mysqli_fetch_assoc($result)) {
+        $listCategories[] = $row;
+    }
+}
+
+$listActiveTenants = [];
+$query_tenant = mysqli_query($conn, "SELECT id, name FROM tenants ORDER BY name ASC");
+if ($query_tenant) {
+    while ($row_t = mysqli_fetch_assoc($query_tenant)) {
+        $listActiveTenants[] = $row_t;
+    }
+}
 ?>
 
 <!DOCTYPE html>

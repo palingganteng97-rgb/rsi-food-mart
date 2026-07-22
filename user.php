@@ -1,16 +1,21 @@
 <?php
+// ====================================================================
+// TAHAP 1: STRUKTUR OTENTIKASI & PROTEKSI BACKEND AMAN (ANTI KEPENTAL)
+// ====================================================================
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Menyertakan file database utama
 include 'db.php';
-include 'notification_helper.php';
 
+// Proteksi tunggal: Memastikan variabel kunci pendeteksi akun login aktif terisi
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
+// Memproses file hapus data jika pemicu action delete dipanggil
 include "delete_handler.php";
 
 $listRoles = [];
@@ -26,6 +31,7 @@ try {
 
 $userId = (int)$_SESSION['user_id'];
 
+// Inisialisasi awal variabel parameter profil dengan data Session (Fallback)
 $roleId    = $_SESSION['role_id'] ?? '-';
 $tenantId  = $_SESSION['tenant_id'] ?? '-';
 $name      = $_SESSION['name'] ?? 'Pasien';
@@ -58,10 +64,13 @@ try {
 
 $isVerified = (int)$status === 1;
 $photoUrl = $photo ? (strpos($photo, 'uploads/') === 0 ? $photo : 'uploads/' . $photo) : 'assets/img/default-avatar.png';
+
 $updateError = '';
 $updateSuccess = '';
 
-
+// ====================================================================
+// TAHAP 2: PROSES COUPLING FORM DATA TAMBAH USER (INSERT)
+// ====================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_register'])) {
     $newName     = trim($_POST['name'] ?? '');
     $newUsername = trim($_POST['username'] ?? '');
@@ -100,18 +109,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_register'])) {
         try {
             $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT);
             $defaultStatus = 1;
+
             $insertStmt = $conn->prepare("INSERT INTO users (role_id, name, username, email, phone, password, photo, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             $insertStmt->bind_param("issssssi", $newRoleId, $newName, $newUsername, $newEmail, $newPhone, $hashedPassword, $uploadedPhotoName, $defaultStatus);
             
             if ($insertStmt->execute()) {
-                createNotification(
-                    'admin', 
-                    (int)$_SESSION['user_id'], 
-                    'Pengguna Baru', 
-                    "Pengguna baru dengan nama '$newName' dan username '$newUsername' berhasil didaftarkan", 
-                    'user.php'
-                );
-
                 header("Location: user.php?status=success_insert");
                 exit;
             } else {
@@ -129,6 +131,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_register'])) {
     }
 }
 
+// ====================================================================
+// TAHAP 3: PROSES COUPLING FORM DATA EDIT USER (UPDATE LENGKAP)
+// ====================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_admin'])) {
     $targetId = (int)($_POST['id'] ?? 0);
     $upName   = trim($_POST['name'] ?? '');
@@ -137,6 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_admin']
     $upPass   = $_POST['password'] ?? '';
     $oldPhoto = trim($_POST['old_photo'] ?? '');
     $upRoleId = (int)($_POST['role_id'] ?? 0);
+
     $finalPhotoName = $oldPhoto; 
     $uploadOk = true;
     $updateError = '';
@@ -164,23 +170,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_admin']
     if ($uploadOk && $targetId > 0 && !empty($upName) && !empty($upEmail) && $upRoleId > 0) {
         try {
             if (!empty($upPass)) {
+                // Eksekusi Update lengkap jika admin ikut mengubah kata sandi baru
                 $hashedPass = password_hash($upPass, PASSWORD_BCRYPT);
                 $updateStmt = $conn->prepare("UPDATE users SET name = ?, email = ?, phone = ?, password = ?, photo = ?, role_id = ?, updated_at = NOW() WHERE id = ?");
                 $updateStmt->bind_param("sssssii", $upName, $upEmail, $upPhone, $hashedPass, $finalPhotoName, $upRoleId, $targetId);
             } else {
+                // Eksekusi Update biasa jika password dikosongkan (tidak diubah)
                 $updateStmt = $conn->prepare("UPDATE users SET name = ?, email = ?, phone = ?, photo = ?, role_id = ?, updated_at = NOW() WHERE id = ?");
                 $updateStmt->bind_param("ssssii", $upName, $upEmail, $upPhone, $finalPhotoName, $upRoleId, $targetId);
             }
             
             if ($updateStmt->execute()) {
-                createNotification(
-                    'admin', 
-                    (int)$_SESSION['user_id'], 
-                    'Pengguna Diperbarui', 
-                    "Informasi profil pengguna dengan nama '$upName' (ID: $targetId) berhasil diperbarui", 
-                    'user.php'
-                );
-
                 header("Location: user.php?status=success_update");
                 exit;
             } else {
@@ -326,9 +326,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_admin']
                               <i class="bi bi-pencil-square"></i>
                             </button>
                             <button type="button" class="btn btn-sm btn-danger" 
-                                    onclick="triggerDeleteUser('user.php?action=delete&id=<?php echo $userRow['id']; ?>', '<?php echo addslashes($userRow['email']); ?>')">
+                                    onclick="triggerDeleteUser('user.php?action=delete&id=<?php echo $row['id']; ?>', '<?php echo addslashes($row['email']); ?>')">
                                 <i class="bi bi-trash"></i>
                             </button>
+                            </a>
                           </div>
                         </td>
                       </tr>

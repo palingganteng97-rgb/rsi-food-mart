@@ -1,11 +1,14 @@
 <?php
+// orders.php - Manajemen dan Riwayat Pesanan Pelanggan
 include 'db.php';
-include 'notification_helper.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// =========================================================================
+// 1. GERBANG VALIDASI AKSES (ADMIN VS PASIEN MANDIRI VIA QR)
+// =========================================================================
 $isAdmin   = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
 $isPatient = isset($_SESSION['patient_session_id']) && $_SESSION['patient_session_id'] > 0;
 $patient_session_id = $isPatient ? (int)$_SESSION['patient_session_id'] : 0;
@@ -15,8 +18,10 @@ if (!$isAdmin && !$isPatient) {
     exit;
 }
 
+// Konfigurasi Halaman & Variabel Dasar
 $perPage = 10;
 $allowedOrderStatuses = ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'delivering', 'completed', 'cancelled'];
+
 $action        = isset($_GET['action']) ? (string)$_GET['action'] : '';
 $q             = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
 $status        = isset($_GET['status']) ? trim((string)$_GET['status']) : '';
@@ -24,6 +29,7 @@ $paymentStatus = isset($_GET['payment_status']) ? trim((string)$_GET['payment_st
 $page          = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset        = ($page - 1) * $perPage;
 
+// Fungsi Helper untuk Sanitasi dan Format Mata Uang
 function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 function money($v) { return 'Rp ' . number_format((float)$v, 0, ',', '.'); }
 
@@ -48,6 +54,9 @@ $writeBackParams = function() use ($q, $status, $paymentStatus, $page) {
     return $qs !== '' ? '?' . $qs : '';
 };
 
+// =========================================================================
+// 2. PROSES UPDATE STATUS PESANAN (KHUSUS ADMIN)
+// =========================================================================
 if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id'], $_POST['status'])) {
     if (!$isAdmin) {
         header('Location: orders.php');
@@ -59,104 +68,24 @@ if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST' && isse
     $ok = ($orderId > 0 && in_array($newStatus, $allowedOrderStatuses, true));
     
     if ($ok) {
+        $stmt = $conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
+        $stmt->bind_param('si', $newStatus, $orderId);
+        $stmt->execute();
+        
+        // Catat otomatis riwayat ke tabel order_status_histories
         $user_id = (int)$_SESSION['user_id'];
         $log_notes = mysqli_real_escape_string($conn, "Status pesanan diperbarui oleh Admin.");
-        mysqli_begin_transaction($conn);
-        try {
-            $stmt = $conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
-            $stmt->bind_param('si', $newStatus, $orderId);
-            if (!$stmt->execute()) {
-                throw new Exception("Gagal update status order: " . $stmt->error);
-            }
-            
-            $orderData = null;
-            $chkOrder = $conn->prepare("SELECT id, order_number, tenant_id, patient_session_id FROM orders WHERE id = ?");
-            $chkOrder->bind_param("i", $orderId);
-            $chkOrder->execute();
-            $resOrder = $chkOrder->get_result();
-            if ($resOrder && $resOrder->num_rows > 0) {
-                $orderData = $resOrder->fetch_assoc();
-            }
-            $chkOrder->close();
-            if (!$orderData) {
-                throw new Exception("Order ID $orderId tidak ditemukan.");
-            }
-            
-            $orderNumber = $orderData['order_number'];
-            
-            $deliveryStatusMap = [
-                'accepted'   => 'PENDING',
-                'preparing'  => 'PENDING',
-                'ready'      => 'PENDING',
-                'picked_up'  => 'ON_PROGRESS',
-                'delivering' => 'ON_PROGRESS',
-                'completed'  => 'DELIVERED',
-            ];
-            
-            $existingDel = null;
-            $chkDel = $conn->prepare("SELECT id, status FROM deliveries WHERE order_id = ? LIMIT 1");
-            $chkDel->bind_param("i", $orderId);
-            $chkDel->execute();
-            $resDel = $chkDel->get_result();
-            if ($resDel && $resDel->num_rows > 0) {
-                $existingDel = $resDel->fetch_assoc();
-            }
-            $chkDel->close();
-            
-            if (isset($deliveryStatusMap[$newStatus])) {
-                $delStatus = $deliveryStatusMap[$newStatus];
-                if ($existingDel) {
-                    $updateDel = $conn->prepare("UPDATE deliveries SET status = ? WHERE id = ?");
-                    $updateDel->bind_param("si", $delStatus, $existingDel['id']);
-                    if (!$updateDel->execute()) {
-                        throw new Exception("Gagal update delivery: " . $updateDel->error);
-                    }
-                    $updateDel->close();
-                } else {
-                    $defaultCourierId = 0;
-                    $courierQuery = $conn->query("SELECT id FROM couriers ORDER BY id ASC LIMIT 1");
-                    if ($courierQuery && $courierQuery->num_rows > 0) {
-                        $courierRow = $courierQuery->fetch_assoc();
-                        $defaultCourierId = (int)$courierRow['id'];
-                    }
-                    if ($defaultCourierId <= 0) {
-                        throw new Exception("Tidak dapat membuat delivery: tidak ada kurier terdaftar di tabel couriers. Silakan tambah kurier terlebih dahulu.");
-                    }
-                    $insertDel = $conn->prepare("INSERT INTO deliveries (order_id, courier_id, status, created_at) VALUES (?, ?, ?, NOW())");
-                    $insertDel->bind_param("iis", $orderId, $defaultCourierId, $delStatus);
-                    if (!$insertDel->execute()) {
-                        throw new Exception("Gagal insert delivery: " . $insertDel->error);
-                    }
-                    $insertDel->close();
-                }
-            }
-            
-            $stmt_log = $conn->prepare('INSERT INTO order_status_histories (order_id, status, changed_by, notes, created_at) VALUES (?, ?, ?, ?, NOW())');
-            $stmt_log->bind_param('isis', $orderId, $newStatus, $user_id, $log_notes);
-            if (!$stmt_log->execute()) {
-                throw new Exception("Gagal insert history: " . $stmt_log->error);
-            }
-            
-            createNotification(
-                'admin', 
-                (int)$_SESSION['user_id'], 
-                'Status Pesanan Diperbarui', 
-                "Status pesanan #$orderNumber berhasil diubah menjadi: $newStatus", 
-                "orders.php?action=detail&id=$orderId"
-            );
-            
-            mysqli_commit($conn);
-        } catch (Exception $e) {
-            mysqli_rollback();
-            error_log("Delivery auto-create error: " . $e->getMessage());
-            header('Location: orders.php?status=error&msg=' . urlencode($e->getMessage()));
-            exit;
-        }
+        $stmt_log = $conn->prepare('INSERT INTO order_status_histories (order_id, status, changed_by, notes, created_at) VALUES (?, ?, ?, ?, NOW())');
+        $stmt_log->bind_param('isis', $orderId, $newStatus, $user_id, $log_notes);
+        $stmt_log->execute();
     }
     header('Location: orders.php' . $writeBackParams());
     exit;
 }
 
+// =========================================================================
+// 3. RESPONS AJAX: RINCIAN DETAIL PESANAN DI MODAL (READ-ONLY)
+// =========================================================================
 if ($action === 'detail' && isset($_GET['id'])) {
     $orderId = (int)$_GET['id'];
     if ($orderId <= 0) { http_response_code(400); echo 'Invalid order id'; exit; }
@@ -167,17 +96,22 @@ if ($action === 'detail' && isset($_GET['id'])) {
     $res = $stmt->get_result();
     $order = $res ? $res->fetch_assoc() : null;
     if (!$order) { http_response_code(404); echo 'Order not found'; exit; }
+
+    // Proteksi data: Pasien tidak boleh mengintip pesanan milik ID sesi orang lain via manipulasi URL AJAX
     if (!$isAdmin && (int)$order['patient_session_id'] !== $patient_session_id) {
         http_response_code(403); echo 'Akses ditolak'; exit;
     }
+
     $stmt2 = $conn->prepare('SELECT oi.id, oi.product_id, oi.qty, oi.price, oi.notes, p.name AS product_name FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ? ORDER BY oi.id ASC');
     $stmt2->bind_param('i', $orderId);
     $stmt2->execute();
     $items = []; $r2 = $stmt2->get_result();
     while ($row = $r2 ? $r2->fetch_assoc() : null) { $items[] = $row; }
+
     $createdAt = $order['created_at'] ?? '';
     $createdLabel = $createdAt ? date('d M Y H:i', strtotime((string)$createdAt)) : '-';
     $subtotal = $order['subtotal'] ?? 0; $discount = $order['discount'] ?? 0; $deliveryFee = $order['delivery_fee'] ?? 0; $grandTotal = $order['grand_total'] ?? 0;
+
     echo '<div class="p-2">';
     echo '<div class="row g-3">';
     echo '<div class="col-md-6"><div class="text-muted small">Nomor Pesanan</div><div class="fw-bold text-white font-monospace">#' . h($order['order_number'] ?? $order['id']) . '</div></div>';
@@ -202,6 +136,7 @@ if ($action === 'detail' && isset($_GET['id'])) {
             $qty = (int)($it['qty'] ?? 0); $price = (float)($it['price'] ?? 0); $subtotalItem = $qty * $price;
             $productName = (string)($it['product_name'] ?? '-');
             $rawNotes = trim((string)($it['notes'] ?? ''));
+            // Parse varian dari field notes (format: "Varian: NamaVarian|...")
             $variant = 'Original';
             if (preg_match('/Varian:\s*([^|\n]+)/i', $rawNotes, $m)) {
                 $variant = trim($m[1]);
@@ -222,14 +157,23 @@ if ($action === 'detail' && isset($_GET['id'])) {
     echo '</tbody></table></div></div></div></div></div>';
     exit;
 }
+
+// =========================================================================
+// =========================================================================
+// 4. LOGIKA FILTER DATA DAN KEAMANAN PRIVASI (ADMIN VS PASIEN MANDIRI)
+// =========================================================================
 $where = [];
 $binds = [];
 $types = '';
+
+// KONDISI UTAMA: Jika user adalah pasien, KUNCI agar hanya melihat pesanan miliknya sendiri
 if (!$isAdmin && $isPatient) {
     $where[] = "patient_session_id = ?";
     $binds[] = $patient_session_id;
     $types  .= 'i';
 }
+
+// Filter Kotak Pencarian Teks Global (Khusus Admin)
 if ($q !== '') {
     $where[] = "(order_number LIKE ? OR patient_session_id LIKE ? OR tenant_id LIKE ?)";
     $likeQuery = '%' . $q . '%';
@@ -238,6 +182,8 @@ if ($q !== '') {
     $binds[] = $likeQuery;
     $types  .= 'sss';
 }
+
+// Filter Status Dropdown
 if ($status !== '') { 
     $where[] = "status = ?"; 
     $binds[] = $status; 
@@ -250,6 +196,8 @@ if ($paymentStatus !== '') {
 }
 
 $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
+
+// Hitung Pagination Total Records
 $countSql = "SELECT COUNT(*) AS total FROM orders $whereClause";
 $countStmt = $conn->prepare($countSql);
 if (!empty($binds)) { 
@@ -258,14 +206,20 @@ if (!empty($binds)) {
 $countStmt->execute();
 $totalRows = $countStmt->get_result()->fetch_assoc()['total'];
 $totalPages = ceil($totalRows / $perPage);
+
+// Eksekusi Ambil List Data Utama Orders
 $sql = "SELECT id, order_number, patient_session_id, tenant_id, subtotal, discount, delivery_fee, grand_total, payment_status, status, created_at 
         FROM orders $whereClause ORDER BY id DESC LIMIT ? OFFSET ?";
 $stmt = $conn->prepare($sql);
+
 $finalTypes = $types . 'ii';
 $finalBinds = array_merge($binds, [$perPage, $offset]);
+
+// PERBAIKAN: Memastikan variabel menggunakan tanda $ secara lengkap
 $stmt->bind_param($finalTypes, ...$finalBinds);
 $stmt->execute();
 $result = $stmt->get_result();
+
 $orders = [];
 if ($result) {
     while ($row = $result->fetch_assoc()) { 
@@ -279,7 +233,7 @@ if ($result) {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Pesanan Pelanggan - RSI Food &amp; Mart</title>
+<title>Admin Pesanan - RSI Food &amp; Mart</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 <style>
@@ -306,7 +260,7 @@ body{background:var(--bg) !important;color:var(--text);}
 <div class="container-fluid rounded-4 p-4" style="background: rgba(15, 23, 42, 0.55) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3 pb-3" style="border-bottom:1px solid rgba(148,163,184,.15) !important;">
 <div>
-<h2 class="fw-bold m-0 text-white" style="font-size:2rem;"> Pesanan Pelanggan</h2>
+<h2 class="fw-bold m-0 text-white" style="font-size:2rem;">Admin Pesanan</h2>
 <div class="text-white-50 small">Kelola status pesanan dan lihat detail item</div>
 </div>
 </div>

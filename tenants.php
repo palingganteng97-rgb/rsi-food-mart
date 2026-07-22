@@ -1,147 +1,174 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-include 'db.php';
-include 'notification_helper.php';
+// tenants.php
+include "db.php"; // Memanggil koneksi database ($conn) & session_start()
 
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
-$crudError = '';
-$crudSuccess = '';
-
-if (isset($_SESSION['tenant_success'])) {
-    $crudSuccess = $_SESSION['tenant_success'];
-    unset($_SESSION['tenant_success']);
-}
-if (isset($_SESSION['tenant_error'])) {
-    $crudError = $_SESSION['tenant_error'];
-    unset($_SESSION['tenant_error']);
+if (file_exists("delete_handler.php")) {
+    include "delete_handler.php";
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_create'])) {
-    $name             = trim($_POST['name'] ?? '');
-    $type             = trim($_POST['type'] ?? '');
-    $description      = trim($_POST['description'] ?? '');
-    $phone            = trim($_POST['phone'] ?? '');
-    $email            = trim($_POST['email'] ?? '');
-    $preparation_time = isset($_POST['preparation_time']) ? (int)$_POST['preparation_time'] : 15;
-    $status           = isset($_POST['status']) ? (int)$_POST['status'] : 1;
-
-    if (!empty($name) && !empty($type)) {
+if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
+    $idToDelete = (int)$_GET['id'];
+    if ($idToDelete > 0) {
         try {
-            $check = $conn->prepare("SELECT id FROM tenants WHERE name = ? LIMIT 1");
-            $check->bind_param("s", $name);
-            $check->execute();
-            if ($check->get_result()->num_rows > 0) {
-                $_SESSION['tenant_error'] = "Nama Tenant sudah terdaftar!";
-            } else {
-                $stmt = $conn->prepare("INSERT INTO tenants (name, type, description, phone, email, preparation_time, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
-                $stmt->bind_param("sssssii", $name, $type, $description, $phone, $email, $preparation_time, $status);
-                
-                if ($stmt->execute()) {
-                    $_SESSION['tenant_success'] = "Data tenant baru berhasil ditambahkan!";
-                    createNotification('admin', (int)$_SESSION['user_id'], 'Tenant Baru', "Tenant $name ($type) berhasil ditambahkan", 'tenants.php');
-                } else {
-                    $_SESSION['tenant_error'] = "Gagal menyimpan data tenant ke database.";
-                }
-                $stmt->close();
-            }
-            $check->close();
-        } catch (Throwable $e) {
-            $_SESSION['tenant_error'] = "Kesalahan sistem: " . $e->getMessage();
-        }
-    } else {
-        $_SESSION['tenant_error'] = "Kolom Nama dan Tipe Tenant wajib diisi!";
-    }
-    header("Location: tenants.php");
-    exit;
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
-    $targetId         = (int)($_POST['edit_id'] ?? 0);
-    $name             = trim($_POST['name'] ?? '');
-    $type             = trim($_POST['type'] ?? '');
-    $description      = trim($_POST['description'] ?? '');
-    $phone            = trim($_POST['phone'] ?? '');
-    $email            = trim($_POST['email'] ?? '');
-    $preparation_time = isset($_POST['preparation_time']) ? (int)$_POST['preparation_time'] : 15;
-    $status           = isset($_POST['status']) ? (int)$_POST['status'] : 1;
-
-    if ($targetId > 0 && !empty($name) && !empty($type)) {
-        try {
-            $check = $conn->prepare("SELECT id FROM tenants WHERE name = ? AND id != ? LIMIT 1");
-            $check->bind_param("si", $name, $targetId);
-            $check->execute();
-            if ($check->get_result()->num_rows > 0) {
-                $_SESSION['tenant_error'] = "Nama Tenant tersebut sudah digunakan oleh data lain!";
-            } else {
-                $updateStmt = $conn->prepare("UPDATE tenants SET name = ?, type = ?, description = ?, phone = ?, email = ?, preparation_time = ?, status = ?, updated_at = NOW() WHERE id = ?");
-                $updateStmt->bind_param("sssssiii", $name, $type, $description, $phone, $email, $preparation_time, $status, $targetId);
-                
-                if ($updateStmt->execute()) {
-                    $_SESSION['tenant_success'] = "Data tenant berhasil diperbarui!";
-                    createNotification('admin', (int)$_SESSION['user_id'], 'Tenant Diperbarui', "Tenant $name ($type) berhasil diperbarui", 'tenants.php');
-                } else {
-                    $_SESSION['tenant_error'] = "Gagal memperbarui data tenant di database.";
-                }
-                $updateStmt->close();
-            }
-            $check->close();
-        } catch (Throwable $e) {
-            $_SESSION['tenant_error'] = "Kesalahan sistem saat mengubah data: " . $e->getMessage();
-        }
-    } else {
-        $_SESSION['tenant_error'] = "Input data perubahan tenant tidak valid.";
-    }
-    header("Location: tenants.php");
-    exit;
-}
-
-if (isset($_GET['action_delete'])) {
-    $deleteId = (int)$_GET['action_delete'];
-
-    if ($deleteId > 0) {
-        try {
-            $nameQuery = $conn->prepare("SELECT name FROM tenants WHERE id = ? LIMIT 1");
-            $nameQuery->bind_param("i", $deleteId);
-            $nameQuery->execute();
-            $nameResult = $nameQuery->get_result()->fetch_assoc();
-            $savedName = $nameResult ? $nameResult['name'] : "ID " . $deleteId;
-            $nameQuery->close();
-
             $deleteStmt = $conn->prepare("UPDATE tenants SET deleted_at = NOW() WHERE id = ?");
-            $deleteStmt->bind_param("i", $deleteId);
+            $deleteStmt->bind_param("i", $idToDelete);
             if ($deleteStmt->execute()) {
-                $_SESSION['tenant_success'] = "Data tenant berhasil dihapus dari sistem!";
-                createNotification('admin', (int)$_SESSION['user_id'], 'Tenant Dihapus', "Tenant '$savedName' berhasil dihapus", 'tenants.php');
+                header("Location: tenants.php?status=success_delete");
+                exit;
             } else {
-                $_SESSION['tenant_error'] = "Gagal menghapus data dari database.";
+                header("Location: tenants.php?status=error_delete&msg=" . urlencode($deleteStmt->error));
+                exit;
             }
             $deleteStmt->close();
         } catch (Throwable $e) {
-            $_SESSION['tenant_error'] = "Kesalahan sistem saat menghapus data: " . $e->getMessage();
+            header("Location: tenants.php?status=error_delete&msg=" . urlencode($e->getMessage()));
+            exit;
         }
     }
-    header("Location: tenants.php");
-    exit;
 }
 
-$tenantsData = [];
-$sql = "SELECT id, name, type, description, logo, phone, email, preparation_time, status, created_at, updated_at 
-        FROM tenants 
-        WHERE deleted_at IS NULL 
-        ORDER BY id ASC";
-$fetchQuery = $conn->query($sql);
-if ($fetchQuery) {
-    while ($row = $fetchQuery->fetch_assoc()) {
-        $tenantsData[] = $row;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_add_tenant'])) {
+    $tenantName  = trim($_POST['name'] ?? '');
+    $tenantType  = trim($_POST['type'] ?? '');
+    $prepTime    = (int)($_POST['preparation_time'] ?? 15);
+    $tenantPhone = trim($_POST['phone'] ?? '');
+    $tenantEmail = trim($_POST['email'] ?? '');
+    $tenantDesc  = trim($_POST['description'] ?? '');
+
+    $uploadedLogoName = '';
+    $uploadOk = true;
+    $errorMessage = '';
+
+    if (empty($tenantName) || empty($tenantType)) {
+        header("Location: tenants.php?status=error_insert&msg=" . urlencode("Nama tenant dan tipe kategori wajib diisi!"));
+        exit;
+    }
+
+    if (!empty($_FILES['logo']['name'])) {
+        $targetDir = "uploads/";
+        if (!file_exists($targetDir)) { mkdir($targetDir, 0777, true); }
+
+        $fileExtension = strtolower(pathinfo($_FILES["logo"]["name"], PATHINFO_EXTENSION));
+        $newFileName = 'tenant_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $fileExtension;
+        $targetFilePath = $targetDir . $newFileName;
+
+        if (in_array($fileExtension, ['jpg', 'jpeg', 'png', 'gif'])) {
+            if ($_FILES["logo"]["size"] <= 2 * 1024 * 1024) {
+                if (move_uploaded_file($_FILES["logo"]["tmp_name"], $targetFilePath)) {
+                    $uploadedLogoName = $newFileName;
+                } else { $uploadOk = false; $errorMessage = "Gagal memindahkan berkas logo ke server."; }
+            } else { $uploadOk = false; $errorMessage = "Ukuran file logo terlalu besar. Maksimal 2MB."; }
+        } else { $uploadOk = false; $errorMessage = "Format gambar tidak didukung."; }
+    }
+
+    if ($uploadOk) {
+        try {
+            $defaultStatus = 1;
+            $insertStmt = $conn->prepare("INSERT INTO tenants (name, type, description, logo, phone, email, preparation_time, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $insertStmt->bind_param("ssssssii", $tenantName, $tenantType, $tenantDesc, $uploadedLogoName, $tenantPhone, $tenantEmail, $prepTime, $defaultStatus);
+            
+            if ($insertStmt->execute()) {
+                header("Location: tenants.php?status=success_insert");
+                exit;
+            } else {
+                header("Location: tenants.php?status=error_insert&msg=" . urlencode($insertStmt->error));
+                exit;
+            }
+            $insertStmt->close();
+        } catch (Throwable $e) { 
+            header("Location: tenants.php?status=error_insert&msg=" . urlencode($e->getMessage()));
+            exit;
+        }
+    } else {
+        header("Location: tenants.php?status=error_insert&msg=" . urlencode($errorMessage));
+        exit;
     }
 }
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_tenant'])) {
+    $targetId    = (int)($_POST['id'] ?? 0);
+    $upName      = trim($_POST['name'] ?? '');
+    $upType      = trim($_POST['type'] ?? '');
+    $upPrepTime  = (int)($_POST['preparation_time'] ?? 15);
+    $upPhone     = trim($_POST['phone'] ?? '');
+    $upEmail     = trim($_POST['email'] ?? '');
+    $upDesc      = trim($_POST['description'] ?? '');
+    $oldLogo     = trim($_POST['old_photo'] ?? '');
+
+    $finalLogoName = $oldLogo; 
+    $uploadOk = true;
+    $errorMessage = '';
+
+    if (!empty($_FILES['logo']['name'])) {
+        $targetDir = "uploads/";
+        if (!file_exists($targetDir)) { mkdir($targetDir, 0777, true); }
+
+        $fileExtension = strtolower(pathinfo($_FILES["logo"]["name"], PATHINFO_EXTENSION));
+        $newFileName = 'tenant_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $fileExtension;
+        $targetFilePath = $targetDir . $newFileName;
+
+        if (in_array($fileExtension, ['jpg', 'jpeg', 'png', 'gif'])) {
+            if ($_FILES["logo"]["size"] <= 2 * 1024 * 1024) {
+                if (move_uploaded_file($_FILES["logo"]["tmp_name"], $targetFilePath)) {
+                    $finalLogoName = $newFileName;
+                    if (!empty($oldLogo) && file_exists("uploads/" . $oldLogo)) {
+                        @unlink("uploads/" . $oldLogo);
+                    }
+                } else { $uploadOk = false; $errorMessage = "Gagal memproses unggahan gambar baru."; }
+            } else { $uploadOk = false; $errorMessage = "Ukuran file logo terlalu besar. Maksimal 2MB."; }
+        } else { $uploadOk = false; $errorMessage = "Format berkas logo tidak valid."; }
+    }
+
+    if ($uploadOk && $targetId > 0 && !empty($upName) && !empty($upType)) {
+        try {
+            $updateStmt = $conn->prepare("UPDATE tenants SET name = ?, type = ?, description = ?, logo = ?, phone = ?, email = ?, preparation_time = ? WHERE id = ?");
+            $updateStmt->bind_param("ssssssii", $upName, $upType, $upDesc, $finalLogoName, $upPhone, $upEmail, $upPrepTime, $targetId);
+            
+            if ($updateStmt->execute()) {
+                header("Location: tenants.php?status=success_update");
+                exit;
+            } else {
+                header("Location: tenants.php?status=error_update&msg=" . urlencode($updateStmt->error));
+                exit;
+            }
+            $updateStmt->close();
+        } catch (Throwable $e) {
+            header("Location: tenants.php?status=error_update&msg=" . urlencode($e->getMessage()));
+            exit;
+        }
+    } else {
+        $errorMsg = !empty($errorMessage) ? $errorMessage : "Semua kolom wajib harus diisi dengan benar.";
+        header("Location: tenants.php?status=error_update&msg=" . urlencode($errorMsg));
+        exit;
+    }
+}
+
+$listTenants = [];
+try {
+    // MENYARING DATA: Hanya menarik record yang data deleted_at-nya masih kosong/NULL
+    $tenantQuery = $conn->query("SELECT * FROM tenants WHERE deleted_at IS NULL ORDER BY id DESC");
+    if ($tenantQuery) {
+        while ($tRow = $tenantQuery->fetch_assoc()) {
+            $listTenants[] = $tRow;
+        }
+    }
+} catch (Throwable $e) {
+    // Tangani error query jika diperlukan
+}
+
+$currentFile = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
+$menu = [
+    'home.php'        => [ 'href' => 'home.php',        'label' => 'Etalase Menu', 'icon' => 'bi-shop' ],
+    'tenants.php'     => [ 'href' => 'tenants.php',     'label' => 'Tenants',      'icon' => 'bi-house' ], 
+    'user.php'        => [ 'href' => 'user.php',        'label' => 'User',         'icon' => 'bi-person' ],
+    'roles.php'       => [ 'href' => 'roles.php',       'label' => 'Roles',        'icon' => 'bi-shield-lock' ],
+    'permissions.php' => [ 'href' => 'permissions.php', 'label' => 'Permissions',  'icon' => 'bi-key' ],
+];
 ?>
 
 <!DOCTYPE html>
@@ -155,8 +182,7 @@ if ($fetchQuery) {
 
 <style>
     :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
-    body, body.modal-open { background:var(--bg) !important; color:var(--text); overflow:auto !important; padding-right:0px !important; pointer-events:auto !important; }
-    .modal-backdrop, .modal-backdrop.show { display:none !important; opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+    body { background:var(--bg) !important; color:var(--text); }
     .content-bg { background: transparent; }
     .search-box { background: rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.25); border-radius: 18px; }
     .diet-pill { border:1px solid rgba(34,197,94,.35); background: rgba(34,197,94,.08); color:#86efac; }
@@ -188,189 +214,180 @@ if ($fetchQuery) {
   <?php require __DIR__ . '/sidebar.php'; ?>
 
 <main class="content-shift p-4">
+  <!-- Container tabel dengan tema gelap transparan yang selaras dengan halaman user -->
   <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
     
     <!-- HEADER TABEL & TOMBOL TAMBAH TENANT -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
       <div>
-        <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Manajemen Data Tenants</h2>
+        <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;"> Data Tenant </h2>
       </div>
       <div>
-        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalTenant" onclick="openTambahTenant()">
-          <i class="bi bi-shop"></i> Tambah Tenant
-        </button>
+<button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" onclick="openTambahModal()">
+    <i class="bi bi-house-add-fill"></i> Tambah Tenant
+</button>
       </div>
     </div>
 
-    <!-- NOTIFIKASI INFORMASI ALERT STATUS OPERASI CRUD -->
-    <?php if (!empty($crudSuccess)): ?>
-      <div class="alert alert-success border-0 rounded-3 mb-4 alert-dismissible fade show" role="alert" style="background: rgba(34, 197, 94, 0.12) !important; color: #86efac !important;">
-        <i class="bi bi-check-circle-fill me-2"></i> <?= htmlspecialchars($crudSuccess) ?>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close" style="font-size: 0.75rem; box-shadow: none;"></button>
-      </div>
-    <?php endif; ?>
-    <?php if (!empty($crudError)): ?>
-      <div class="alert alert-danger border-0 rounded-3 mb-4 alert-dismissible fade show" role="alert" style="background: rgba(239, 68, 68, 0.12) !important; color: #fecaca !important;">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= htmlspecialchars($crudError) ?>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close" style="font-size: 0.75rem; box-shadow: none;"></button>
-      </div>
-    <?php endif; ?>
-
-    <!-- STRUKTUR TABEL LIST DATA TENANTS (DRAG SCROLL & TRANSPARAN) -->
-    <div id="dragScrollStockContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
-      <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1100px; user-select: none; border-collapse: collapse !important;">
+    <!-- STRUKTUR TABEL LIST DATA TENANT (TANPA SCROLL BAR & DAPAT DIGESER MOUSE - BEBAS GARIS PUTIH) -->
+    <div id="dragScrollContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important;">
+      <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 1500px; user-select: none; border-collapse: collapse !important;">
         <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
-            <tr>
-              <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;">ID</th>
-              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Nama Tenant</th>
-              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Tipe</th>
-              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Kontak &amp; Email</th>
-              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Persiapan</th>
-              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Status</th>
-              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Aksi</th>
-            </tr>
+          <tr> 
+              <th class="py-3 px-2 text-center text-white" style="background: transparent !important; border: none !important;"> ID</th> 
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;"> Name</th> 
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Type</th> 
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Description</th> 
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Logo</th> 
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Phone</th> 
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Email</th> 
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Prep Time</th> 
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Status</th> 
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Created At</th> 
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Updated At</th> 
+              <th class="py-3 text-white" style="background: transparent !important; border: none !important;">Deleted At</th> 
+              <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important;">Aksi</th> 
+          </tr>
         </thead>
         <tbody style="background: transparent !important;">
           <?php
-          if (!empty($tenantsData)) {
-              foreach ($tenantsData as $tenantRow) {
-                  $statusBadge = ($tenantRow['status'] == 1) ? 'bg-success' : 'bg-secondary';
-                  $statusText = ($tenantRow['status'] == 1) ? 'Aktif' : 'Non-Aktif';
+          try {
+              $queryTenants = "SELECT id, name, type, description, logo, phone, email, preparation_time, status, created_at, updated_at, deleted_at FROM tenants WHERE deleted_at IS NULL ORDER BY id ASC";
+              $resultTenants = $conn->query($queryTenants);
+              
+              if ($resultTenants && $resultTenants->num_rows > 0) {
+                  while ($tenantRow = $resultTenants->fetch_assoc()) {
+                      $isTenantActive = (int)$tenantRow['status'] === 1;
+                      
+                      if (!empty($tenantRow['logo']) && file_exists("uploads/" . $tenantRow['logo'])) {
+                          $imgDisplay = '<img src="uploads/'.htmlspecialchars($tenantRow['logo']).'" class="rounded-circle shadow-sm" style="width: 35px; height: 35px; object-fit: cover; border: 1px solid rgba(148, 163, 184, 0.2);" draggable="false">';
+                      } else {
+                          $initials = strtoupper(substr($tenantRow['name'] ?? 'TN', 0, 2));
+                          $imgDisplay = '<div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm" style="width: 35px; height: 35px; background: rgba(148, 163, 184, 0.25); border: 1px solid rgba(148, 163, 184, 0.2); font-size: 0.75rem;">'.$initials.'</div>';
+                      }
+                      ?>
+                      <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
+                        <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $tenantRow['id'] ?></td>
+                        <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($tenantRow['name'] ?? '-') ?></td>
+                        <td class="text-center" style="background: transparent !important; border: none !important;">
+                          <span class="badge bg-info-subtle text-info border border-info border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem; background: rgba(13, 202, 240, 0.15);"><?= htmlspecialchars($tenantRow['type'] ?? '-') ?></span>
+                        </td>
+                        <td class="text-white-50" style="background: transparent !important; border: none !important; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><?= htmlspecialchars($tenantRow['description'] ?? '-') ?></td>
+                        <td class="text-center" style="background: transparent !important; border: none !important;"><?= $imgDisplay ?></td>
+                        <td class="text-white-50" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($tenantRow['phone'] ?: '-') ?></td>
+                        <td class="text-white-50" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($tenantRow['email'] ?: '-') ?></td>
+                        <td class="text-center text-white-50" style="background: transparent !important; border: none !important;"><?= htmlspecialchars($tenantRow['preparation_time']) ?> mnt</td>
+                        <td class="text-center" style="background: transparent !important; border: none !important;">
+                          <?php if ($isTenantActive): ?>
+                            <span class="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">1 (Aktif)</span>
+                          <?php else: ?>
+                            <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">0 (Nonaktif)</span>
+                          <?php endif; ?>
+                        </td>
+                        <td class="text-white-50 small" style="background: transparent !important; border: none !important;"><?= $tenantRow['created_at'] ?? 'NULL' ?></td>
+                        <td class="text-white-50 small" style="background: transparent !important; border: none !important;"><?= $tenantRow['updated_at'] ?? 'NULL' ?></td>
+                        <td class="text-white-50 small" style="background: transparent !important; border: none !important;"><?= $tenantRow['deleted_at'] ?? 'NULL' ?></td>
+                        
+                        <td class="text-center" style="background: transparent !important; border: none !important;">
+                          <div class="d-flex justify-content-center gap-1">
+                            <button type="button" class="btn btn-sm btn-success" onclick='editTenant(<?= json_encode($tenantRow, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger p-1" title="Delete Tenant" onclick='confirmDeleteTenant(<?= json_encode($tenantRow) ?>)'>
+                                <i class="bi bi-trash-fill" style="font-size: 1.15rem;"></i>
+                            </button>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <?php
+                  }
+              } else {
                   ?>
-                  <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
-                    <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $tenantRow['id'] ?></td>
-                    <td class="fw-semibold text-white" style="background: transparent !important; border: none !important;">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-shop text-white-50"></i>
-                            <div>
-                                <span><?= htmlspecialchars($tenantRow['name']) ?></span>
-                                <span class="d-block small text-white-50 fw-normal"><?= htmlspecialchars($tenantRow['description'] ?: '-') ?></span>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="text-center fw-medium" style="background: transparent !important; border: none !important; color: #cbd5e1 !important;"><span class="badge bg-dark border border-secondary text-light"><?= htmlspecialchars($tenantRow['type']) ?></span></td>
-                    <td style="background: transparent !important; border: none !important;">
-                        <span class="d-block fw-medium"><i class="bi bi-telephone me-1 text-white-50"></i><?= htmlspecialchars($tenantRow['phone'] ?: '-') ?></span>
-                        <span class="d-block small text-white-50"><i class="bi bi-envelope me-1"></i><?= htmlspecialchars($tenantRow['email'] ?: '-') ?></span>
-                    </td>
-                    <td class="text-center fw-bold text-warning" style="background: transparent !important; border: none !important;"><?= $tenantRow['preparation_time'] ?> Menit</td>
-                    <td class="text-center" style="background: transparent !important; border: none !important;">
-                        <span class="badge <?= $statusBadge ?> rounded-2 px-2.5 py-1.5 fw-bold" style="font-size: 0.75rem; color: #fff !important;"><?= $statusText ?></span>
-                    </td>
-                    <td class="text-center" style="background: transparent !important; border: none !important;">
-                      <div class="d-inline-flex gap-2">
-                        <button type="button" class="btn btn-sm btn-outline-warning border-0 rounded-2 text-warning" title="Edit Tenant" onclick="openEditTenant(<?= htmlspecialchars(json_encode($tenantRow)) ?>)">
-                          <i class="bi bi-pencil-square"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Hapus Tenant" onclick="triggerDeleteTenant('tenants.php?action_delete=<?= $tenantRow['id']; ?>', '<?= addslashes($tenantRow['name']); ?>')">
-                          <i class="bi bi-trash3-fill"></i>
-                        </button>
-                      </div>
+                  <tr>
+                    <td colspan="13" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">
+                      <i class="bi bi-folder-x d-block mb-2" style="font-size: 2rem; color: rgba(148, 163, 184, 0.4);"></i>
+                      Tidak ada data tenant yang aktif saat ini.
                     </td>
                   </tr>
                   <?php
               }
-          } else {
-              echo '<tr><td colspan="7" class="text-center py-5 text-muted" style="background: transparent !important; border: none !important;">
-                      <i class="bi bi-folder-x d-block mb-2" style="font-size: 2rem; color: rgba(148, 163, 184, 0.4);"></i>
-                      Belum ada data tenant terdaftar di database.
-                    </td></tr>';
+          } catch (Throwable $e) {
+              echo "<tr><td colspan='13' class='text-danger text-center py-3' style='background: transparent !important; border: none !important;'>Gagal memuat data: " . htmlspecialchars($e->getMessage()) . "</td></tr>";
           }
           ?>
         </tbody>
       </table>
     </div>
-
   </div>
 </main>
 
 <!-- Modal CRUD (Memanjang Ke Kanan & Transparan Gelap Selaras) -->
-<div class="modal fade" id="modalTenant" tabindex="-1" aria-hidden="true">
-    <!-- Menggunakan class modal-lg agar ukuran kotak form memanjang lebar ke kanan -->
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <form action="tenants.php" method="POST" id="formTenant" class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb; border-radius: 16px;">
-            
-            <div class="modal-header border-0 pb-0" style="padding: 1.5rem 1.5rem 0 1.5rem;">
-                <h5 class="fw-bold text-white m-0" id="modalTenantLabel"><i class="bi bi-shop text-success me-2"></i> Tambah Tenant Baru</h5>
+<div class="modal fade modal-right" id="modalTenantRight" tabindex="-1" aria-labelledby="modalTenantLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.88) !important; backdrop-filter: blur(10px); border-left: 1px solid rgba(148, 163, 184, 0.2); color: #e5e7eb;">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
+                <h5 class="modal-title fw-bold text-white" id="modalTenantLabel">Form Tenant</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            
-            <div class="modal-body p-4">
-                <!-- Input Hidden ID Kunci Transaksi -->
-                <input type="hidden" name="edit_id" id="tenant_id">
-                
-                <!-- ROW STRUKTUR MEMANJANG KE KANAN (2 KOLOM JAJAR SIDE-BY-SIDE) -->
-                <div class="row g-3">
+            <form id="formTenant" action="tenants.php" method="POST" enctype="multipart/form-data">
+                <div class="modal-body" style="overflow-y: auto; max-height: calc(100vh - 130px); padding-bottom: 80px;">
                     
-                    <!-- SISI KIRI: IDENTITAS UTAMA TOKO -->
-                    <div class="col-12 col-md-6 border-end-md" style="border-color: rgba(148, 163, 184, 0.15) !important;">
-                        <div class="pe-md-2">
-                            <div class="mb-3">
-                                <label class="form-label small text-white-50 fw-medium">Nama Tenant / Toko</label>
-                                <input type="text" name="name" id="tenant_name" class="form-control text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); color: #fff !important;" required placeholder="Contoh: Dapur Gizi Sehat">
-                            </div>
+                    <input type="hidden" name="id" id="tenant_id">
+                    <input type="hidden" name="action_add_tenant" id="action_add_trigger" value="1">
+                    <input type="hidden" name="action_update_tenant" id="action_update_trigger" value="1" disabled>
+                    <input type="hidden" name="old_photo" id="tenant_old_photo">
 
-                            <div class="mb-3">
-                                <label class="form-label small text-white-50 fw-medium">Tipe Kategori Tenant</label>
-                                <select name="type" id="tenant_type" class="form-select text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); color: #fff !important;" required>
-                                    <option value="kantin">Kantin</option>
-                                    <option value="cafe">Cafe</option>
-                                    <option value="koperasi">Koperasi</option>
-                                    <option value="laundry">Laundry</option>
-                                </select>
-                            </div>
-
-                            <div class="mb-0">
-                                <label class="form-label small text-white-50 fw-medium">Status Operasional Global</label>
-                                <select name="status" id="tenant_status" class="form-select text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); color: #fff !important;">
-                                    <option value="1">Aktif / Buka</option>
-                                    <option value="0">Non-Aktif / Tutup</option>
-                                </select>
-                            </div>
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Nama Tenant</label>
+                        <input type="text" class="form-control" name="name" id="tenant_name" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Tipe Tenant</label>
+                        <select class="form-select" name="type" id="tenant_type" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" onchange="toggleCustomType(this.value)" required>
+                            <option value="kantin">Kantin</option>
+                            <option value="cafe">Cafe</option>
+                            <option value="koperasi">Koperasi</option>
+                            <option value="laundry">Laundry</option>
+                            <option value="florist">Florist</option>
+                            <option value="giftshop">Giftshop</option>
+                            <option value="lainnya">Lainnya</option>
+                        </select>
+                    </div>
+                    
+                    <!-- PERBAIKAN: Wadah Input Ketik Manual Saat Memilih Opsi "Lainnya" -->
+                    <div class="mb-3" id="custom_type_container" style="display: none;">
+                        <label class="form-label" style="color: #22c55e !important; font-weight: 500;">Masukkan Tipe Baru</label>
+                        <input type="text" class="form-control" id="tenant_type_custom" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(34, 197, 94, 0.4) !important; color: #e5e7eb !important;">
                     </div>
 
-                    <!-- SISI KANAN: DESKRIPSI & TENTANG TENANT -->
-                    <div class="col-12 col-md-6">
-                        <div class="ps-md-2">
-                            <div class="mb-0">
-                                <label class="form-label small text-white-50 fw-medium">Deskripsi Singkat / Keterangan Toko</label>
-                                <textarea name="description" id="tenant_description" rows="6" class="form-control text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); color: #fff !important;" placeholder="Tulis rincian atau catatan menu spesifik tenant disini..."></textarea>
-                            </div>
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Upload Logo</label>
+                        <input type="file" class="form-control" name="logo" id="tenant_logo" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
                     </div>
-
-                </div>
-
-                <!-- TOMBOL ACTION SUBMIT FORM UTAMA -->
-                <div class="mt-4 pb-1">
-                    <button type="submit" id="btnSubmitTenant" class="btn btn-success rounded-3 w-100 py-2 fw-medium">Simpan Data Tenant</button>
-                </div>
-
-                <!-- KOMPONEN DI BAWAH BUTTON: KONTAK, EMAIL & WAKTU PREPARASI -->
-                <div class="p-3 rounded-4 mt-3" style="background: rgba(30, 41, 59, 0.3); border: 1px dashed rgba(148, 163, 184, 0.25);">
-                    <div class="row g-3">
-                        <div class="col-12 col-md-4">
-                            <label class="form-label small text-white-50 fw-medium"><i class="bi bi-telephone me-1"></i> No. Telepon (Phone)</label>
-                            <input type="text" name="phone" id="tenant_phone" class="form-control text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); color: #fff !important;" placeholder="Contoh: 0812345678">
-                        </div>
-                        <div class="col-12 col-md-5">
-                            <label class="form-label small text-white-50 fw-medium"><i class="bi bi-envelope me-1"></i> Alamat Email Toko</label>
-                            <input type="email" name="email" id="tenant_email" class="form-control text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); color: #fff !important;" placeholder="nama@tenant.com">
-                        </div>
-                        <div class="col-12 col-md-3">
-                            <label class="form-label small text-white-50 fw-medium"><i class="bi bi-hourglass-split me-1"></i> Persiapan (Menit)</label>
-                            <input type="number" name="preparation_time" id="tenant_preparation_time" min="1" class="form-control text-white border-secondary rounded-3" style="background: rgba(2, 6, 23, 0.4); color: #fff !important;" value="15">
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Deskripsi</label>
+                        <textarea class="form-control" name="description" id="tenant_description" rows="3" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Nomor Telepon</label>
+                        <input type="text" class="form-control" name="phone" id="tenant_phone" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Email</label>
+                        <input type="email" class="form-control" name="email" id="tenant_email" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Waktu Persiapan (Menit)</label>
+                        <input type="number" class="form-control" name="preparation_time" id="tenant_prep" value="15" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
                     </div>
                 </div>
-
-            </div>
-            
-            <div class="modal-footer border-0 pt-0 justify-content-center" style="padding: 0 1.5rem 1.5rem 1.5rem;">
-                <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 px-4 py-1.5" data-bs-dismiss="modal">Tutup Jendela</button>
-            </div>
-        </form>
+                <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.15); position: absolute; bottom: 0; width: 100%; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px);">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-success">Simpan Data</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -379,29 +396,28 @@ if ($fetchQuery) {
     <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
         <div class="modal-content" style="background: rgba(15, 23, 42, 0.95) !important; backdrop-filter: blur(10px); border: 1px solid rgba(239, 68, 68, 0.25); color: #e5e7eb; border-radius: 16px;">
             <div class="modal-body text-center p-4">
-                <!-- Visual Anchor berupa icon Exclamation dengan efek drop-shadow merah transparan -->
                 <div class="text-danger mb-3">
                     <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem; filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.3));"></i>
                 </div>
-                <h5 class="fw-bold text-white mb-2">Hapus Data Tenant?</h5>
-                <p class="text-white-50 small mb-4">Tindakan ini akan menonaktifkan tenant <span id="delete_tenant_name" class="text-white fw-semibold"></span> secara permanen dari sistem.</p>
+                <h5 class="fw-bold text-white mb-2">Hapus Tenant?</h5>
+                <p class="text-muted small mb-4">Tindakan ini akan menghapus data tenant <span id="delete_tenant_name" class="text-white fw-semibold"></span>. Data yang dihapus tidak dapat dikembalikan.</p>
                 <div class="d-flex gap-2 justify-content-center">
                     <button type="button" class="btn btn-sm btn-secondary rounded-3 px-3 py-2" data-bs-dismiss="modal" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8;">Batal</button>
-                    <a id="btn_confirm_delete_tenant" href="#" class="btn btn-sm btn-danger rounded-3 px-3 py-2 fw-medium">Ya, Hapus</a>
+                    <a id="btn_confirm_delete" href="#" class="btn btn-sm btn-danger rounded-3 px-3 py-2 fw-medium">Ya, Hapus</a>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
+  
 <!-- JavaScript Integrasi Modal, Isian Form, dan Drag to Scroll -->
 <script>
 let deleteModalInstance = null;
 let tenantModalInstance = null;
 
-function triggerDeleteTenant(url, tenantName) {
-    document.getElementById('delete_tenant_name').innerText = '"' + tenantName + '"';
-    document.getElementById('btn_confirm_delete_tenant').setAttribute('href', url);
+function confirmDeleteTenant(data) {
+    document.getElementById('delete_tenant_name').innerText = '"' + data.name + '"';
+    document.getElementById('btn_confirm_delete').href = 'tenants.php?action=delete&id=' + data.id;
     
     if (!deleteModalInstance) {
         deleteModalInstance = new bootstrap.Modal(document.getElementById('modalDeleteTenant'));
@@ -411,101 +427,101 @@ function triggerDeleteTenant(url, tenantName) {
 
 function getTenantModal() {
     if (!tenantModalInstance) {
-        tenantModalInstance = new bootstrap.Modal(document.getElementById('modalTenant'));
+        tenantModalInstance = new bootstrap.Modal(document.getElementById('modalTenantRight'));
     }
     return tenantModalInstance;
 }
 
-function bersihkanMacet() {
-    document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
-    document.body.classList.remove('modal-open');
-    document.body.style.overflow = '';
-    document.body.style.paddingRight = '';
-}
-document.addEventListener('hidden.bs.modal', bersihkanMacet);
-setInterval(() => {
-    let adaModalAktif = false;
-    document.querySelectorAll('.modal').forEach(m => {
-        if (m.classList.contains('show')) adaModalAktif = true;
-    });
-    if (!adaModalAktif && document.querySelector('.modal-backdrop')) {
-        bersihkanMacet();
-    }
-}, 300);
-
 document.addEventListener('DOMContentLoaded', function() {
-    if (window.history.replaceState && window.location.search !== '') {
-        const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-        window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
-    }
-
-    const slider = document.getElementById('dragScrollStockContainer');
+    const slider = document.querySelector('.table-responsive');
     if (!slider) return;
     let isDown = false, startX, scrollLeft;
     
     slider.addEventListener('mousedown', (e) => {
         if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
         isDown = true; 
-        slider.style.cursor = 'grabbing';
         startX = e.pageX - slider.offsetLeft; 
         scrollLeft = slider.scrollLeft;
     });
-    slider.addEventListener('mouseleave', () => { isDown = false; slider.style.cursor = 'grab'; });
-    slider.addEventListener('mouseup', () => { isDown = false; slider.style.cursor = 'grab'; });
+    slider.addEventListener('mouseleave', () => { isDown = false; });
+    slider.addEventListener('mouseup', () => { isDown = false; });
     slider.addEventListener('mousemove', (e) => {
         if (!isDown) return; 
         e.preventDefault();
         const x = e.pageX - slider.offsetLeft; 
-        const walk = (x - startX) * 2;
+        const walk = (x - startX) * 1.5;
         slider.scrollLeft = scrollLeft - walk;
     });
 });
 
-function openTambahTenant() {
+function openTambahModal() {
     resetForm();
-    document.getElementById('modalTenantLabel').innerHTML = '<i class="bi bi-shop text-success me-2"></i> Tambah Tenant Baru';
-    
-    const btnSubmit = document.getElementById('btnSubmitTenant');
-    if (btnSubmit) {
-        btnSubmit.setAttribute('name', 'action_create');
-        btnSubmit.className = "btn btn-success rounded-3 w-100 py-2 fw-medium";
-        btnSubmit.innerText = "Simpan Data Tenant";
-    }
+    document.getElementById('modalTenantLabel').innerText = 'Tambah Tenant';
     getTenantModal().show();
 }
 
 function resetForm() {
-    const form = document.getElementById('formTenant');
-    if (form) form.reset();
+    document.getElementById('formTenant').reset();
     document.getElementById('tenant_id').value = '';
-    document.getElementById('tenant_preparation_time').value = '15';
+    document.getElementById('action_add_trigger').removeAttribute('disabled');
+    document.getElementById('action_update_trigger').setAttribute('disabled', 'disabled');
+    toggleCustomType('kantin'); 
 }
 
-function openEditTenant(tenantRow) {
-    if (!tenantRow) return;
+function editTenant(data) {
     resetForm();
+    document.getElementById('modalTenantLabel').innerText = 'Ubah Data Tenant';
+    document.getElementById('action_add_trigger').setAttribute('disabled', 'disabled');
+    document.getElementById('action_update_trigger').removeAttribute('disabled');
     
-    document.getElementById('modalTenantLabel').innerHTML = '<i class="bi bi-pencil-square text-warning me-2"></i> Ubah Data Tenant';
+    document.getElementById('tenant_id').value = data.id;
+    document.getElementById('tenant_name').value = data.name;
+    document.getElementById('tenant_description').value = data.description || '';
+    document.getElementById('tenant_phone').value = data.phone || '';
+    document.getElementById('tenant_email').value = data.email || '';
+    document.getElementById('tenant_prep').value = data.preparation_time || 15;
     
-    document.getElementById('tenant_id').value = tenantRow.id;
-    document.getElementById('tenant_name').value = tenantRow.name || '';
-    document.getElementById('tenant_type').value = tenantRow.type || 'kantin';
-    document.getElementById('tenant_description').value = tenantRow.description || '';
-    document.getElementById('tenant_status').value = tenantRow.status;
-    document.getElementById('tenant_phone').value = tenantRow.phone || '';
-    document.getElementById('tenant_email').value = tenantRow.email || '';
-    document.getElementById('tenant_preparation_time').value = tenantRow.preparation_time || '15';
+    if (document.getElementById('tenant_old_photo')) { 
+        document.getElementById('tenant_old_photo').value = data.logo || ''; 
+    }
 
-    const btnSubmit = document.getElementById('btnSubmitTenant');
-    if (btnSubmit) {
-        btnSubmit.setAttribute('name', 'action_update');
-        btnSubmit.className = "btn btn-warning text-dark rounded-3 w-100 py-2 fw-bold";
-        btnSubmit.innerText = "Simpan Perubahan Tenant";
+    const selectType = document.getElementById('tenant_type');
+    const standardOptions = ['kantin', 'cafe', 'koperasi', 'laundry', 'florist', 'giftshop'];
+    
+    if (data.type && standardOptions.includes(data.type.toLowerCase())) {
+        selectType.value = data.type.toLowerCase(); 
+        toggleCustomType(data.type.toLowerCase());
+    } else {
+        selectType.value = 'lainnya'; 
+        toggleCustomType('lainnya');
+        if (document.getElementById('tenant_type_custom')) { 
+            document.getElementById('tenant_type_custom').value = data.type || ''; 
+        }
     }
     getTenantModal().show();
+}
+
+function toggleCustomType(value) {
+    const container = document.getElementById('custom_type_container');
+    const inputCustom = document.getElementById('tenant_type_custom');
+    const selectType = document.getElementById('tenant_type');
+    if (!container || !inputCustom || !selectType) return;
+    
+    if (value === 'lainnya') {
+        container.style.display = 'block'; 
+        inputCustom.setAttribute('name', 'type');
+        inputCustom.setAttribute('required', 'required'); 
+        selectType.removeAttribute('name');
+    } else {
+        container.style.display = 'none'; 
+        inputCustom.removeAttribute('name');
+        inputCustom.removeAttribute('required'); 
+        selectType.setAttribute('name', 'type');
+    }
 }
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+

@@ -1,6 +1,6 @@
 <?php
+// product_addons.php
 include 'db.php'; 
-include 'notification_helper.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -15,6 +15,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'read';
 $status = isset($_GET['status']) ? $_GET['status'] : "";
 $msg    = isset($_GET['msg']) ? $_GET['msg'] : "";
 
+// 1. Ambil Semua Data Topping / Addon (Read)
 if ($action == 'read') {
     $query = "SELECT pa.*, p.name AS product_name 
               FROM product_addons pa 
@@ -27,6 +28,7 @@ if ($action == 'read') {
     $addons = mysqli_fetch_all($result, MYSQLI_ASSOC);
 }
 
+// 2. Tambah Data (Create)
 if ($action == 'create' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     $product_id = intval($_POST['product_id']);
     $addon_name = mysqli_real_escape_string($conn, trim($_POST['addon_name']));
@@ -35,7 +37,6 @@ if ($action == 'create' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!empty($product_id) && !empty($addon_name)) {
         $query = "INSERT INTO product_addons (product_id, addon_name, required) VALUES ($product_id, '$addon_name', $required)";
         if (mysqli_query($conn, $query)) {
-            createNotification('admin', (int)$_SESSION['user_id'], 'Grup Addon Ditambahkan', "Grup addon '$addon_name' berhasil ditambahkan", 'product_addons.php');
             header("Location: product_addons.php?status=success_add");
             exit;
         } else {
@@ -45,6 +46,7 @@ if ($action == 'create' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
+// 3. Ubah Data (Update)
 if ($action == 'update' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     $id         = intval($_POST['id']);
     $product_id = intval($_POST['product_id']);
@@ -54,7 +56,6 @@ if ($action == 'update' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!empty($id) && !empty($product_id) && !empty($addon_name)) {
         $query = "UPDATE product_addons SET product_id = $product_id, addon_name = '$addon_name', required = $required WHERE id = $id";
         if (mysqli_query($conn, $query)) {
-            createNotification('admin', (int)$_SESSION['user_id'], 'Grup Addon Diperbarui', "Grup addon '$addon_name' (ID: $id) berhasil diperbarui", 'product_addons.php');
             header("Location: product_addons.php?status=success_edit");
             exit;
         } else {
@@ -64,16 +65,11 @@ if ($action == 'update' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
+// 4. Hapus Data (Delete)
 if ($action == 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
-    
-    $infoQuery = mysqli_query($conn, "SELECT addon_name FROM product_addons WHERE id = $id");
-    $addon_data = mysqli_fetch_assoc($infoQuery);
-    $saved_name = $addon_data ? $addon_data['addon_name'] : "ID " . $id;
-
     $query = "DELETE FROM product_addons WHERE id = $id";
     if (mysqli_query($conn, $query)) {
-        createNotification('admin', (int)$_SESSION['user_id'], 'Grup Addon Dihapus', "Grup addon '$saved_name' berhasil dihapus", 'product_addons.php');
         header("Location: product_addons.php?status=success_delete");
         exit;
     } else {
@@ -82,6 +78,7 @@ if ($action == 'delete' && isset($_GET['id'])) {
     }
 }
 
+// Ambil list produk untuk dropdown form
 $product_query = "SELECT id, name FROM products WHERE deleted_at IS NULL ORDER BY name ASC";
 $product_result = mysqli_query($conn, $product_query);
 $products = $product_result ? mysqli_fetch_all($product_result, MYSQLI_ASSOC) : [];

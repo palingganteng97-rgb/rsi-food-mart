@@ -1,11 +1,12 @@
 <?php
+// product_reviews.php
 include "db.php"; 
-include "notification_helper.php";
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Proteksi Halaman: Jika sesi user_id kosong, tendang kembali ke login.php
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
@@ -14,6 +15,9 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
 $crudError = '';
 $crudSuccess = '';
 
+// ==========================================
+// 1. PROSES CRUD: MENAMPILKAN DATA (READ)
+// ==========================================
 $reviews = [];
 try {
     $query = "SELECT pr.*, p.name AS product_name 
@@ -28,6 +32,9 @@ try {
     $crudError = "Gagal memuat ulasan: " . $e->getMessage();
 }
 
+// ==========================================
+// 2. PROSES CRUD: TAMBAH ULASAN BARU (CREATE)
+// ==========================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_create'])) {
     $product_id         = (int)($_POST['product_id'] ?? 0);
     $patient_session_id = (int)($_POST['patient_session_id'] ?? 0);
@@ -40,12 +47,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_create'])) {
             $stmt->bind_param("iiis", $product_id, $patient_session_id, $rating, $review);
             
             if ($stmt->execute()) {
-                $productQuery = mysqli_query($conn, "SELECT name FROM products WHERE id = $product_id");
-                $productData  = mysqli_fetch_assoc($productQuery);
-                $productName  = $productData ? $productData['name'] : "ID " . $product_id;
-
-                createNotification('admin', (int)$_SESSION['user_id'], 'Ulasan Produk Baru', "Ulasan baru dengan rating $rating berhasil ditambahkan pada produk '$productName'", 'product_reviews.php');
-
                 $crudSuccess = "Ulasan baru berhasil ditambahkan!";
                 header("Location: product_reviews.php?status=success_add");
                 exit;
@@ -61,6 +62,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_create'])) {
     }
 }
 
+// ==========================================
+// 3. PROSES CRUD: SIMPAN PERUBAHAN (UPDATE)
+// ==========================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
     $targetId           = (int)($_POST['edit_id'] ?? 0);
     $product_id         = (int)($_POST['product_id'] ?? 0);
@@ -74,12 +78,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
             $updateStmt->bind_param("iiisi", $product_id, $patient_session_id, $rating, $review, $targetId);
             
             if ($updateStmt->execute()) {
-                $productQuery = mysqli_query($conn, "SELECT name FROM products WHERE id = $product_id");
-                $productData  = mysqli_fetch_assoc($productQuery);
-                $productName  = $productData ? $productData['name'] : "ID " . $product_id;
-
-                createNotification('admin', (int)$_SESSION['user_id'], 'Ulasan Produk Diperbarui', "Data ulasan (ID: $targetId) pada produk '$productName' berhasil diperbarui", 'product_reviews.php');
-
                 $crudSuccess = "Data ulasan berhasil diperbarui!";
                 header("Location: product_reviews.php?status=success_edit");
                 exit;
@@ -95,21 +93,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
     }
 }
 
+// ==========================================
+// 4. PROSES CRUD: HAPUS DATA (DELETE)
+// ==========================================
 if (isset($_GET['action_delete'])) {
     $deleteId = (int)$_GET['action_delete'];
 
     if ($deleteId > 0) {
         try {
-            $infoQuery = mysqli_query($conn, "SELECT pr.product_id, p.name AS product_name FROM product_reviews pr LEFT JOIN products p ON pr.product_id = p.id WHERE pr.id = $deleteId");
-            $infoData  = mysqli_fetch_assoc($infoQuery);
-            $productName = $infoData ? $infoData['product_name'] : "ID " . ($infoData['product_id'] ?? 0);
-
             $deleteStmt = $conn->prepare("DELETE FROM product_reviews WHERE id = ?");
             $deleteStmt->bind_param("i", $deleteId);
             
             if ($deleteStmt->execute()) {
-                createNotification('admin', (int)$_SESSION['user_id'], 'Ulasan Produk Dihapus', "Data ulasan (ID: $deleteId) pada produk '$productName' berhasil dihapus dari sistem", 'product_reviews.php');
-
                 $crudSuccess = "Ulasan berhasil dihapus dari sistem!";
                 header("Location: product_reviews.php?status=success_delete");
                 exit;
@@ -123,6 +118,7 @@ if (isset($_GET['action_delete'])) {
     }
 }
 
+// Ambil list produk untuk dropdown form input ulasan
 $products = [];
 try {
     $product_result = mysqli_query($conn, "SELECT id, name FROM products WHERE deleted_at IS NULL ORDER BY name ASC");

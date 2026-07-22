@@ -1,12 +1,13 @@
 <?php
-include "db.php"; 
-include "notification_helper.php";
+// tenant_operating_hours.php
+include "db.php"; // Memanggil koneksi database ($conn) & session_start()
 
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
+// Menangkap notifikasi dari session untuk dicocokkan dengan alert komponen HTML Anda
 $status = '';
 $msg = '';
 if (isset($_SESSION['success'])) {
@@ -19,25 +20,22 @@ if (isset($_SESSION['error'])) {
     unset($_SESSION['error']);
 }
 
+// ==========================================
+// 1. PROSES SIMPAN / TAMBAH DATA (CREATE MULTI-HARI)
+// ==========================================
 if (isset($_POST['action']) && $_POST['action'] == 'insert') {
     $tenant_id   = $_POST['tenant_id'];
-    $days        = isset($_POST['day_of_week']) ? $_POST['day_of_week'] : []; 
+    $days        = isset($_POST['day_of_week']) ? $_POST['day_of_week'] : []; // Menangkap array hari []
     $open_time   = $_POST['open_time'];
     $close_time  = $_POST['close_time'];
     $is_open     = $_POST['is_open']; 
 
     if (!empty($days)) {
-        $tenantQuery = $conn->prepare("SELECT name FROM tenants WHERE id = ? LIMIT 1");
-        $tenantQuery->bind_param("i", $tenant_id);
-        $tenantQuery->execute();
-        $tenantRes = $tenantQuery->get_result()->fetch_assoc();
-        $tenantName = $tenantRes ? $tenantRes['name'] : "ID " . $tenant_id;
-        $tenantQuery->close();
-
         $query = "INSERT INTO tenant_operating_hours (tenant_id, day_of_week, open_time, close_time, is_open) VALUES (?, ?, ?, ?, ?)";
         $stmt  = $conn->prepare($query);
         
         foreach ($days as $day_of_week) {
+            // Mencegah duplikasi hari yang sama untuk tenant ini agar tidak bentrok
             $queryCheck = "SELECT id FROM tenant_operating_hours WHERE tenant_id = ? AND day_of_week = ?";
             $stmtCheck = $conn->prepare($queryCheck);
             $stmtCheck->bind_param("ii", $tenant_id, $day_of_week);
@@ -49,15 +47,6 @@ if (isset($_POST['action']) && $_POST['action'] == 'insert') {
                 $stmt->execute();
             }
         }
-        
-        createNotification(
-            'admin', 
-            (int)$_SESSION['user_id'], 
-            'Jam Operasional Tenant', 
-            "Pengaturan jam operasional baru untuk tenant '$tenantName' berhasil disimpan", 
-            'tenant_operating_hours.php'
-        );
-
         $_SESSION['success'] = "success_insert";
     } else {
         $_SESSION['error'] = "Silakan pilih minimal satu hari operasional!";
@@ -66,22 +55,19 @@ if (isset($_POST['action']) && $_POST['action'] == 'insert') {
     exit;
 }
 
+// ==========================================
+// 2. PROSES UPDATE DATA (SINKRONISASI KELOMPOK HARI AMAN)
+// ==========================================
 if (isset($_POST['action']) && $_POST['action'] == 'update') {
     $id          = $_POST['id'];
     $tenant_id   = $_POST['tenant_id'];
-    $days        = isset($_POST['day_of_week']) ? $_POST['day_of_week'] : []; 
+    $days        = isset($_POST['day_of_week']) ? $_POST['day_of_week'] : []; // Menangkap array hari []
     $open_time   = $_POST['open_time'];
     $close_time  = $_POST['close_time'];
     $is_open     = $_POST['is_open']; 
 
     if (!empty($days)) {
-        $tenantQuery = $conn->prepare("SELECT name FROM tenants WHERE id = ? LIMIT 1");
-        $tenantQuery->bind_param("i", $tenant_id);
-        $tenantQuery->execute();
-        $tenantRes = $tenantQuery->get_result()->fetch_assoc();
-        $tenantName = $tenantRes ? $tenantRes['name'] : "ID " . $tenant_id;
-        $tenantQuery->close();
-
+        // Langkah A: Cari tahu konfigurasi waktu lama sebelum di-update berdasarkan ID baris trigger
         $queryFindOld = "SELECT open_time, close_time, is_open FROM tenant_operating_hours WHERE id = ?";
         $stmtFind = $conn->prepare($queryFindOld);
         $stmtFind->bind_param("i", $id);
@@ -93,16 +79,19 @@ if (isset($_POST['action']) && $_POST['action'] == 'update') {
             $old_close = $resOld['close_time'];
             $old_is_open = $resOld['is_open'];
 
+            // Langkah B: Hapus kelompok waktu operasional lama yang cocok saja agar tidak merusak kelompok hari lain
             $queryDeleteGroup = "DELETE FROM tenant_operating_hours WHERE tenant_id = ? AND open_time = ? AND close_time = ? AND is_open = ?";
             $stmtDel = $conn->prepare($queryDeleteGroup);
             $stmtDel->bind_param("issi", $tenant_id, $old_open, $old_close, $old_is_open);
             $stmtDel->execute();
         }
 
+        // Langkah C: Daftarkan ulang baris data hari yang baru dicentang di modal
         $queryInsertNew = "INSERT INTO tenant_operating_hours (tenant_id, day_of_week, open_time, close_time, is_open) VALUES (?, ?, ?, ?, ?)";
         $stmtIns = $conn->prepare($queryInsertNew);
         
         foreach ($days as $day_of_week) {
+            // Validasi: Cegah tabrakan hari jika hari baru yang dipilih sudah terpakai di kelompok jam kerja lain
             $queryCheck = "SELECT id FROM tenant_operating_hours WHERE tenant_id = ? AND day_of_week = ?";
             $stmtCheck = $conn->prepare($queryCheck);
             $stmtCheck->bind_param("ii", $tenant_id, $day_of_week);
@@ -112,15 +101,6 @@ if (isset($_POST['action']) && $_POST['action'] == 'update') {
                 $stmtIns->execute();
             }
         }
-
-        createNotification(
-            'admin', 
-            (int)$_SESSION['user_id'], 
-            'Jam Operasional Diperbarui', 
-            "Jam operasional kelompok untuk tenant '$tenantName' berhasil diperbarui", 
-            'tenant_operating_hours.php'
-        );
-
         $_SESSION['success'] = "success_update";
     } else {
         $_SESSION['error'] = "Silakan pilih minimal satu hari operasional!";
@@ -129,28 +109,15 @@ if (isset($_POST['action']) && $_POST['action'] == 'update') {
     exit;
 }
 
+// ==========================================
+// 3. PROSES HAPUS DATA (DELETE)
+// ==========================================
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
     $id = $_GET['id'];
-
-    $infoQuery = $conn->prepare("SELECT toh.tenant_id, t.name AS tenant_name FROM tenant_operating_hours toh LEFT JOIN tenants t ON toh.tenant_id = t.id WHERE toh.id = ? LIMIT 1");
-    $infoQuery->bind_param("i", $id);
-    $infoQuery->execute();
-    $infoRes = $infoQuery->get_result()->fetch_assoc();
-    $tenantName = $infoRes ? $infoRes['tenant_name'] : "ID " . ($infoRes['tenant_id'] ?? 0);
-    $infoQuery->close();
-
     $query = "DELETE FROM tenant_operating_hours WHERE id = ?";
     $stmt  = $conn->prepare($query);
     $stmt->bind_param("i", $id);
     if ($stmt->execute()) {
-        createNotification(
-            'admin', 
-            (int)$_SESSION['user_id'], 
-            'Jam Operasional Dihapus', 
-            "Konfigurasi jam operasional untuk tenant '$tenantName' berhasil dihapus dari sistem", 
-            'tenant_operating_hours.php'
-        );
-
         $_SESSION['success'] = "success_delete";
     } else {
         $_SESSION['error'] = $conn->error;
@@ -159,6 +126,9 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id']))
     exit;
 }
 
+// ==========================================
+// 4. AMBIL DATA UNTUK DROPDOWN & TABEL
+// ==========================================
 $listActiveTenants = [];
 $queryActiveTenants = "SELECT id, name FROM tenants WHERE deleted_at IS NULL ORDER BY name ASC";
 $resultActiveTenants = $conn->query($queryActiveTenants);
@@ -168,6 +138,7 @@ if ($resultActiveTenants) {
     }
 }
 
+// PERBAIKAN GROUP BY & ONLY_FULL_GROUP_BY COMPATIBLE
 $listOperatingHours = [];
 $query  = "SELECT MAX(toh.id) as id, toh.tenant_id, toh.open_time, toh.close_time, toh.is_open, t.name as tenant_name, 
           GROUP_CONCAT(toh.day_of_week ORDER BY toh.day_of_week ASC) as array_days 

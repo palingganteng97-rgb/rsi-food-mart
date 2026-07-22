@@ -2,10 +2,12 @@
 // patient_sessions.php
 include 'db.php';
 
+// PERBAIKAN UTAMA: Wajib jalankan session_start() agar data $_SESSION tersimpan permanen di gawai pasien
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Menangkap otomatis nama ruangan dari scan QR Code
 $room_otomatis = isset($_GET['room']) ? htmlspecialchars($_GET['room']) : '';
 
 if (isset($_POST['submit'])) {
@@ -17,7 +19,9 @@ if (isset($_POST['submit'])) {
     $class                 = mysqli_real_escape_string($conn, $_POST['class']);
     $doctor                = mysqli_real_escape_string($conn, $_POST['doctor']);
     
+    // Waktu masuk session pasien
     $login_at              = date('Y-m-d H:i:s');
+    // Expired otomatis 1 hari kemudian
     $expired_at            = date('Y-m-d H:i:s', strtotime('+1 day')); 
 
     $query = "INSERT INTO patient_sessions (medical_record_number, patient_name, phone, room, bed, class, doctor, login_at, expired_at) 
@@ -26,46 +30,21 @@ if (isset($_POST['submit'])) {
     if (mysqli_query($conn, $query)) {
         $patient_session_id = mysqli_insert_id($conn);
 
-        // =========================================================================
-        // TAMBAHAN LOGIKA: OTOMATIS INSERT LOG KE TABLE patient_sync_logs
-        // =========================================================================
-        // Menyiapkan payload simulasi JSON kiriman (request) dan balikan (response) API
-        $mockRequestData = [
-            "action" => "PATIENT_LOGIN_VIA_QR",
-            "room" => $room,
-            "bed" => $bed,
-            "device" => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown'
-        ];
-        
-        $mockResponseData = [
-            "status" => 200,
-            "message" => "Sesi berhasil dibuat di perangkat pasien",
-            "session_id" => $patient_session_id
-        ];
-
-        $request_payload  = mysqli_real_escape_string($conn, json_encode($mockRequestData));
-        $response_payload = mysqli_real_escape_string($conn, json_encode($mockResponseData));
-
-        $logQuery = "INSERT INTO patient_sync_logs (medical_record_number, request_payload, response_payload, sync_status, created_at) 
-                     VALUES ('$medical_record_number', '$request_payload', '$response_payload', 'SUCCESS', '$login_at')";
-        
-        // Eksekusi insert log di background (tidak mengganggu jalannya aplikasi pasien)
-        mysqli_query($conn, $logQuery);
-        // =========================================================================
-
+        // Simpan session pasien (Berhasil tersimpan karena session_start() sudah aktif di atas)
         $tenant_id = 1;
 
-        $_SESSION['patient_session_id']    = (int)$patient_session_id;
-        $_SESSION['tenant_id']             = (int)$tenant_id;
-        $_SESSION['patient_name']          = $patient_name;
-        $_SESSION['medical_record_number'] = $medical_record_number;
-        $_SESSION['room']                  = $room;
-        $_SESSION['bed']                   = $bed;
-        $_SESSION['class']                 = $class;
-        $_SESSION['doctor']                = $doctor;
-        $_SESSION['login_at']              = $login_at;
-        $_SESSION['expired_at']            = $expired_at;
+        $_SESSION['patient_session_id']      = (int)$patient_session_id;
+        $_SESSION['tenant_id']              = (int)$tenant_id;
+        $_SESSION['patient_name']            = $patient_name;
+        $_SESSION['medical_record_number']   = $medical_record_number;
+        $_SESSION['room']                    = $room;
+        $_SESSION['bed']                     = $bed;
+        $_SESSION['class']                   = $class;
+        $_SESSION['doctor']                  = $doctor;
+        $_SESSION['login_at']                = $login_at;
+        $_SESSION['expired_at']              = $expired_at;
 
+        // Dialihkan dengan aman ke etalase menu tanpa hambatan
         header("Location: home.php");
         exit;
     } else {

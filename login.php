@@ -3,13 +3,6 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Ambil flash error dari session (diset oleh index.php saat login gagal)
-$error = '';
-if (isset($_SESSION['flash_error'])) {
-    $error = $_SESSION['flash_error'];
-    unset($_SESSION['flash_error']);
-}
-
 // BYPASS: Jika user sebenarnya sudah login, jangan tampilkan form login lagi, langsung lempar ke Etalase Toko
 if (isset($_SESSION['id'])) {
     header("Location: index.php");

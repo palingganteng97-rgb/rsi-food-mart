@@ -1,6 +1,5 @@
 <?php
 include 'db.php';
-include 'notification_helper.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();

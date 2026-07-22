@@ -1,6 +1,5 @@
 <?php
 include 'db.php';
-include 'notification_helper.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -29,7 +28,6 @@ if (isset($_POST['action_add_unit'])) {
         } else {
             $query = "INSERT INTO units (name, symbol) VALUES ('$name', '$symbol')";
             if (mysqli_query($conn, $query)) {
-                createNotification('admin', (int)$_SESSION['user_id'], 'Satuan Unit Baru', "Unit satuan '$name' ($symbol) berhasil ditambahkan", 'units.php');
                 $status = "success_insert";
             } else {
                 $status = "error";
@@ -55,7 +53,6 @@ if (isset($_POST['action_update_unit'])) {
         } else {
             $query = "UPDATE units SET name = '$name', symbol = '$symbol' WHERE id = $id";
             if (mysqli_query($conn, $query)) {
-                createNotification('admin', (int)$_SESSION['user_id'], 'Satuan Unit Diperbarui', "Unit satuan '$name' ($symbol) berhasil diperbarui", 'units.php');
                 $status = "success_update";
             } else {
                 $status = "error";
@@ -68,13 +65,8 @@ if (isset($_POST['action_update_unit'])) {
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
 
-    $nameQuery = mysqli_query($conn, "SELECT name, symbol FROM units WHERE id = $id LIMIT 1");
-    $unitData  = mysqli_fetch_assoc($nameQuery);
-    $savedName = $unitData ? $unitData['name'] . " (" . $unitData['symbol'] . ")" : "ID " . $id;
-
     $query = "DELETE FROM units WHERE id = $id";
     if (mysqli_query($conn, $query)) {
-        createNotification('admin', (int)$_SESSION['user_id'], 'Satuan Unit Dihapus', "Unit satuan '$savedName' berhasil dihapus dari sistem", 'units.php');
         $status = "success_delete";
     } else {
         $status = "error";
