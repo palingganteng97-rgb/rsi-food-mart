@@ -2,8 +2,8 @@
 
 ## Progress Tracker
 
-- [ ] 1. `roles.php` - Tambah, Ubah, Hapus Role
-- [ ] 2. `tenants.php` - Tambah, Ubah, Hapus Tenant
+- [x] 1. `roles.php` - Tambah, Ubah, Hapus Role
+- [x] 2. `tenants.php` - Tambah, Ubah, Hapus Tenant
 - [ ] 3. `products.php` - Tambah, Ubah, Hapus Produk
 - [ ] 4. `categories.php` - Tambah, Ubah, Hapus Kategori
 - [ ] 5. `brands.php` - Tambah, Ubah, Hapus Brand
