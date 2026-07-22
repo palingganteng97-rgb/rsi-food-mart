@@ -22,3 +22,7 @@
 {"log_id":"cartlog_6a5efb267fbce9.21773507","compiled_notes_used":"","select_found":false,"select_row":null}
 {"log_id":"cartlog_6a5efc32e31c80.52260050","action":"add","method":"POST","cart_id":1,"product_id":1,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":15000}
 {"log_id":"cartlog_6a5efc32e31c80.52260050","compiled_notes_used":"","select_found":false,"select_row":null}
+{"log_id":"cartlog_6a605f66692f86.15329746","action":"add","method":"POST","cart_id":1,"product_id":1,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":15000}
+{"log_id":"cartlog_6a605f66692f86.15329746","compiled_notes_used":"","select_found":false,"select_row":null}
+{"log_id":"cartlog_6a60634c098462.98876664","action":"add","method":"POST","cart_id":1,"product_id":1,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":15000}
+{"log_id":"cartlog_6a60634c098462.98876664","compiled_notes_used":"","select_found":true,"select_row":{"id":1,"qty":1}}
