@@ -227,4 +227,5 @@ $menu = [
 </div>
 
 <!-- JavaScript untuk penentuan menu aktif telah dihapus. 100% menggunakan logika PHP. -->
+<script src="notifications.js?v=1.0"></script>
 

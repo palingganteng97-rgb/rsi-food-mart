@@ -1,27 +1,15 @@
 <?php
-// home.php
 include "db.php";
+include "notification_helper.php"; // INTEGRASI: Menyertakan helper pencatat notifikasi sistem
 
-// session_start sudah dipanggil di db.php
-
-// =========================================================================
-// Mode Pasien (standalone): Izinkan hanya jika ada sesi pasien aktif (patient QR)
-// =========================================================================
 $isPatient = isset($_SESSION['patient_session_id']) && $_SESSION['patient_session_id'] > 0;
 
 if (!$isPatient) {
-    // Setelah Form Pasien, alurnya harus mengarah ke home.php dengan session pasien.
-    // Jika tidak ada, arahkan ke halaman entry awal.
     header("Location: index.php");
     exit;
 }
 
-// Menentukan nama sapaan di halaman katalog pasien
 $userName = $_SESSION['patient_name'] ?? 'Pasien';
-
-
-// --- TAMBAHKAN QUERY INI UNTUK MENGHITUNG KELUARAN JUMLAH ITEM AWAL ---
-// Jika patient_session_id belum ada, set default 0 agar query tidak crash
 $patient_session_id = isset($_SESSION['patient_session_id']) ? intval($_SESSION['patient_session_id']) : 0;
 
 $initialCartCount = 0;
@@ -32,9 +20,17 @@ if ($patient_session_id > 0) {
         $initialCartCount = (int)($countCartData['total_items'] ?? 0);
     }
 }
-// --------------------------------------------------------------------
 
-// AMBIL DATA UTAMA PRODUK UNTUK ETALASE HOME
+$unreadCount = 0;
+$countQuery = $conn->prepare("SELECT COUNT(*) AS cnt FROM notifications WHERE user_type = 'patient' AND user_reference = ? AND is_read = 0");
+if ($countQuery) {
+    $countQuery->bind_param("i", $patient_session_id);
+    $countQuery->execute();
+    $resCount = $countQuery->get_result()->fetch_assoc();
+    $unreadCount = (int)($resCount['cnt'] ?? 0);
+    $countQuery->close();
+}
+
 $listActiveProducts = [];
 $sql = "SELECT p.*, c.name AS category_name 
         FROM products p 
