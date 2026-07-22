@@ -1,5 +1,6 @@
 <?php
 include 'db.php';
+include 'notification_helper.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -7,7 +8,6 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $action = isset($_GET['action']) ? trim((string)$_GET['action']) : '';
 
-// 1. PROSES TAMBAH DATA (CREATE)
 if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $order_id      = intval($_POST['order_id'] ?? 0);
     $courier_id    = intval($_POST['courier_id'] ?? 0);
@@ -17,10 +17,45 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $proof_photo   = trim($_POST['proof_photo'] ?? '');
 
     if ($order_id > 0 && $courier_id > 0) {
+        // CEK DUPLIKAT: Pastikan order_id belum memiliki data delivery
+        $checkStmt = $conn->prepare("SELECT id FROM deliveries WHERE order_id = ? LIMIT 1");
+        $checkStmt->bind_param("i", $order_id);
+        $checkStmt->execute();
+        $checkResult = $checkStmt->get_result();
+        if ($checkResult && $checkResult->num_rows > 0) {
+            error_log("[Deliveries] DUPLICATE BLOCKED: order_id $order_id already has a delivery record");
+            header("Location: deliveries.php?status=error&msg=" . urlencode("Pengiriman untuk pesanan ini sudah tersedia."));
+            exit();
+        }
+        $checkStmt->close();
+
         $stmt = $conn->prepare("INSERT INTO deliveries (order_id, courier_id, status, pickup_time, delivery_time, proof_photo) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->bind_param("iissss", $order_id, $courier_id, $status, $pickup_time, $delivery_time, $proof_photo);
         
         if ($stmt->execute()) {
+            error_log("[Deliveries] INSERT success: delivery created for order_id $order_id");
+            $infoQuery = $conn->prepare("SELECT order_number FROM orders WHERE id = ? LIMIT 1");
+            $infoQuery->bind_param("i", $order_id);
+            $infoQuery->execute();
+            $infoRes = $infoQuery->get_result()->fetch_assoc();
+            $orderNumber = $infoRes ? $infoRes['order_number'] : "ID " . $order_id;
+            $infoQuery->close();
+
+            $courierQuery = $conn->prepare("SELECT name FROM couriers WHERE id = ? LIMIT 1");
+            $courierQuery->bind_param("i", $courier_id);
+            $courierQuery->execute();
+            $courierRes = $courierQuery->get_result()->fetch_assoc();
+            $courierName = $courierRes ? $courierRes['name'] : "ID " . $courier_id;
+            $courierQuery->close();
+
+            createNotification(
+                'admin', 
+                (int)$_SESSION['user_id'], 
+                'Pengiriman Ditugaskan', 
+                "Pesanan #$orderNumber telah ditugaskan kepada kurir $courierName dengan status: $status", 
+                'deliveries.php'
+            );
+
             header("Location: deliveries.php?status=success_create");
         } else {
             header("Location: deliveries.php?status=error&msg=" . urlencode($stmt->error));
@@ -29,7 +64,6 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 2. PROSES UBAH DATA (UPDATE)
 if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $id            = intval($_POST['id'] ?? 0);
     $order_id      = intval($_POST['order_id'] ?? 0);
@@ -44,6 +78,21 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("iissssi", $order_id, $courier_id, $status, $pickup_time, $delivery_time, $proof_photo, $id);
         
         if ($stmt->execute()) {
+            $infoQuery = $conn->prepare("SELECT order_number FROM orders WHERE id = ? LIMIT 1");
+            $infoQuery->bind_param("i", $order_id);
+            $infoQuery->execute();
+            $infoRes = $infoQuery->get_result()->fetch_assoc();
+            $orderNumber = $infoRes ? $infoRes['order_number'] : "ID " . $order_id;
+            $infoQuery->close();
+
+            createNotification(
+                'admin', 
+                (int)$_SESSION['user_id'], 
+                'Pengiriman Diperbarui', 
+                "Data pengiriman ID $id (Order #$orderNumber) telah disesuaikan ke status baru: $status", 
+                'deliveries.php'
+            );
+
             header("Location: deliveries.php?status=success_update");
         } else {
             header("Location: deliveries.php?status=error&msg=" . urlencode($stmt->error));
@@ -52,15 +101,40 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 3. PROSES HAPUS DATA (DELETE)
 if ($action === 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id'] ?? 0);
 
     if ($id > 0) {
+        $infoQuery = $conn->prepare("SELECT order_id FROM deliveries WHERE id = ? LIMIT 1");
+        $infoQuery->bind_param("i", $id);
+        $infoQuery->execute();
+        $infoRes = $infoQuery->get_result()->fetch_assoc();
+        $savedOrderId = $infoRes ? $infoRes['order_id'] : 0;
+        $infoQuery->close();
+
+        if ($savedOrderId > 0) {
+            $orderQuery = $conn->prepare("SELECT order_number FROM orders WHERE id = ? LIMIT 1");
+            $orderQuery->bind_param("i", $savedOrderId);
+            $orderQuery->execute();
+            $orderRes = $orderQuery->get_result()->fetch_assoc();
+            $orderNumber = $orderRes ? $orderRes['order_number'] : "ID " . $savedOrderId;
+            $orderQuery->close();
+        } else {
+            $orderNumber = "Unknown";
+        }
+
         $stmt = $conn->prepare("DELETE FROM deliveries WHERE id = ?");
         $stmt->bind_param("i", $id);
         
         if ($stmt->execute()) {
+            createNotification(
+                'admin', 
+                (int)$_SESSION['user_id'], 
+                'Pengiriman Dibatalkan', 
+                "Data tugas logistik pengiriman untuk Pesanan #$orderNumber (ID Pengiriman: $id) telah dihapus", 
+                'deliveries.php'
+            );
+
             header("Location: deliveries.php?status=success_delete");
         } else {
             header("Location: deliveries.php?status=error&msg=" . urlencode($stmt->error));
@@ -69,13 +143,12 @@ if ($action === 'delete' && isset($_GET['id'])) {
     }
 }
 
-// 4. PROSES READ DATA DENGAN JOIN (Untuk Relasi Nama Kurir & Invoice Pesanan)
 $deliveries = [];
 $sql = "SELECT d.*, o.order_number, c.name AS courier_name 
         FROM deliveries d
         LEFT JOIN orders o ON d.order_id = o.id
         LEFT JOIN couriers c ON d.courier_id = c.id
-        ORDER BY d.id DESC";
+        ORDER BY d.id ASC";
 $result = $conn->query($sql);
 if ($result) {
     while ($row = $result->fetch_assoc()) {
@@ -86,7 +159,6 @@ if ($result) {
 $status = isset($_GET['status']) ? (string)$_GET['status'] : '';
 $msg = isset($_GET['msg']) ? (string)$_GET['msg'] : '';
 
-// Data dropdown untuk form (dibaca untuk tampilan saja)
 $orders = [];
 $orderRes = $conn->query("SELECT id, order_number FROM orders ORDER BY id DESC");
 if ($orderRes) {
@@ -109,13 +181,20 @@ if ($courierRes) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Etalase Menu - RSI Food &amp; Mart</title>
+  <title>Deliveries - RSI Food &amp; Mart</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
   <style>
     :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
     body { background:var(--bg) !important; color:var(--text); }
+    .table-transparent thead th,.table-transparent tbody td{color:#fff !important;}
+    .table-transparent{background:transparent !important;}
+    .table-transparent thead{background:rgba(15,23,42,.65) !important; border-bottom:1px solid rgba(148,163,184,.25) !important;}
+    .table-transparent td,.table-transparent th{background:transparent !important; border-color:rgba(148,163,184,.12) !important;}
+    .table-transparent tbody tr{border-bottom:1px solid rgba(148,163,184,.12) !important;}
+    .table-transparent *{color:#fff !important;}
+    .text-white*{color:#fff !important;}
     bottom-nav { position: fixed; left:0; right:0; bottom:0; z-index: 1035; background: rgba(15,23,42,.88); backdrop-filter: blur(10px); border-top: 1px solid rgba(148,163,184,.25); display:block; }
     #dragScrollDeliveryContainer::-webkit-scrollbar { display: none !important; }
     #dragScrollDeliveryContainer { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow-x: auto !important; cursor: grab !important; box-shadow: none !important; border: none !important; -webkit-box-shadow: none !important; }
@@ -144,8 +223,8 @@ if ($courierRes) {
         </div>
 
         <?php if (!empty($status)): ?>
-        <div class="alert <?= strpos($status, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4" role="alert" style="background-color: #1e1e24; color: #fff; border-color: #2d2d34;">
-            <strong>
+        <div class="alert <?= strpos($status, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4 rounded-3 border-0" role="alert" style="background:<?= strpos($status, 'success') !== false ? 'rgba(34,197,94,.15)' : 'rgba(239,68,68,.15)'; ?>; color:#e5e7eb;">
+            <i class="bi <?= strpos($status, 'success') !== false ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'; ?> me-2"></i>
             <?php 
                 if ($status === 'success_create') echo "Data pengiriman berhasil ditambahkan!";
                 elseif ($status === 'success_update') echo "Data pengiriman berhasil diperbarui!";
@@ -153,39 +232,40 @@ if ($courierRes) {
                 elseif ($status === 'error') echo "Operasi gagal: " . htmlspecialchars($msg);
                 else echo "Operasi: " . htmlspecialchars($status);
             ?>
-            </strong>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
         <?php endif; ?>
 
         <div id="dragScrollDeliveryContainer" class="table-responsive rounded-3" style="border: none !important; background: transparent !important;">
-        <table class="table table-hover align-middle mb-0 text-white-element" style="background: transparent !important; color: #e5e7eb !important; min-width: 950px; user-select: none; border-collapse: collapse !important;">
-            <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important; background-color: rgba(15, 23, 42, 0.8) !important; border-bottom: 1px solid rgba(148, 163, 184, 0.25) !important;">
+        <table class="table table-transparent table-hover align-middle mb-0 text-white-element" style="min-width: 950px; user-select: none;">
+            <thead class="text-uppercase" style="font-size: 0.8rem; font-weight: 700; color: #94a3b8 !important;">
             <tr>
-                <th class="py-3 px-3 text-center text-white" style="background: transparent !important; border: none !important; width: 100px;">ID</th>
-                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 220px;">Order</th>
-                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 220px;">Courier</th>
-                <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 140px;">Status</th>
-                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 200px;">Pickup Time</th>
-                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 200px;">Delivery Time</th>
-                <th class="py-3 text-white" style="background: transparent !important; border: none !important; width: 220px;">Proof Photo</th>
-                <th class="py-3 text-center text-white" style="background: transparent !important; border: none !important; width: 150px;">Aksi</th>
+                <th class="py-3 px-3 text-center" style="width: 100px;">ID</th>
+                <th class="py-3" style="width: 220px;">Order</th>
+                <th class="py-3" style="width: 220px;">Courier</th>
+                <th class="py-3 text-center" style="width: 140px;">Status</th>
+                <th class="py-3" style="width: 200px;">Pickup Time</th>
+                <th class="py-3" style="width: 200px;">Delivery Time</th>
+                <th class="py-3" style="width: 220px;">Proof Photo</th>
+                <th class="py-3 text-center" style="width: 150px;">Aksi</th>
             </tr>
             </thead>
-            <tbody style="background: transparent !important;">
+            <tbody>
             <?php if (!empty($deliveries)): ?>
                 <?php foreach ($deliveries as $row): ?>
-                <tr style="background: transparent !important; font-size: 0.88rem;">
+                <tr>
                     <td class="text-center fw-semibold" style="color: #94a3b8 !important;"><?= (int)$row['id'] ?></td>
                     <td class="fw-semibold text-white"><?= htmlspecialchars($row['order_number'] ?? '-') ?></td>
                     <td class="text-white-50"><?= htmlspecialchars($row['courier_name'] ?? '-') ?></td>
                     <td class="text-center">
                     <?php
-                        $st = strtoupper(trim((string)($row['status'] ?? '')));
-                        if ($st === 'DELIVERED' || $st === 'DONE') {
-                        echo '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 px-3 py-1.5 rounded-pill">Delivered</span>';
-                        } elseif ($st === 'ON_PROGRESS' || $st === 'PICKUP' || $st === 'IN_PROGRESS') {
-                        echo '<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-50 px-3 py-1.5 rounded-pill">On Progress</span>';
+                        $st = strtolower(trim((string)($row['status'] ?? '')));
+                        if ($st === 'completed' || $st === 'delivered') {
+                        echo '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 px-3 py-1.5 rounded-pill">Completed</span>';
+                        } elseif ($st === 'cancelled') {
+                        echo '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-3 py-1.5 rounded-pill">Cancelled</span>';
+                        } elseif (in_array($st, ['delivering', 'picked_up', 'preparing', 'accepted'])) {
+                        echo '<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-50 px-3 py-1.5 rounded-pill">'.ucfirst($st).'</span>';
                         } else {
                         echo '<span class="badge bg-secondary bg-opacity-25 text-white border border-secondary border-opacity-50 px-3 py-1.5 rounded-pill">'.htmlspecialchars($row['status'] ?? '-').'</span>';
                         }
@@ -196,10 +276,17 @@ if ($courierRes) {
                     <td class="text-white-50"><?= htmlspecialchars($row['proof_photo'] ?? '-') ?></td>
                     <td class="text-center">
                     <div class="d-flex justify-content-center gap-2">
-                        <button class="btn btn-sm btn-outline-warning rounded-2" data-bs-toggle="modal" data-bs-target="#modalDelivery" onclick='openEditDelivery(<?= json_encode($row) ?>)'>
+                        <button class="btn btn-sm btn-outline-warning rounded-2" data-bs-toggle="modal" data-bs-target="#modalDelivery"
+                            data-id="<?= (int)$row['id'] ?>"
+                            data-order-id="<?= (int)$row['order_id'] ?>"
+                            data-courier-id="<?= (int)$row['courier_id'] ?>"
+                            data-status="<?= htmlspecialchars($row['status'] ?? '') ?>"
+                            data-pickup-time="<?= htmlspecialchars($row['pickup_time'] ?? '') ?>"
+                            data-delivery-time="<?= htmlspecialchars($row['delivery_time'] ?? '') ?>"
+                            data-proof-photo="<?= htmlspecialchars($row['proof_photo'] ?? '') ?>"
+                            onclick="openEditDelivery(this)">
                         <i class="bi bi-pencil-square"></i>
                         </button>
-                        <!-- Perbaikan Utama: Mengganti tag <a> menjadi tombol pemicu modal konfirmasi hapus -->
                         <button type="button" class="btn btn-sm btn-outline-danger rounded-2" data-bs-toggle="modal" data-bs-target="#modalHapusDelivery" onclick="openHapusDelivery(<?= $row['id'] ?>, '<?= htmlspecialchars($row['order_number'] ?? '-') ?>')">
                         <i class="bi bi-trash"></i>
                         </button>
@@ -209,7 +296,7 @@ if ($courierRes) {
                 <?php endforeach; ?>
             <?php else: ?>
                 <tr>
-                <td colspan="8" class="text-center py-5 text-muted italic" style="background: transparent !important; border: none !important;">Belum ada data pengiriman.</td>
+                <td colspan="8" class="text-center text-white-50 py-5">Belum ada data pengiriman.</td>
                 </tr>
             <?php endif; ?>
             </tbody>
@@ -222,71 +309,79 @@ if ($courierRes) {
 
 <!-- Modal Delivery (Create/Update) -->
 <div class="modal fade" id="modalDelivery" tabindex="-1" aria-labelledby="modalDeliveryLabel" aria-hidden="true">
-<div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content" style="background: rgba(15, 23, 42, 0.93) !important; backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.2); color: #e5e7eb; border-radius: 16px;">
-    <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
-        <h5 class="modal-title fw-bold text-white" id="modalDeliveryLabel">Form Data Pengiriman</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-    </div>
-
-    <form id="formDelivery" action="deliveries.php" method="POST">
-        <input type="hidden" name="action" id="delivery-action" value="create">
-        <input type="hidden" name="id" id="delivery-id" value="">
-
-        <div class="modal-body" style="overflow: visible !important;">
-        <div class="row g-3">
-            <div class="col-md-6">
-            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Order <span class="text-danger">*</span></label>
-            <select class="form-select" name="order_id" id="delivery-order-id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                <option value="" disabled selected>-- Pilih Order --</option>
-                <?php foreach ($orders as $o): ?>
-                <option value="<?= (int)$o['id'] ?>"><?= htmlspecialchars($o['order_number'] ?? ('Order #'.$o['id'])) ?></option>
-                <?php endforeach; ?>
-            </select>
-            </div>
-
-            <div class="col-md-6">
-            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Courier <span class="text-danger">*</span></label>
-            <select class="form-select" name="courier_id" id="delivery-courier-id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                <option value="" disabled selected>-- Pilih Kurir --</option>
-                <?php foreach ($couriers as $c): ?>
-                <option value="<?= (int)$c['id'] ?>"><?= htmlspecialchars($c['name'] ?? ('Courier #'.$c['id'])) ?></option>
-                <?php endforeach; ?>
-            </select>
-            </div>
-
-            <div class="col-md-12">
-            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Status</label>
-            <input type="text" class="form-control" name="status" id="delivery-status" placeholder="Contoh: PENDING, ON_PROGRESS, DELIVERED" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-            </div>
-
-            <div class="col-md-6">
-            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Pickup Time</label>
-            <input type="datetime-local" class="form-control" name="pickup_time" id="delivery-pickup-time" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-            </div>
-
-            <div class="col-md-6">
-            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Delivery Time</label>
-            <input type="datetime-local" class="form-control" name="delivery_time" id="delivery-delivery-time" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-            </div>
-
-            <div class="col-md-12">
-            <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Proof Photo</label>
-            <input type="text" class="form-control" name="proof_photo" id="delivery-proof-photo" placeholder="Nama file / path foto" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
-            </div>
-        </div>
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.93) !important; backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.2); color: #e5e7eb; border-radius: 16px;">
+        <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
+            <h5 class="modal-title fw-bold text-white" id="modalDeliveryLabel">Form Data Pengiriman</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
 
-        <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.15); background: rgba(15, 23, 42, 0.95); border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-        <button type="submit" class="btn btn-success" id="btnSubmitDelivery">Simpan Data</button>
+        <form id="formDelivery" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="id" id="delivery-id" value="">
+
+            <div class="modal-body" style="overflow: visible !important;">
+            <div class="row g-3">
+                <div class="col-md-6">
+                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Order <span class="text-danger">*</span></label>
+                <select class="form-select" name="order_id" id="delivery-order-id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                    <option value="" disabled selected>-- Pilih Order --</option>
+                    <?php foreach ($orders as $o): ?>
+                    <option value="<?= (int)$o['id'] ?>"><?= htmlspecialchars($o['order_number'] ?? ('Order #'.$o['id'])) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                </div>
+
+                <div class="col-md-6">
+                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Courier <span class="text-danger">*</span></label>
+                <select class="form-select" name="courier_id" id="delivery-courier-id" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                    <option value="" disabled selected>-- Pilih Kurir --</option>
+                    <?php foreach ($couriers as $c): ?>
+                    <option value="<?= (int)$c['id'] ?>"><?= htmlspecialchars($c['name'] ?? ('Courier #'.$c['id'])) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                </div>
+
+                <div class="col-md-12">
+                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Status <span class="text-danger">*</span></label>
+                <select class="form-select" name="status" id="delivery-status" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
+                    <option value="pending">pending</option>
+                    <option value="accepted">accepted</option>
+                    <option value="preparing">preparing</option>
+                    <option value="ready">ready</option>
+                    <option value="picked_up">picked_up</option>
+                    <option value="delivering">delivering</option>
+                    <option value="completed">completed</option>
+                    <option value="cancelled">cancelled</option>
+                </select>
+                </div>
+
+                <div class="col-md-6">
+                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Pickup Time</label>
+                <input type="datetime-local" class="form-control" name="pickup_time" id="delivery-pickup-time" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important; color-scheme: dark;">
+                </div>
+
+                <div class="col-md-6">
+                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Delivery Time</label>
+                <input type="datetime-local" class="form-control" name="delivery_time" id="delivery-delivery-time" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important; color-scheme: dark;">
+                </div>
+
+                <div class="col-md-12">
+                <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Proof Photo</label>
+                <input type="file" class="form-control" name="proof_photo" id="delivery-proof-photo" accept="image/*" capture="environment" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
+                </div>
+            </div>
+            </div>
+
+            <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.15); background: rgba(15, 23, 42, 0.95); border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="submit" class="btn btn-success" id="btnSubmitDelivery">Simpan Data</button>
+            </div>
+        </form>
         </div>
-    </form>
     </div>
 </div>
-</div>
 
-<!-- KOMPONEN BARU: Struktur Modal Pop-Up Konfirmasi Hapus Data Pengiriman -->
+<!--Modal Hapus -->
 <div class="modal fade" id="modalHapusDelivery" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
     <div class="modal-content text-white rounded-4 border-0" style="background: #111827; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
@@ -338,30 +433,51 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function openTambahDelivery() {
     document.getElementById('formDelivery').reset();
+    document.getElementById('formDelivery').action = 'deliveries.php?action=create';
     document.getElementById('modalDeliveryLabel').innerText = 'Tambah Data Pengiriman';
     document.getElementById('delivery-id').value = '';
-    document.getElementById('delivery-action').value = 'create';
     document.getElementById('btnSubmitDelivery').className = 'btn btn-success';
     document.getElementById('btnSubmitDelivery').innerText = 'Simpan Data';
+    document.getElementById('btnSubmitDelivery').disabled = false;
 }
 
-function openEditDelivery(data) {
+function openEditDelivery(btn) {
+    const data = {
+        id: btn.getAttribute('data-id'),
+        order_id: btn.getAttribute('data-order-id'),
+        courier_id: btn.getAttribute('data-courier-id'),
+        status: btn.getAttribute('data-status'),
+        pickup_time: btn.getAttribute('data-pickup-time'),
+        delivery_time: btn.getAttribute('data-delivery-time'),
+        proof_photo: btn.getAttribute('data-proof-photo')
+    };
+
+    console.log('Delivery ID:', data.id);
+    console.log('Data Delivery:', data);
+
     document.getElementById('formDelivery').reset();
+    document.getElementById('formDelivery').action = 'deliveries.php?action=update';
     document.getElementById('modalDeliveryLabel').innerText = 'Perbarui Data Pengiriman';
     document.getElementById('delivery-id').value = data.id;
-    document.getElementById('delivery-action').value = 'update';
-
     document.getElementById('delivery-order-id').value = data.order_id;
     document.getElementById('delivery-courier-id').value = data.courier_id;
     document.getElementById('delivery-status').value = data.status || '';
-    document.getElementById('delivery-proof-photo').value = data.proof_photo || '';
 
-    // datetime-local expects format YYYY-MM-DDTHH:MM; jika DB simpan berbeda, biarkan kosong.
-    document.getElementById('delivery-pickup-time').value = (data.pickup_time || '').replace(' ', 'T');
-    document.getElementById('delivery-delivery-time').value = (data.delivery_time || '').replace(' ', 'T');
+    // Convert datetime from MySQL format (YYYY-MM-DD HH:MM:SS) to browser format (YYYY-MM-DDTHH:MM)
+    if (data.pickup_time) {
+        document.getElementById('delivery-pickup-time').value = data.pickup_time.replace(' ', 'T').substring(0, 16);
+    } else {
+        document.getElementById('delivery-pickup-time').value = '';
+    }
+    if (data.delivery_time) {
+        document.getElementById('delivery-delivery-time').value = data.delivery_time.replace(' ', 'T').substring(0, 16);
+    } else {
+        document.getElementById('delivery-delivery-time').value = '';
+    }
 
     document.getElementById('btnSubmitDelivery').className = 'btn btn-warning text-dark fw-medium';
     document.getElementById('btnSubmitDelivery').innerText = 'Perbarui Data';
+    document.getElementById('btnSubmitDelivery').disabled = false;
 }
 
 // FUNGSI BARU: Untuk mengisi data ke Modal Konfirmasi Hapus secara dinamis
@@ -376,6 +492,24 @@ function openHapusDelivery(id, orderNumber) {
         txtOrderInfo.innerText = orderNumber;
     }
 }
+
+// CEK GANDA: Mencegah double submit pada form delivery
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('formDelivery');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const btn = document.getElementById('btnSubmitDelivery');
+            if (btn.disabled) {
+                e.preventDefault();
+                console.log('[Deliveries] Double submit prevented');
+                return false;
+            }
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Memproses...';
+            console.log('[Deliveries] Form submitted, button disabled');
+        });
+    }
+});
 </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
