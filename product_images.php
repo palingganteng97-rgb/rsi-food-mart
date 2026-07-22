@@ -1,6 +1,6 @@
 <?php
-// product_images.php
-include 'db.php'; // Hubungkan ke koneksi database $conn
+include 'db.php'; 
+include 'notification_helper.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -19,9 +19,6 @@ if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0775, true);
 }
 
-// ==========================================
-// 1. PROSES CREATE (TAMBAH GAMBAR GALERI)
-// ==========================================
 if (isset($_POST['action_add_image'])) {
     $product_id = intval($_POST['product_id']);
     $is_primary = isset($_POST['is_primary']) ? intval($_POST['is_primary']) : 0;
@@ -45,13 +42,17 @@ if (isset($_POST['action_add_image'])) {
         exit();
     }
 
-    // Jika gambar baru diset sebagai Utama (is_primary = 1), matikan status primary gambar lain pada produk ini
     if ($is_primary === 1) {
         mysqli_query($conn, "UPDATE product_images SET is_primary = 0 WHERE product_id = $product_id");
     }
 
     $query = "INSERT INTO product_images (product_id, image, is_primary) VALUES ($product_id, '$imageName', $is_primary)";
     if (mysqli_query($conn, $query)) {
+        $productQuery = mysqli_query($conn, "SELECT name FROM products WHERE id = $product_id");
+        $productData  = mysqli_fetch_assoc($productQuery);
+        $productName  = $productData ? $productData['name'] : "ID " . $product_id;
+
+        createNotification('admin', (int)$_SESSION['user_id'], 'Gambar Produk Ditambahkan', "Gambar baru berhasil diunggah untuk produk '$productName'", 'product_images.php');
         header("Location: product_images.php?status=success_insert");
         exit();
     } else {
@@ -60,9 +61,6 @@ if (isset($_POST['action_add_image'])) {
     }
 }
 
-// ==========================================
-// 2. PROSES UPDATE (UBAH STATUS UTAMA / FILE)
-// ==========================================
 if (isset($_POST['action_update_image'])) {
     $id         = intval($_POST['id']);
     $product_id = intval($_POST['product_id']);
@@ -93,6 +91,11 @@ if (isset($_POST['action_update_image'])) {
 
     $query = "UPDATE product_images SET product_id = $product_id, image = '$imageName', is_primary = $is_primary WHERE id = $id";
     if (mysqli_query($conn, $query)) {
+        $productQuery = mysqli_query($conn, "SELECT name FROM products WHERE id = $product_id");
+        $productData  = mysqli_fetch_assoc($productQuery);
+        $productName  = $productData ? $productData['name'] : "ID " . $product_id;
+
+        createNotification('admin', (int)$_SESSION['user_id'], 'Gambar Produk Diperbarui', "Pengaturan gambar untuk produk '$productName' (ID: $id) berhasil diperbarui", 'product_images.php');
         header("Location: product_images.php?status=success_update");
         exit();
     } else {
@@ -101,16 +104,21 @@ if (isset($_POST['action_update_image'])) {
     }
 }
 
-// ==========================================
-// 3. PROSES DELETE (HAPUS BERKAS FISIK & DATA)
-// ==========================================
 if (isset($_GET['action_delete'])) {
     $id = intval($_GET['action_delete']);
 
-    $checkQuery  = mysqli_query($conn, "SELECT image FROM product_images WHERE id = $id");
+    $checkQuery  = mysqli_query($conn, "SELECT product_id, image FROM product_images WHERE id = $id");
     $currentData = mysqli_fetch_assoc($checkQuery);
     
+    $savedProductName = "ID " . $id;
     if ($currentData) {
+        $product_id = intval($currentData['product_id']);
+        $productQuery = mysqli_query($conn, "SELECT name FROM products WHERE id = $product_id");
+        $productData  = mysqli_fetch_assoc($productQuery);
+        if ($productData) {
+            $savedProductName = $productData['name'];
+        }
+
         $oldImage = $currentData['image'];
         if (!empty($oldImage) && file_exists($uploadDir . $oldImage)) {
             unlink($uploadDir . $oldImage);
@@ -119,6 +127,7 @@ if (isset($_GET['action_delete'])) {
 
     $query = "DELETE FROM product_images WHERE id = $id";
     if (mysqli_query($conn, $query)) {
+        createNotification('admin', (int)$_SESSION['user_id'], 'Gambar Produk Dihapus', "Gambar galeri untuk produk '$savedProductName' berhasil dihapus dari sistem", 'product_images.php');
         header("Location: product_images.php?status=success_delete");
         exit();
     } else {
@@ -127,9 +136,6 @@ if (isset($_GET['action_delete'])) {
     }
 }
 
-// ==========================================
-// 4. BIND DROPDOWN & LOOPING DATA
-// ==========================================
 $listProducts = [];
 $qProd = mysqli_query($conn, "SELECT id, name FROM products WHERE deleted_at IS NULL ORDER BY name ASC");
 while ($r = mysqli_fetch_assoc($qProd)) { $listProducts[] = $r; }

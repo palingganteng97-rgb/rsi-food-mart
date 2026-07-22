@@ -1,6 +1,6 @@
 <?php
-// promos.php - Modul CRUD Promos (Admin) LENGKAP
 include 'db.php';
+include 'notification_helper.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -11,16 +11,11 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// Ambil notifikasi status dari query parameter URL
 $status = isset($_GET['status']) ? (string)$_GET['status'] : '';
 $msg = isset($_GET['msg']) ? (string)$_GET['msg'] : '';
 
-// ==========================================
-// 1. ACTION HANDLER (PROSES POST/GET ACTIONS)
-// ==========================================
 $action = isset($_POST['action']) ? (string)$_POST['action'] : (isset($_GET['action']) ? (string)$_GET['action'] : '');
 
-// Aksi Tambah Promo (Create)
 if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $tenant_id = (int)($_POST['tenant_id'] ?? 0);
     $title = trim((string)($_POST['title'] ?? ''));
@@ -39,6 +34,7 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmtIns->bind_param('issdss', $tenant_id, $title, $discount_type, $discount_value, $start_date, $end_date);
     
     if ($stmtIns->execute()) {
+        createNotification('admin', (int)$_SESSION['user_id'], 'Promo Baru', "Promo '$title' berhasil ditambahkan", 'promos.php');
         header('Location: promos.php?status=success_insert');
     } else {
         header('Location: promos.php?status=error&msg=Gagal menyimpan data promo');
@@ -46,7 +42,6 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// Aksi Ubah Promo (Update)
 if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = (int)($_POST['id'] ?? 0);
     $tenant_id = (int)($_POST['tenant_id'] ?? 0);
@@ -66,6 +61,7 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmtUpd->bind_param('issdssi', $tenant_id, $title, $discount_type, $discount_value, $start_date, $end_date, $id);
     
     if ($stmtUpd->execute()) {
+        createNotification('admin', (int)$_SESSION['user_id'], 'Promo Diperbarui', "Promo '$title' (ID: $id) berhasil diperbarui", 'promos.php');
         header('Location: promos.php?status=success_update');
     } else {
         header('Location: promos.php?status=error&msg=Gagal memperbarui data promo');
@@ -73,15 +69,22 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// Aksi Hapus Promo (Delete)
 if ($action === 'delete' && isset($_GET['id'])) {
     $id = (int)$_GET['id'];
+
+    $infoQuery = $conn->prepare('SELECT title FROM promos WHERE id = ? LIMIT 1');
+    $infoQuery->bind_param('i', $id);
+    $infoQuery->execute();
+    $infoRes = $infoQuery->get_result()->fetch_assoc();
+    $savedTitle = $infoRes ? $infoRes['title'] : "ID " . $id;
+    $infoQuery->close();
 
     $sqlDel = 'DELETE FROM promos WHERE id = ?';
     $stmtDel = $conn->prepare($sqlDel);
     $stmtDel->bind_param('i', $id);
     
     if ($stmtDel->execute()) {
+        createNotification('admin', (int)$_SESSION['user_id'], 'Promo Dihapus', "Promo '$savedTitle' berhasil dihapus dari sistem", 'promos.php');
         header('Location: promos.php?status=success_delete');
     } else {
         header('Location: promos.php?status=error&msg=Gagal menghapus data promo');
@@ -89,9 +92,6 @@ if ($action === 'delete' && isset($_GET['id'])) {
     exit;
 }
 
-// ==========================================
-// 2. LOGIKA READ & PAGINATION (DATA RETRIEVAL)
-// ==========================================
 $search = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $perPage = 10;
@@ -101,14 +101,12 @@ $params = [];
 $types = '';
 
 if ($search !== '') {
-    // Mencari berdasarkan judul promo atau nama tenant
     $where = 'WHERE p.title LIKE ? OR t.name LIKE ?';
     $types = 'ss';
     $params[] = '%' . $search . '%';
     $params[] = '%' . $search . '%';
 }
 
-// Hitung total baris data (menggunakan JOIN agar pencarian nama tenant sinkron)
 $sqlCount = 'SELECT COUNT(*) AS total FROM promos p LEFT JOIN tenants t ON p.tenant_id = t.id ' . $where;
 $stmtCount = $conn->prepare($sqlCount);
 if ($where !== '') {
@@ -123,7 +121,6 @@ if ($resCount) {
 }
 $totalPages = max(1, (int)ceil($totalRows / $perPage));
 
-// Ambil data gabungan tabel promos dan tenants
 $sql = 'SELECT p.*, t.name AS tenant_name FROM promos p LEFT JOIN tenants t ON p.tenant_id = t.id ' . $where . ' ORDER BY p.id DESC LIMIT ? OFFSET ?';
 $stmt = $conn->prepare($sql);
 
@@ -141,7 +138,6 @@ if ($list) {
     }
 }
 
-// Ambil daftar tenant aktif untuk kebutuhan opsi Select di form modal input
 $listActiveTenants = [];
 $resTenants = $conn->query('SELECT id, name FROM tenants ORDER BY name ASC');
 if ($resTenants) {

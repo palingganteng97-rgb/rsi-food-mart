@@ -1,5 +1,6 @@
 <?php
 include 'db.php';
+include 'notification_helper.php'; // INTEGRASI: Menyertakan fungsi pembuat notifikasi
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -18,10 +19,20 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("ssi", $name, $provider, $is_online);
         
         if ($stmt->execute()) {
+            // INTEGRASI: Membuat notifikasi setelah berhasil menambahkan metode pembayaran baru
+            createNotification(
+                'admin', 
+                (int)$_SESSION['user_id'], 
+                'Metode Pembayaran Baru', 
+                "Metode pembayaran '$name' ($provider) berhasil ditambahkan", 
+                'payment_methods.php'
+            );
+
             header("Location: payment_methods.php?status=success_create");
         } else {
             header("Location: payment_methods.php?status=error&msg=" . urlencode($stmt->error));
         }
+        $stmt->close();
         exit();
     }
 }
@@ -38,10 +49,20 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("ssii", $name, $provider, $is_online, $id);
         
         if ($stmt->execute()) {
+            // INTEGRASI: Membuat notifikasi setelah berhasil memperbarui metode pembayaran
+            createNotification(
+                'admin', 
+                (int)$_SESSION['user_id'], 
+                'Metode Pembayaran Diperbarui', 
+                "Metode pembayaran '$name' (ID: $id) berhasil diperbarui", 
+                'payment_methods.php'
+            );
+
             header("Location: payment_methods.php?status=success_update");
         } else {
             header("Location: payment_methods.php?status=error&msg=" . urlencode($stmt->error));
         }
+        $stmt->close();
         exit();
     }
 }
@@ -51,19 +72,37 @@ if ($action === 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id'] ?? 0);
 
     if ($id > 0) {
+        // INTEGRASI: Ambil nama metode pembayaran sebelum datanya dihapus permanen dari database
+        $nameQuery = $conn->prepare("SELECT name FROM payment_methods WHERE id = ? LIMIT 1");
+        $nameQuery->bind_param("i", $id);
+        $nameQuery->execute();
+        $nameResult = $nameQuery->get_result()->fetch_assoc();
+        $savedName = $nameResult ? $nameResult['name'] : "ID " . $id;
+        $nameQuery->close();
+
         $stmt = $conn->prepare("DELETE FROM payment_methods WHERE id = ?");
         $stmt->bind_param("i", $id);
         
         if ($stmt->execute()) {
+            // INTEGRASI: Membuat notifikasi setelah berhasil menghapus metode pembayaran
+            createNotification(
+                'admin', 
+                (int)$_SESSION['user_id'], 
+                'Metode Pembayaran Dihapus', 
+                "Metode pembayaran '$savedName' berhasil dihapus dari sistem", 
+                'payment_methods.php'
+            );
+
             header("Location: payment_methods.php?status=success_delete");
         } else {
             header("Location: payment_methods.php?status=error&msg=" . urlencode($stmt->error));
         }
+        $stmt->close();
         exit();
     }
 }
 
-// 4. PROSES AMBIL DATA LIST (READ)
+// 4. PROSES AMBIL DATA (READ)
 $payment_methods = [];
 $result = $conn->query("SELECT * FROM payment_methods ORDER BY id DESC");
 if ($result) {
@@ -72,7 +111,6 @@ if ($result) {
     }
 }
 
-// Status notif dari URL
 $status = isset($_GET['status']) ? (string)$_GET['status'] : '';
 $msg = isset($_GET['msg']) ? (string)$_GET['msg'] : '';
 ?>

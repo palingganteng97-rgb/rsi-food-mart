@@ -1,15 +1,5 @@
 <?php
-/**
- * notification_helper.php
- * 
- * Helper function to create notifications system-wide.
- * Include this file wherever notifications need to be inserted.
- * 
- * Usage:
- *   include 'notification_helper.php';
- *   createNotification('admin', $userId, 'Pesanan Baru', 'Kamar 302 memesan Nasi Rendah Garam', 'orders.php?id=15');
- *   createNotification('patient', $patientSessionId, 'Pesanan Siap', 'Pesanan Anda sudah siap diantar', 'riwayat_pesanan.php?id=10');
- */
+///notification_helper.php
 
 if (!function_exists('createNotification')) {
     /**

@@ -1,5 +1,6 @@
 <?php
 include 'db.php';
+include 'notification_helper.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -7,19 +8,32 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $action = isset($_GET['action']) ? trim((string)$_GET['action']) : '';
 
-// 1. PROSES PENGAJUAN REFUND BARU (CREATE)
 if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $payment_id = intval($_POST['payment_id'] ?? 0);
     $amount     = isset($_POST['amount']) ? floatval($_POST['amount']) : 0.0;
     $reason     = trim($_POST['reason'] ?? '');
-    $status     = trim($_POST['status'] ?? 'PENDING'); // Default status pengajuan awal
+    $status     = trim($_POST['status'] ?? 'PENDING');
 
     if ($payment_id > 0 && $amount > 0) {
         $stmt = $conn->prepare("INSERT INTO refunds (payment_id, amount, reason, status) VALUES (?, ?, ?, ?)");
         $stmt->bind_param("idss", $payment_id, $amount, $reason, $status);
         
         if ($stmt->execute()) {
-            // Opsional: Update juga status di tabel payments menjadi 'REFUNDED' atau 'REFUND_PENDING' jika diperlukan
+            $infoQuery = $conn->prepare("SELECT o.order_number FROM payments p LEFT JOIN orders o ON p.order_id = o.id WHERE p.id = ? LIMIT 1");
+            $infoQuery->bind_param("i", $payment_id);
+            $infoQuery->execute();
+            $infoRes = $infoQuery->get_result()->fetch_assoc();
+            $orderNumber = $infoRes ? $infoRes['order_number'] : "ID Pembayaran " . $payment_id;
+            $infoQuery->close();
+
+            createNotification(
+                'admin', 
+                (int)$_SESSION['user_id'], 
+                'Pengajuan Refund', 
+                "Pengembalian dana diajukan untuk Pesanan #$orderNumber sebesar Rp " . number_format($amount), 
+                'refunds.php'
+            );
+
             header("Location: refunds.php?status=success_create");
         } else {
             header("Location: refunds.php?status=error&msg=" . urlencode($stmt->error));
@@ -28,16 +42,31 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 2. PROSES UPDATE STATUS REFUND OLEH ADMIN (UPDATE)
 if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $id         = intval($_POST['id'] ?? 0);
-    $new_status = trim($_POST['status'] ?? 'APPROVED'); // APPROVED / REJECTED / PENDING
+    $new_status = trim($_POST['status'] ?? 'APPROVED');
 
     if ($id > 0) {
+        $infoQuery = $conn->prepare("SELECT o.order_number, r.amount FROM refunds r LEFT JOIN payments p ON r.payment_id = p.id LEFT JOIN orders o ON p.order_id = o.id WHERE r.id = ? LIMIT 1");
+        $infoQuery->bind_param("i", $id);
+        $infoQuery->execute();
+        $infoRes = $infoQuery->get_result()->fetch_assoc();
+        $orderNumber = $infoRes ? $infoRes['order_number'] : "ID " . $id;
+        $amount = $infoRes ? floatval($infoRes['amount']) : 0;
+        $infoQuery->close();
+
         $stmt = $conn->prepare("UPDATE refunds SET status = ? WHERE id = ?");
         $stmt->bind_param("si", $new_status, $id);
         
         if ($stmt->execute()) {
+            createNotification(
+                'admin', 
+                (int)$_SESSION['user_id'], 
+                'Status Refund Diperbarui', 
+                "Pengajuan refund Pesanan #$orderNumber sebesar Rp " . number_format($amount) . " dinyatakan $new_status", 
+                'refunds.php'
+            );
+
             header("Location: refunds.php?status=success_update");
         } else {
             header("Location: refunds.php?status=error&msg=" . urlencode($stmt->error));
@@ -46,15 +75,29 @@ if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 3. PROSES HAPUS RIWAYAT REFUND (DELETE)
 if ($action === 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id'] ?? 0);
 
     if ($id > 0) {
+        $infoQuery = $conn->prepare("SELECT o.order_number FROM refunds r LEFT JOIN payments p ON r.payment_id = p.id LEFT JOIN orders o ON p.order_id = o.id WHERE r.id = ? LIMIT 1");
+        $infoQuery->bind_param("i", $id);
+        $infoQuery->execute();
+        $infoRes = $infoQuery->get_result()->fetch_assoc();
+        $orderNumber = $infoRes ? $infoRes['order_number'] : "ID " . $id;
+        $infoQuery->close();
+
         $stmt = $conn->prepare("DELETE FROM refunds WHERE id = ?");
         $stmt->bind_param("i", $id);
         
         if ($stmt->execute()) {
+            createNotification(
+                'admin', 
+                (int)$_SESSION['user_id'], 
+                'Riwayat Refund Dihapus', 
+                "Data riwayat pengembalian dana untuk Pesanan #$orderNumber berhasil dihapus dari sistem", 
+                'refunds.php'
+            );
+
             header("Location: refunds.php?status=success_delete");
         } else {
             header("Location: refunds.php?status=error&msg=" . urlencode($stmt->error));
@@ -63,9 +106,7 @@ if ($action === 'delete' && isset($_GET['id'])) {
     }
 }
 
-// 4. PROSES AMBIL DATA RIWAYAT REFUND DENGAN JOIN RELASI (READ)
 $refunds = [];
-// Melakukan JOIN ke tabel payments dan orders agar admin bisa melihat Nomor Invoice & Nomor Transaksi asli
 $sql = "SELECT r.*, p.transaction_number, o.order_number 
         FROM refunds r
         LEFT JOIN payments p ON r.payment_id = p.id
@@ -82,6 +123,7 @@ if ($result) {
 $msg_status = isset($_GET['status']) ? (string)$_GET['status'] : '';
 $msg = isset($_GET['msg']) ? (string)$_GET['msg'] : '';
 ?>
+
 
 <!DOCTYPE html>
 <html lang="id">

@@ -43,7 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_create'])) {
                 $stmt->bind_param("s", $name);
                 if ($stmt->execute()) {
                     $_SESSION['roles_success'] = "Role baru berhasil ditambahkan!";
-                    createNotification('admin', $_SESSION['user_id'], 'Role Baru', "Role $name berhasil ditambahkan");
+                    // SINKRONISASI HELPER: Menambahkan parameter kelima berupa tautan tujuan
+                    createNotification('admin', (int)$_SESSION['user_id'], 'Role Baru', "Role $name berhasil ditambahkan", 'roles.php');
                 } else {
                     $_SESSION['roles_error'] = "Gagal menyimpan role baru ke database.";
                 }
@@ -79,7 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                 $updateStmt->bind_param("si", $newName, $targetId);
                 if ($updateStmt->execute()) {
                     $_SESSION['roles_success'] = "Nama role berhasil diperbarui!";
-                    createNotification('admin', $_SESSION['user_id'], 'Role Diperbarui', "Role $newName berhasil diperbarui");
+                    // SINKRONISASI HELPER: Menambahkan parameter kelima berupa tautan tujuan
+                    createNotification('admin', (int)$_SESSION['user_id'], 'Role Diperbarui', "Role $newName berhasil diperbarui", 'roles.php');
                 } else {
                     $_SESSION['roles_error'] = "Gagal memperbarui data role di database.";
                 }
@@ -110,11 +112,20 @@ if (isset($_GET['action_delete'])) {
             if ($checkUsed->get_result()->num_rows > 0) {
                 $_SESSION['roles_error'] = "Role tidak bisa dihapus karena masih digunakan oleh beberapa pengguna!";
             } else {
+                // Mengambil nama role terlebih dahulu untuk dicatat di isi notifikasi sebelum dihapus
+                $roleQuery = $conn->prepare("SELECT name FROM roles WHERE id = ? LIMIT 1");
+                $roleQuery->bind_param("i", $deleteId);
+                $roleQuery->execute();
+                $roleResult = $roleQuery->get_result()->fetch_assoc();
+                $savedRoleName = $roleResult ? $roleResult['name'] : "ID " . $deleteId;
+                $roleQuery->close();
+
                 $deleteStmt = $conn->prepare("DELETE FROM roles WHERE id = ?");
                 $deleteStmt->bind_param("i", $deleteId);
                 if ($deleteStmt->execute()) {
                     $_SESSION['roles_success'] = "Role berhasil dihapus dari sistem!";
-                    createNotification('admin', $_SESSION['user_id'], 'Role Dihapus', "Role (ID: $deleteId) berhasil dihapus");
+                    // SINKRONISASI HELPER: Mengganti teks log agar memuat nama asli role dan menambahkan parameter tautan
+                    createNotification('admin', (int)$_SESSION['user_id'], 'Role Dihapus', "Role '$savedRoleName' berhasil dihapus", 'roles.php');
                 } else {
                     $_SESSION['roles_error'] = "Gagal menghapus data dari database.";
                 }

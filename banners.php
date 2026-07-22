@@ -1,6 +1,7 @@
 <?php
 // banners.php - Modul CRUD Banners (Admin) LENGKAP
 include 'db.php';
+include 'notification_helper.php'; // INTEGRASI: Menyertakan fungsi pembuat notifikasi
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -57,6 +58,15 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmtIns->bind_param('sssi', $title, $imageName, $link, $statusParam);
     
     if ($stmtIns->execute()) {
+        // INTEGRASI: Membuat notifikasi setelah berhasil tambah banner
+        createNotification(
+            'admin',
+            (int)$_SESSION['user_id'],
+            'Banner Baru Ditambahkan',
+            "Banner '$title' berhasil diunggah dan ditambahkan",
+            'banners.php'
+        );
+
         header('Location: banners.php?status=success&msg=Banner berhasil ditambahkan');
     } else {
         header('Location: banners.php?status=error&msg=Gagal menyimpan data');
@@ -102,6 +112,15 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmtUpd->bind_param('sssii', $title, $imageName, $link, $statusParam, $id);
     
     if ($stmtUpd->execute()) {
+        // INTEGRASI: Membuat notifikasi setelah berhasil mengubah banner
+        createNotification(
+            'admin',
+            (int)$_SESSION['user_id'],
+            'Banner Diperbarui',
+            "Banner '$title' (ID: $id) berhasil diperbarui",
+            'banners.php'
+        );
+
         header('Location: banners.php?status=success&msg=Banner berhasil diperbarui');
     } else {
         header('Location: banners.php?status=error&msg=Gagal memperbarui data');
@@ -113,14 +132,16 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($action === 'delete' && isset($_GET['id'])) {
     $id = (int)$_GET['id'];
 
-    $sqlImg = 'SELECT image FROM banners WHERE id = ?';
-    $stmtImg = $conn->prepare($sqlImg);
-    $stmtImg->bind_param('i', $id);
-    $stmtImg->execute();
-    $resImg = $stmtImg->get_result()->fetch_assoc();
+    // Ambil judul banner terlebih dahulu sebelum datanya dihapus dari database
+    $sqlTitle = 'SELECT title, image FROM banners WHERE id = ?';
+    $stmtTitle = $conn->prepare($sqlTitle);
+    $stmtTitle->bind_param('i', $id);
+    $stmtTitle->execute();
+    $resTitle = $stmtTitle->get_result()->fetch_assoc();
     
-    if ($resImg) {
-        $imageName = $resImg['image'];
+    if ($resTitle) {
+        $savedTitle = $resTitle['title'];
+        $imageName = $resTitle['image'];
         if ($imageName !== '' && file_exists($uploadDir . $imageName)) {
             unlink($uploadDir . $imageName);
         }
@@ -130,6 +151,15 @@ if ($action === 'delete' && isset($_GET['id'])) {
         $stmtDel->bind_param('i', $id);
         
         if ($stmtDel->execute()) {
+            // INTEGRASI: Membuat notifikasi setelah berhasil menghapus banner
+            createNotification(
+                'admin',
+                (int)$_SESSION['user_id'],
+                'Banner Dihapus',
+                "Banner '$savedTitle' berhasil dihapus dari sistem",
+                'banners.php'
+            );
+
             header('Location: banners.php?status=success&msg=Banner berhasil dihapus');
         } else {
             header('Location: banners.php?status=error&msg=Gagal menghapus data dari database');

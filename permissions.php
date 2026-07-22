@@ -1,5 +1,4 @@
 <?php
-// permissions.php
 include 'db.php'; 
 include 'notification_helper.php';
 if (session_status() === PHP_SESSION_NONE) {
@@ -20,7 +19,6 @@ if (isset($_SESSION['perm_error_msg'])) {
     unset($_SESSION['perm_error_msg']); 
 }
 
-// 1. PROSES BERKAS CREATE (TAMBAH DATA)
 if (isset($_POST['create'])) {
     $module_name     = trim($_POST['module_name']);
     $permission_name = trim($_POST['permission_name']);
@@ -31,7 +29,6 @@ if (isset($_POST['create'])) {
         exit();
     }
 
-    // Cek duplicate module_name (case insensitive)
     $checkStmt = $conn->prepare("SELECT id FROM permissions WHERE LOWER(module_name) = LOWER(?) LIMIT 1");
     $checkStmt->bind_param("s", $module_name);
     $checkStmt->execute();
@@ -47,7 +44,7 @@ if (isset($_POST['create'])) {
     $stmt->bind_param("ss", $module_name, $permission_name);
     if ($stmt->execute()) {
         $stmt->close();
-        createNotification('admin', $_SESSION['user_id'], 'Hak Akses Baru', "Permission $permission_name ($module_name) berhasil ditambahkan");
+        createNotification('admin', (int)$_SESSION['user_id'], 'Hak Akses Baru', "Permission $permission_name ($module_name) berhasil ditambahkan", 'permissions.php');
         header("Location: permissions.php?status=success_create");
         exit();
     } else {
@@ -58,7 +55,6 @@ if (isset($_POST['create'])) {
     }
 }
 
-// 2. PROSES BERKAS UPDATE (UBAH DATA)
 if (isset($_POST['update'])) {
     $id              = intval($_POST['id']);
     $module_name     = trim($_POST['module_name']);
@@ -70,7 +66,6 @@ if (isset($_POST['update'])) {
         exit();
     }
 
-    // Cek duplicate module_name (case insensitive, exclude current record)
     $checkStmt = $conn->prepare("SELECT id FROM permissions WHERE LOWER(module_name) = LOWER(?) AND id != ? LIMIT 1");
     $checkStmt->bind_param("si", $module_name, $id);
     $checkStmt->execute();
@@ -86,7 +81,7 @@ if (isset($_POST['update'])) {
     $stmt->bind_param("ssi", $module_name, $permission_name, $id);
     if ($stmt->execute()) {
         $stmt->close();
-        createNotification('admin', $_SESSION['user_id'], 'Hak Akses Diperbarui', "Permission $permission_name ($module_name) berhasil diperbarui");
+        createNotification('admin', (int)$_SESSION['user_id'], 'Hak Akses Diperbarui', "Permission $permission_name ($module_name) berhasil diperbarui", 'permissions.php');
         header("Location: permissions.php?status=success_update");
         exit();
     } else {
@@ -97,16 +92,22 @@ if (isset($_POST['update'])) {
     }
 }
 
-// 3. PROSES BERKAS DELETE (HAPUS DATA)
 if (isset($_GET['delete'])) {
     $id = intval($_GET['delete']);
 
     if ($id > 0) {
+        $infoQuery = $conn->prepare("SELECT permission_name, module_name FROM permissions WHERE id = ? LIMIT 1");
+        $infoQuery->bind_param("i", $id);
+        $infoQuery->execute();
+        $infoRes = $infoQuery->get_result()->fetch_assoc();
+        $savedName = $infoRes ? $infoRes['permission_name'] . " (" . $infoRes['module_name'] . ")" : "ID " . $id;
+        $infoQuery->close();
+
         $stmt = $conn->prepare("DELETE FROM permissions WHERE id = ?");
         $stmt->bind_param("i", $id);
         if ($stmt->execute()) {
             $stmt->close();
-            createNotification('admin', $_SESSION['user_id'], 'Hak Akses Dihapus', "Permission (ID: $id) berhasil dihapus");
+            createNotification('admin', (int)$_SESSION['user_id'], 'Hak Akses Dihapus', "Permission '$savedName' berhasil dihapus", 'permissions.php');
             header("Location: permissions.php?status=success_delete");
             exit();
         } else {
@@ -122,7 +123,6 @@ if (isset($_GET['delete'])) {
     }
 }
 
-// 4. READ DATA UNTUK LOOPING TABEL VIEW
 $permissionsData = [];
 $sql = "SELECT id, module_name, permission_name FROM permissions ORDER BY id DESC";
 $fetchQuery = mysqli_query($conn, $sql);

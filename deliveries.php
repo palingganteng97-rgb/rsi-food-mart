@@ -1,5 +1,6 @@
 <?php
 include 'db.php';
+include 'notification_helper.php'; // INTEGRASI: Menyertakan fungsi pembuat notifikasi
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -7,7 +8,6 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $action = isset($_GET['action']) ? trim((string)$_GET['action']) : '';
 
-// 1. PROSES TAMBAH DATA (CREATE) — DENGAN VALIDASI FK & TRANSACTION
 if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $order_id      = intval($_POST['order_id'] ?? 0);
     $courier_id    = intval($_POST['courier_id'] ?? 0);
@@ -15,7 +15,6 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $pickup_time   = !empty($_POST['pickup_time']) ? $_POST['pickup_time'] : null;
     $delivery_time = !empty($_POST['delivery_time']) ? $_POST['delivery_time'] : null;
     $proof_photo   = trim($_POST['proof_photo'] ?? '');
-
     $errors = [];
     if ($order_id <= 0) {
         $errors[] = 'order_id tidak valid';
@@ -24,7 +23,6 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'courier_id tidak valid';
     }
 
-    // Validasi Foreign Key: order_id harus ada di tabel orders
     if ($order_id > 0) {
         $chkOrder = $conn->prepare("SELECT id FROM orders WHERE id = ?");
         $chkOrder->bind_param("i", $order_id);
@@ -35,7 +33,6 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $chkOrder->close();
     }
 
-    // Validasi Foreign Key: courier_id harus ada di tabel couriers
     if ($courier_id > 0) {
         $chkCourier = $conn->prepare("SELECT id FROM couriers WHERE id = ?");
         $chkCourier->bind_param("i", $courier_id);
@@ -46,7 +43,6 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $chkCourier->close();
     }
 
-    // Cegah duplikasi: cek apakah sudah ada delivery untuk order_id ini
     if ($order_id > 0) {
         $chkDup = $conn->prepare("SELECT id FROM deliveries WHERE order_id = ? LIMIT 1");
         $chkDup->bind_param("i", $order_id);
@@ -63,7 +59,6 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
 
-    // Gunakan TRANSACTION agar data konsisten
     mysqli_begin_transaction($conn);
     try {
         $stmt = $conn->prepare("INSERT INTO deliveries (order_id, courier_id, status, pickup_time, delivery_time, proof_photo) VALUES (?, ?, ?, ?, ?, ?)");
@@ -73,6 +68,23 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception("SQL INSERT error: " . $stmt->error);
         }
         
+        // INTEGRASI: Ambil data nama kurir untuk kebutuhan riwayat pesan notifikasi
+        $courierQuery = $conn->prepare("SELECT name FROM couriers WHERE id = ? LIMIT 1");
+        $courierQuery->bind_param("i", $courier_id);
+        $courierQuery->execute();
+        $courierRes = $courierQuery->get_result()->fetch_assoc();
+        $courierName = $courierRes ? $courierRes['name'] : "ID " . $courier_id;
+        $courierQuery->close();
+
+        // INTEGRASI: Membuat entri data log tabel notifications baru
+        createNotification(
+            'admin', 
+            (int)$_SESSION['user_id'], 
+            'Pengiriman Ditugaskan', 
+            "Pesanan #$order_id telah ditugaskan kepada kurir $courierName dengan status awal: $status", 
+            'deliveries.php'
+        );
+
         mysqli_commit($conn);
         header("Location: deliveries.php?status=success_create");
     } catch (Exception $e) {
@@ -82,7 +94,6 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit();
 }
 
-// 2. PROSES UBAH DATA (UPDATE) — DENGAN VALIDASI FK & TRANSACTION
 if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $id            = intval($_POST['id'] ?? 0);
     $order_id      = intval($_POST['order_id'] ?? 0);
@@ -91,7 +102,6 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $pickup_time   = !empty($_POST['pickup_time']) ? $_POST['pickup_time'] : null;
     $delivery_time = !empty($_POST['delivery_time']) ? $_POST['delivery_time'] : null;
     $proof_photo   = trim($_POST['proof_photo'] ?? '');
-
     $errors = [];
     if ($id <= 0) {
         $errors[] = 'id delivery tidak valid';
@@ -103,7 +113,6 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'courier_id tidak valid';
     }
 
-    // Validasi Foreign Key
     if ($order_id > 0) {
         $chkOrder = $conn->prepare("SELECT id FROM orders WHERE id = ?");
         $chkOrder->bind_param("i", $order_id);
@@ -122,7 +131,6 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $chkCourier->close();
     }
-    // Cek apakah record delivery dengan id ini ada
     if ($id > 0) {
         $chkDel = $conn->prepare("SELECT id FROM deliveries WHERE id = ?");
         $chkDel->bind_param("i", $id);
@@ -139,7 +147,6 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
 
-    // Gunakan TRANSACTION
     mysqli_begin_transaction($conn);
     try {
         $stmt = $conn->prepare("UPDATE deliveries SET order_id = ?, courier_id = ?, status = ?, pickup_time = ?, delivery_time = ?, proof_photo = ? WHERE id = ?");
@@ -149,6 +156,15 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception("SQL UPDATE error: " . $stmt->error);
         }
         
+        // INTEGRASI: Membuat entri data log tabel notifications update status logistik pengantaran
+        createNotification(
+            'admin', 
+            (int)$_SESSION['user_id'], 
+            'Pengiriman Diperbarui', 
+            "Data pengiriman ID $id (Order #$order_id) telah disesuaikan ke status baru: $status", 
+            'deliveries.php'
+        );
+
         mysqli_commit($conn);
         header("Location: deliveries.php?status=success_update");
     } catch (Exception $e) {
@@ -158,7 +174,6 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit();
 }
 
-// 3. PROSES HAPUS DATA (DELETE) — DENGAN TRANSACTION
 if ($action === 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id'] ?? 0);
 
@@ -167,7 +182,6 @@ if ($action === 'delete' && isset($_GET['id'])) {
         $errors[] = 'id delivery tidak valid';
     }
 
-    // Cek apakah record delivery dengan id ini ada
     if ($id > 0) {
         $chkDel = $conn->prepare("SELECT id FROM deliveries WHERE id = ?");
         $chkDel->bind_param("i", $id);
@@ -185,22 +199,36 @@ if ($action === 'delete' && isset($_GET['id'])) {
         exit();
     }
 
-    // Gunakan TRANSACTION
     mysqli_begin_transaction($conn);
     try {
-        // Hapus data tracking terkait terlebih dahulu (FK constraint)
+        // INTEGRASI: Ambil referensi order_id pengiriman sebelum dihapus dari database
+        $infoQuery = $conn->prepare("SELECT order_id FROM deliveries WHERE id = ? LIMIT 1");
+        $infoQuery->bind_param("i", $id);
+        $infoQuery->execute();
+        $infoRes = $infoQuery->get_result()->fetch_assoc();
+        $savedOrderId = $infoRes ? $infoRes['order_id'] : 0;
+        $infoQuery->close();
+
         $delTrack = $conn->prepare("DELETE FROM delivery_tracking WHERE delivery_id = ?");
         $delTrack->bind_param("i", $id);
         $delTrack->execute();
         $delTrack->close();
-
-        // Hapus delivery
+        
         $stmt = $conn->prepare("DELETE FROM deliveries WHERE id = ?");
         $stmt->bind_param("i", $id);
         if (!$stmt->execute()) {
             throw new Exception("SQL DELETE error: " . $stmt->error);
         }
         $stmt->close();
+
+        // INTEGRASI: Membuat entri data log tabel notifications pembatalan penugasan kurir pengiriman
+        createNotification(
+            'admin', 
+            (int)$_SESSION['user_id'], 
+            'Pengiriman Dibatalkan', 
+            "Data tugas logistik pengiriman untuk pesanan #$savedOrderId (ID Pengiriman: $id) telah dihapus", 
+            'deliveries.php'
+        );
 
         mysqli_commit($conn);
         header("Location: deliveries.php?status=success_delete");
@@ -211,7 +239,6 @@ if ($action === 'delete' && isset($_GET['id'])) {
     exit();
 }
 
-// 4. PROSES READ DATA DENGAN JOIN (Untuk Relasi Nama Kurir & Invoice Pesanan)
 $deliveries = [];
 $sql = "SELECT d.*, o.order_number, c.name AS courier_name 
         FROM deliveries d
@@ -227,8 +254,6 @@ if ($result) {
 
 $status = isset($_GET['status']) ? (string)$_GET['status'] : '';
 $msg = isset($_GET['msg']) ? (string)$_GET['msg'] : '';
-
-// Data dropdown untuk form (dibaca untuk tampilan saja)
 $orders = [];
 $orderRes = $conn->query("SELECT id, order_number FROM orders ORDER BY id DESC");
 if ($orderRes) {

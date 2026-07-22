@@ -1,14 +1,12 @@
 <?php
-// tenant_settings.php
-include "db.php"; // Memanggil koneksi database ($conn) & session_start()
+include "db.php"; 
+include "notification_helper.php";
 
-// Proteksi Halaman: Jika sesi user_id kosong, tendang kembali ke login.php
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
-// Inisialisasi variabel status notifikasi
 $status = "";
 $msg = "";
 if (isset($_SESSION['status'])) {
@@ -17,9 +15,6 @@ if (isset($_SESSION['status'])) {
     unset($_SESSION['status'], $_SESSION['msg']);
 }
 
-// ==========================================
-// 1. PROSES SIMPAN / TAMBAH DATA (CREATE)
-// ==========================================
 if (isset($_POST['action']) && $_POST['action'] == 'insert') {
     $tenant_id     = $_POST['tenant_id'];
     $auto_accept   = isset($_POST['auto_accept']) ? (int)$_POST['auto_accept'] : 0;
@@ -32,6 +27,21 @@ if (isset($_POST['action']) && $_POST['action'] == 'insert') {
     $stmt->bind_param("iiidd", $tenant_id, $auto_accept, $accept_order, $minimum_order, $maximum_order);
     
     if ($stmt->execute()) {
+        $tenantQuery = $conn->prepare("SELECT name FROM tenants WHERE id = ? LIMIT 1");
+        $tenantQuery->bind_param("i", $tenant_id);
+        $tenantQuery->execute();
+        $tenantRes = $tenantQuery->get_result()->fetch_assoc();
+        $tenantName = $tenantRes ? $tenantRes['name'] : "ID " . $tenant_id;
+        $tenantQuery->close();
+
+        createNotification(
+            'admin', 
+            (int)$_SESSION['user_id'], 
+            'Pengaturan Tenant Baru', 
+            "Konfigurasi batasan dan aturan baru untuk tenant '$tenantName' berhasil ditambahkan", 
+            'tenant_settings.php'
+        );
+
         $_SESSION['status'] = 'success_insert';
     } else {
         $_SESSION['status'] = 'failed';
@@ -41,9 +51,6 @@ if (isset($_POST['action']) && $_POST['action'] == 'insert') {
     exit;
 }
 
-// ==========================================
-// 2. PROSES UPDATE DATA (UPDATE)
-// ==========================================
 if (isset($_POST['action']) && $_POST['action'] == 'update') {
     $id            = $_POST['id'];
     $tenant_id     = $_POST['tenant_id'];
@@ -57,6 +64,21 @@ if (isset($_POST['action']) && $_POST['action'] == 'update') {
     $stmt->bind_param("iiiddi", $tenant_id, $auto_accept, $accept_order, $minimum_order, $maximum_order, $id);
     
     if ($stmt->execute()) {
+        $tenantQuery = $conn->prepare("SELECT name FROM tenants WHERE id = ? LIMIT 1");
+        $tenantQuery->bind_param("i", $tenant_id);
+        $tenantQuery->execute();
+        $tenantRes = $tenantQuery->get_result()->fetch_assoc();
+        $tenantName = $tenantRes ? $tenantRes['name'] : "ID " . $tenant_id;
+        $tenantQuery->close();
+
+        createNotification(
+            'admin', 
+            (int)$_SESSION['user_id'], 
+            'Pengaturan Tenant Diperbarui', 
+            "Konfigurasi batasan dan aturan untuk tenant '$tenantName' (ID: $id) berhasil diperbarui", 
+            'tenant_settings.php'
+        );
+
         $_SESSION['status'] = 'success_update';
     } else {
         $_SESSION['status'] = 'failed';
@@ -66,17 +88,29 @@ if (isset($_POST['action']) && $_POST['action'] == 'update') {
     exit;
 }
 
-// ==========================================
-// 3. PROSES HAPUS DATA (DELETE)
-// ==========================================
 if (isset($_GET['action']) && $_GET['action'] == 'delete') {
     $id = $_GET['id'];
     
+    $infoQuery = $conn->prepare("SELECT ts.tenant_id, t.name AS tenant_name FROM tenant_settings ts LEFT JOIN tenants t ON ts.tenant_id = t.id WHERE ts.id = ? LIMIT 1");
+    $infoQuery->bind_param("i", $id);
+    $infoQuery->execute();
+    $infoRes = $infoQuery->get_result()->fetch_assoc();
+    $tenantName = $infoRes ? $infoRes['tenant_name'] : "ID " . ($infoRes['tenant_id'] ?? 0);
+    $infoQuery->close();
+
     $query = "DELETE FROM tenant_settings WHERE id = ?";
     $stmt  = $conn->prepare($query);
     $stmt->bind_param("i", $id);
     
     if ($stmt->execute()) {
+        createNotification(
+            'admin', 
+            (int)$_SESSION['user_id'], 
+            'Pengaturan Tenant Dihapus', 
+            "Konfigurasi aturan khusus untuk tenant '$tenantName' berhasil dihapus dari sistem", 
+            'tenant_settings.php'
+        );
+
         $_SESSION['status'] = 'success_delete';
     } else {
         $_SESSION['status'] = 'failed';
@@ -86,9 +120,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete') {
     exit;
 }
 
-// ==========================================
-// 4. AMBIL DATA UNTUK DITAMPILKAN (READ)
-// ==========================================
 $query  = "SELECT ts.*, t.name AS tenant_name 
            FROM tenant_settings ts 
            LEFT JOIN tenants t ON ts.tenant_id = t.id 

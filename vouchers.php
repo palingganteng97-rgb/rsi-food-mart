@@ -1,6 +1,6 @@
 <?php
-// vouchers.php
 include 'db.php';
+include 'notification_helper.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -14,12 +14,8 @@ if (!isset($_SESSION['user_id'])) {
 $status = isset($_GET['status']) ? (string)$_GET['status'] : '';
 $msg = isset($_GET['msg']) ? (string)$_GET['msg'] : '';
 
-// ==========================================
-// 1. ACTION HANDLER (PROSES POST/GET ACTIONS)
-// ==========================================
 $action = isset($_POST['action']) ? (string)$_POST['action'] : (isset($_GET['action']) ? (string)$_GET['action'] : '');
 
-// Aksi Tambah Voucher (Create)
 if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $code = strtoupper(trim((string)($_POST['code'] ?? '')));
     $discount_type = trim((string)($_POST['discount_type'] ?? 'percent'));
@@ -40,6 +36,7 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmtIns->bind_param('ssddissi', $code, $discount_type, $discount_value, $minimum_purchase, $quota, $start_date, $end_date, $statusParam);
     
     if ($stmtIns->execute()) {
+        createNotification('admin', (int)$_SESSION['user_id'], 'Voucher Baru', "Voucher dengan kode '$code' berhasil ditambahkan", 'vouchers.php');
         header('Location: vouchers.php?status=success_insert');
     } else {
         header('Location: vouchers.php?status=error&msg=Gagal menyimpan data voucher');
@@ -47,7 +44,6 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// Aksi Ubah Voucher (Update)
 if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = (int)($_POST['id'] ?? 0);
     $code = strtoupper(trim((string)($_POST['code'] ?? '')));
@@ -69,6 +65,7 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmtUpd->bind_param('ssddissii', $code, $discount_type, $discount_value, $minimum_purchase, $quota, $start_date, $end_date, $statusParam, $id);
     
     if ($stmtUpd->execute()) {
+        createNotification('admin', (int)$_SESSION['user_id'], 'Voucher Diperbarui', "Voucher dengan kode '$code' (ID: $id) berhasil diperbarui", 'vouchers.php');
         header('Location: vouchers.php?status=success_update');
     } else {
         header('Location: vouchers.php?status=error&msg=Gagal memperbarui data voucher');
@@ -76,15 +73,22 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// Aksi Hapus Voucher (Delete)
 if ($action === 'delete' && isset($_GET['id'])) {
     $id = (int)$_GET['id'];
+
+    $infoQuery = $conn->prepare('SELECT code FROM vouchers WHERE id = ? LIMIT 1');
+    $infoQuery->bind_param('i', $id);
+    $infoQuery->execute();
+    $infoRes = $infoQuery->get_result()->fetch_assoc();
+    $savedCode = $infoRes ? $infoRes['code'] : "ID " . $id;
+    $infoQuery->close();
 
     $sqlDel = 'DELETE FROM vouchers WHERE id = ?';
     $stmtDel = $conn->prepare($sqlDel);
     $stmtDel->bind_param('i', $id);
     
     if ($stmtDel->execute()) {
+        createNotification('admin', (int)$_SESSION['user_id'], 'Voucher Dihapus', "Voucher dengan kode '$savedCode' berhasil dihapus dari sistem", 'vouchers.php');
         header('Location: vouchers.php?status=success_delete');
     } else {
         header('Location: vouchers.php?status=error&msg=Gagal menghapus data voucher');
@@ -92,9 +96,6 @@ if ($action === 'delete' && isset($_GET['id'])) {
     exit;
 }
 
-// ==========================================
-// 2. LOGIKA READ & PAGINATION (DATA RETRIEVAL)
-// ==========================================
 $search = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $perPage = 10;

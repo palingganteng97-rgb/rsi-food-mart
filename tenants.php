@@ -1,5 +1,4 @@
 <?php
-// tenants.php (Full Kode Logika Atas Baris Nomor 1)
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -15,7 +14,6 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
 $crudError = '';
 $crudSuccess = '';
 
-// Menangkap notifikasi status dari session agar aman saat di-refresh (F5)
 if (isset($_SESSION['tenant_success'])) {
     $crudSuccess = $_SESSION['tenant_success'];
     unset($_SESSION['tenant_success']);
@@ -25,9 +23,6 @@ if (isset($_SESSION['tenant_error'])) {
     unset($_SESSION['tenant_error']);
 }
 
-// =========================================================================
-// 1. PROSES CRUD: TAMBAH DATA TENANT BARU (CREATE)
-// =========================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_create'])) {
     $name             = trim($_POST['name'] ?? '');
     $type             = trim($_POST['type'] ?? '');
@@ -39,20 +34,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_create'])) {
 
     if (!empty($name) && !empty($type)) {
         try {
-            // Validasi duplikasi: Cek nama tenant agar tidak kembar
             $check = $conn->prepare("SELECT id FROM tenants WHERE name = ? LIMIT 1");
             $check->bind_param("s", $name);
             $check->execute();
             if ($check->get_result()->num_rows > 0) {
                 $_SESSION['tenant_error'] = "Nama Tenant sudah terdaftar!";
             } else {
-                // Menyematkan kolom phone, email, dan preparation_time ke dalam query insert
                 $stmt = $conn->prepare("INSERT INTO tenants (name, type, description, phone, email, preparation_time, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
                 $stmt->bind_param("sssssii", $name, $type, $description, $phone, $email, $preparation_time, $status);
                 
                 if ($stmt->execute()) {
                     $_SESSION['tenant_success'] = "Data tenant baru berhasil ditambahkan!";
-                    createNotification('admin', $_SESSION['user_id'], 'Tenant Baru', "Tenant $name ($type) berhasil ditambahkan");
+                    createNotification('admin', (int)$_SESSION['user_id'], 'Tenant Baru', "Tenant $name ($type) berhasil ditambahkan", 'tenants.php');
                 } else {
                     $_SESSION['tenant_error'] = "Gagal menyimpan data tenant ke database.";
                 }
@@ -69,9 +62,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_create'])) {
     exit;
 }
 
-// =========================================================================
-// 2. PROSES CRUD: SIMPAN PERUBAHAN DATA TENANT (UPDATE)
-// =========================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
     $targetId         = (int)($_POST['edit_id'] ?? 0);
     $name             = trim($_POST['name'] ?? '');
@@ -84,20 +74,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
 
     if ($targetId > 0 && !empty($name) && !empty($type)) {
         try {
-            // Validasi duplikasi untuk update: Nama tidak boleh kembar dengan ID lain
             $check = $conn->prepare("SELECT id FROM tenants WHERE name = ? AND id != ? LIMIT 1");
             $check->bind_param("si", $name, $targetId);
             $check->execute();
             if ($check->get_result()->num_rows > 0) {
                 $_SESSION['tenant_error'] = "Nama Tenant tersebut sudah digunakan oleh data lain!";
             } else {
-                // Memperbarui record database lengkap termasuk phone, email, dan preparation_time
                 $updateStmt = $conn->prepare("UPDATE tenants SET name = ?, type = ?, description = ?, phone = ?, email = ?, preparation_time = ?, status = ?, updated_at = NOW() WHERE id = ?");
                 $updateStmt->bind_param("sssssiii", $name, $type, $description, $phone, $email, $preparation_time, $status, $targetId);
                 
                 if ($updateStmt->execute()) {
                     $_SESSION['tenant_success'] = "Data tenant berhasil diperbarui!";
-                    createNotification('admin', $_SESSION['user_id'], 'Tenant Diperbarui', "Tenant $name ($type) berhasil diperbarui");
+                    createNotification('admin', (int)$_SESSION['user_id'], 'Tenant Diperbarui', "Tenant $name ($type) berhasil diperbarui", 'tenants.php');
                 } else {
                     $_SESSION['tenant_error'] = "Gagal memperbarui data tenant di database.";
                 }
@@ -114,20 +102,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
     exit;
 }
 
-// =========================================================================
-// 3. PROSES CRUD: SOFT DELETE DATA TENANT (DELETE LOGIC)
-// =========================================================================
 if (isset($_GET['action_delete'])) {
     $deleteId = (int)$_GET['action_delete'];
 
     if ($deleteId > 0) {
         try {
-            // Menggunakan Soft Delete (mengisi deleted_at) sesuai ketersediaan kolom pada struktur HeidiSQL Anda
+            $nameQuery = $conn->prepare("SELECT name FROM tenants WHERE id = ? LIMIT 1");
+            $nameQuery->bind_param("i", $deleteId);
+            $nameQuery->execute();
+            $nameResult = $nameQuery->get_result()->fetch_assoc();
+            $savedName = $nameResult ? $nameResult['name'] : "ID " . $deleteId;
+            $nameQuery->close();
+
             $deleteStmt = $conn->prepare("UPDATE tenants SET deleted_at = NOW() WHERE id = ?");
             $deleteStmt->bind_param("i", $deleteId);
             if ($deleteStmt->execute()) {
                 $_SESSION['tenant_success'] = "Data tenant berhasil dihapus dari sistem!";
-                createNotification('admin', $_SESSION['user_id'], 'Tenant Dihapus', "Tenant (ID: $deleteId) berhasil dihapus");
+                createNotification('admin', (int)$_SESSION['user_id'], 'Tenant Dihapus', "Tenant '$savedName' berhasil dihapus", 'tenants.php');
             } else {
                 $_SESSION['tenant_error'] = "Gagal menghapus data dari database.";
             }
@@ -140,9 +131,6 @@ if (isset($_GET['action_delete'])) {
     exit;
 }
 
-// =========================================================================
-// 4. READ DATA UNTUK LOOPING VIEW (Mengecualikan data yang sudah dihapus)
-// =========================================================================
 $tenantsData = [];
 $sql = "SELECT id, name, type, description, logo, phone, email, preparation_time, status, created_at, updated_at 
         FROM tenants 

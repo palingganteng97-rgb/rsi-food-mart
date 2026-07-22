@@ -1,6 +1,5 @@
 <?php
-// products.php
-include 'db.php'; // Hubungkan ke koneksi database $conn
+include 'db.php'; 
 include 'notification_helper.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -20,9 +19,6 @@ if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0775, true);
 }
 
-// ==========================================
-// 1. PROSES CREATE (TAMBAH DATA PRODUK)
-// ==========================================
 if (isset($_POST['action_add_product'])) {
     $tenant_id   = intval($_POST['tenant_id']);
     $category_id = intval($_POST['category_id']);
@@ -61,7 +57,7 @@ if (isset($_POST['action_add_product'])) {
               VALUES ($tenant_id, $category_id, $brand_id, $unit_id, '$sku', '$barcode', '$name', '$description', $base_price, $stock, '$imageName', $p_status, NOW())";
     
     if (mysqli_query($conn, $query)) {
-        createNotification('admin', $_SESSION['user_id'], 'Produk Baru', "Produk $name berhasil ditambahkan");
+        createNotification('admin', (int)$_SESSION['user_id'], 'Produk Baru', "Produk $name berhasil ditambahkan", 'products.php');
         header("Location: products.php?status=success_insert");
         exit();
     } else {
@@ -70,9 +66,6 @@ if (isset($_POST['action_add_product'])) {
     }
 }
 
-// ==========================================
-// 2. PROSES UPDATE (UBAH DATA PRODUK)
-// ==========================================
 if (isset($_POST['action_update_product'])) {
     $id          = intval($_POST['id']);
     $tenant_id   = intval($_POST['tenant_id']);
@@ -120,7 +113,7 @@ if (isset($_POST['action_update_product'])) {
               WHERE id = $id";
     
     if (mysqli_query($conn, $query)) {
-        createNotification('admin', $_SESSION['user_id'], 'Produk Diperbarui', "Produk $name berhasil diperbarui");
+        createNotification('admin', (int)$_SESSION['user_id'], 'Produk Diperbarui', "Produk $name berhasil diperbarui", 'products.php');
         header("Location: products.php?status=success_update");
         exit();
     } else {
@@ -129,14 +122,16 @@ if (isset($_POST['action_update_product'])) {
     }
 }
 
-// ==========================================
-// 3. PROSES SOFT DELETE (HAPUS DATA PRODUK)
-// ==========================================
 if (isset($_GET['action_restore'])) {
     $id = intval($_GET['action_restore']);
 
     $query = "UPDATE products SET deleted_at = NULL, updated_at = NOW() WHERE id = $id";
     if (mysqli_query($conn, $query)) {
+        $productQuery = mysqli_query($conn, "SELECT name FROM products WHERE id = $id");
+        $productData  = mysqli_fetch_assoc($productQuery);
+        $savedName    = $productData ? $productData['name'] : "ID " . $id;
+
+        createNotification('admin', (int)$_SESSION['user_id'], 'Produk Dipulihkan', "Produk '$savedName' berhasil dipulihkan dari arsip", 'products.php');
         header("Location: products.php?status=success_restore");
         exit();
     } else {
@@ -148,11 +143,14 @@ if (isset($_GET['action_restore'])) {
 if (isset($_GET['action_delete'])) {
     $id = intval($_GET['action_delete']);
 
-    // Menggunakan Soft Delete (updated_at & deleted_at diisi bersamaan sesuai kolom HeidiSQL)
+    $productQuery = mysqli_query($conn, "SELECT name FROM products WHERE id = $id");
+    $productData  = mysqli_fetch_assoc($productQuery);
+    $savedName    = $productData ? $productData['name'] : "ID " . $id;
+
     $query = "UPDATE products SET updated_at = NOW(), deleted_at = NOW() WHERE id = $id";
     
     if (mysqli_query($conn, $query)) {
-        createNotification('admin', $_SESSION['user_id'], 'Produk Dihapus', "Produk (ID: $id) berhasil dihapus");
+        createNotification('admin', (int)$_SESSION['user_id'], 'Produk Dihapus', "Produk '$savedName' berhasil dihapus", 'products.php');
         header("Location: products.php?status=success_delete");
         exit();
     } else {
@@ -161,9 +159,6 @@ if (isset($_GET['action_delete'])) {
     }
 }
 
-// ==========================================
-// 4. FETCH DATA DROPDOWN & LIST PRODUK
-// ==========================================
 $listTenants = []; $listCategories = []; $listBrands = []; $listUnits = [];
 $qTenant = mysqli_query($conn, "SELECT id, name FROM tenants ORDER BY name ASC");
 while ($r = mysqli_fetch_assoc($qTenant)) { $listTenants[] = $r; }

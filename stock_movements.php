@@ -1,10 +1,10 @@
 <?php
-// stock_movements.php (Hanya Logika Atas Backend)
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 include 'db.php';
+include 'notification_helper.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
@@ -13,7 +13,7 @@ if (!isset($_SESSION['user_id'])) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_move_stock'])) {
     $productId     = (int)($_POST['product_id'] ?? 0);
-    $movementType  = $_POST['movement_type'] ?? ''; // 'IN', 'OUT', 'ADJUSTMENT'
+    $movementType  = $_POST['movement_type'] ?? ''; 
     $qty           = (int)($_POST['qty'] ?? 0);
     $referenceType = !empty($_POST['reference_type']) ? trim($_POST['reference_type']) : null;
     $referenceId   = !empty($_POST['reference_id']) ? (int)$_POST['reference_id'] : null;
@@ -27,8 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_move_stock']))
     try {
         $conn->begin_transaction();
 
-        // 1. Ambil stok saat ini untuk mengamankan data (FOR UPDATE)
-        $pStmt = $conn->prepare("SELECT stock FROM products WHERE id = ? FOR UPDATE");
+        $pStmt = $conn->prepare("SELECT name, stock FROM products WHERE id = ? FOR UPDATE");
         $pStmt->bind_param("i", $productId);
         $pStmt->execute();
         $pRes = $pStmt->get_result();
@@ -38,10 +37,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_move_stock']))
         }
         
         $pRow = $pRes->fetch_assoc();
+        $productName = $pRow['name'];
         $beforeStock = (int)$pRow['stock'];
         $pStmt->close();
 
-        // 2. Kalkulasi nominal after_stock berdasarkan movement_type
         if ($movementType === 'IN') {
             $afterStock = $beforeStock + $qty;
         } elseif ($movementType === 'OUT' || $movementType === 'ADJUSTMENT') {
@@ -51,18 +50,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_move_stock']))
             }
         }
 
-        // 3. Simpan data riwayat mutasi stok ke database
         $insSql = "INSERT INTO stock_movements (product_id, movement_type, qty, before_stock, after_stock, reference_type, reference_id, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
         $insStmt = $conn->prepare($insSql);
         $insStmt->bind_param("isiiisii", $productId, $movementType, $qty, $beforeStock, $afterStock, $referenceType, $referenceId, $userId);
         $insStmt->execute();
         $insStmt->close();
 
-        // 4. Perbarui kuantitas stok di tabel utama produk
         $upStmt = $conn->prepare("UPDATE products SET stock = ? WHERE id = ?");
         $upStmt->bind_param("ii", $afterStock, $productId);
         $upStmt->execute();
         $upStmt->close();
+
+        createNotification(
+            'admin', 
+            (int)$_SESSION['user_id'], 
+            'Mutasi Stok', 
+            "Perubahan stok produk '$productName' tipe $movementType sebanyak $qty pcs berhasil diproses", 
+            'stock_movements.php'
+        );
 
         $conn->commit();
         header("Location: stock_movements.php?status=success");

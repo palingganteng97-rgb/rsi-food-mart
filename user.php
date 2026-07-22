@@ -1,10 +1,10 @@
 <?php
-// user.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 include 'db.php';
+include 'notification_helper.php';
 
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
@@ -104,6 +104,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_register'])) {
             $insertStmt->bind_param("issssssi", $newRoleId, $newName, $newUsername, $newEmail, $newPhone, $hashedPassword, $uploadedPhotoName, $defaultStatus);
             
             if ($insertStmt->execute()) {
+                createNotification(
+                    'admin', 
+                    (int)$_SESSION['user_id'], 
+                    'Pengguna Baru', 
+                    "Pengguna baru dengan nama '$newName' dan username '$newUsername' berhasil didaftarkan", 
+                    'user.php'
+                );
+
                 header("Location: user.php?status=success_insert");
                 exit;
             } else {
@@ -165,6 +173,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_admin']
             }
             
             if ($updateStmt->execute()) {
+                createNotification(
+                    'admin', 
+                    (int)$_SESSION['user_id'], 
+                    'Pengguna Diperbarui', 
+                    "Informasi profil pengguna dengan nama '$upName' (ID: $targetId) berhasil diperbarui", 
+                    'user.php'
+                );
+
                 header("Location: user.php?status=success_update");
                 exit;
             } else {

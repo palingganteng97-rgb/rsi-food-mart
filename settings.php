@@ -1,10 +1,10 @@
 <?php
-// settings.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 include 'db.php';
+include 'notification_helper.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
@@ -14,11 +14,7 @@ if (!isset($_SESSION['user_id'])) {
 $status = $_GET['status'] ?? '';
 $msg = $_GET['msg'] ?? '';
 
-// =========================================================================
-// PROSES UPDATE / SIMPAN KONFIGURASI GLOBAL (MASS UPDATE)
-// =========================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_settings'])) {
-    // Mengambil semua input form berbentuk array key-value pair
     $configs = $_POST['config'] ?? [];
 
     if (empty($configs) || !is_array($configs)) {
@@ -29,7 +25,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_settings'
     try {
         $conn->begin_transaction();
 
-        // Siapkan SQL Upsert (Insert jika belum ada key-nya, Update jika sudah ada key-nya)
         $sql = "INSERT INTO settings (`key`, `value`, created_at, updated_at) 
                 VALUES (?, ?, NOW(), NOW()) 
                 ON DUPLICATE KEY UPDATE `value` = ?, updated_at = NOW()";
@@ -40,12 +35,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_settings'
             $keyName = trim($keyName);
             $valueContent = trim($valueContent);
 
-            // Bind parameter: key, value (insert), value (update)
             $stmt->bind_param("sss", $keyName, $valueContent, $valueContent);
             $stmt->execute();
         }
 
         $stmt->close();
+        
+        createNotification(
+            'admin', 
+            (int)$_SESSION['user_id'], 
+            'Pengaturan Diperbarui', 
+            'Konfigurasi dan parameter sistem global berhasil diperbarui', 
+            'settings.php'
+        );
+
         $conn->commit();
         
         header("Location: settings.php?status=success");
@@ -58,9 +61,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_settings'
     }
 }
 
-// =========================================================================
-// PROSES MEMBACA DATA SETTINGS DARI DATABASE UNTUK DI-RENDER DI FORM
-// =========================================================================
 $currentSettings = [];
 $query = $conn->query("SELECT `key`, `value` FROM settings");
 if ($query) {
@@ -69,7 +69,6 @@ if ($query) {
     }
 }
 
-// Fungsi helper untuk mengambil nilai setting secara aman di elemen HTML input value
 function getSettingValue(string $key, array $currentSettings, string $default = ''): string {
     return htmlspecialchars($currentSettings[$key] ?? $default);
 }

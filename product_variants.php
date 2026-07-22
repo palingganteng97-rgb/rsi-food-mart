@@ -1,8 +1,6 @@
 <?php
-// =========================================================================
-// LOGIKA BACKEND - PRODUCT VARIANTS (VERSI MYSQLI)
-// =========================================================================
 include 'db.php'; 
+include 'notification_helper.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -15,7 +13,6 @@ if (!isset($_SESSION['user_id'])) {
 
 $action = isset($_GET['action']) ? $_GET['action'] : 'read';
 
-// 1. Ambil Semua Data Varian (Read)
 if ($action == 'read') {
     $query = "SELECT pv.*, p.name AS product_name 
               FROM product_variants pv 
@@ -28,7 +25,6 @@ if ($action == 'read') {
     $variants = mysqli_fetch_all($result, MYSQLI_ASSOC);
 }
 
-// 2. Tambah Data (Create)
 if ($action == 'create' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     $product_id = intval($_POST['product_id']);
     $name       = mysqli_real_escape_string($conn, trim($_POST['name']));
@@ -36,6 +32,7 @@ if ($action == 'create' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!empty($product_id) && !empty($name)) {
         $query = "INSERT INTO product_variants (product_id, name) VALUES ($product_id, '$name')";
         if (mysqli_query($conn, $query)) {
+            createNotification('admin', (int)$_SESSION['user_id'], 'Varian Produk Ditambahkan', "Varian '$name' berhasil ditambahkan", 'product_variants.php');
             header("Location: product_variants.php?status=success_add");
             exit;
         } else {
@@ -45,7 +42,6 @@ if ($action == 'create' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// 3. Ubah Data (Update)
 if ($action == 'update' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     $id         = intval($_POST['id']);
     $product_id = intval($_POST['product_id']);
@@ -54,6 +50,7 @@ if ($action == 'update' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!empty($id) && !empty($product_id) && !empty($name)) {
         $query = "UPDATE product_variants SET product_id = $product_id, name = '$name' WHERE id = $id";
         if (mysqli_query($conn, $query)) {
+            createNotification('admin', (int)$_SESSION['user_id'], 'Varian Produk Diperbarui', "Varian '$name' (ID: $id) berhasil diperbarui", 'product_variants.php');
             header("Location: product_variants.php?status=success_edit");
             exit;
         } else {
@@ -63,11 +60,16 @@ if ($action == 'update' && $_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// 4. Hapus Data (Delete)
 if ($action == 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
+    
+    $infoQuery = mysqli_query($conn, "SELECT name FROM product_variants WHERE id = $id");
+    $variant_data = mysqli_fetch_assoc($infoQuery);
+    $saved_name = $variant_data ? $variant_data['name'] : "ID " . $id;
+
     $query = "DELETE FROM product_variants WHERE id = $id";
     if (mysqli_query($conn, $query)) {
+        createNotification('admin', (int)$_SESSION['user_id'], 'Varian Produk Dihapus', "Varian '$saved_name' berhasil dihapus", 'product_variants.php');
         header("Location: product_variants.php?status=success_delete");
         exit;
     } else {
@@ -76,11 +78,9 @@ if ($action == 'delete' && isset($_GET['id'])) {
     }
 }
 
-// Ambil list produk untuk dropdown form
 $product_query = "SELECT id, name FROM products WHERE deleted_at IS NULL ORDER BY name ASC";
-// DEBUG: logging eksekusi query dan hasil
 error_log('[product_variants.php][DEBUG] Executing product dropdown query. action=' . $action . ' uri=' . ($_SERVER['REQUEST_URI'] ?? '')); 
-// DEBUG: protect from accidental re-render side-effects
+
 static $debugOnce = false;
 if ($debugOnce) {
     error_log('[product_variants.php][DEBUG][WARN] product_variants.php logic executed again in same request (unexpected).');

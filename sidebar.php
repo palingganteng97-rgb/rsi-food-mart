@@ -85,6 +85,7 @@ $menu = [
             'role_permissions.php' => [ 'href' => 'role_permissions.php', 'label' => 'Atur Hak Akses', 'icon' => 'bi-check-all' ],
         ]
     ],
+    'notifications.php' => [ 'href' => 'notifications.php', 'label' => 'Notifikasi', 'icon' => 'bi-bell-fill', 'class' => '' ],
     'patient_sync_logs.php' => [ 'href' => 'patient_sync_logs.php', 'label' => 'Log Sinkronisasi Pasien', 'icon' => 'bi-database-fill-gear', 'class' => '' ],
     'settings.php' => [ 'href' => 'settings.php', 'label' => 'Settings', 'icon' => 'bi-gear-fill', 'class' => '' ],
 ];

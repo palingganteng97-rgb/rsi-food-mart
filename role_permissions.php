@@ -1,6 +1,6 @@
 <?php
-// role_permissions.php (Hanya Logika Atas Backend)
-include "db.php"; // Di dalam db.php harus sudah dipanggil session_start()
+include "db.php"; 
+include "notification_helper.php";
 
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
@@ -10,19 +10,14 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
 $crudError = '';
 $crudSuccess = '';
 
-// =========================================================================
-// 1. PROSES MASS-UPSERT: SIMPAN PERUBAHAN PERMISSIONS KELOMPOK ROLE
-// =========================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_matrix'])) {
-    $matrixData = $_POST['matrix'] ?? []; // Struktur data array: [role_id][permission_id] = 1
+    $matrixData = $_POST['matrix'] ?? []; 
 
     try {
         $conn->begin_transaction();
 
-        // Kosongkan seluruh isi tabel role_permissions agar tidak bentrok
         $conn->query("DELETE FROM role_permissions");
 
-        // Masukkan relasi Many-to-Many baru secara massal jika ada centang yang dikirim
         if (!empty($matrixData) && is_array($matrixData)) {
             $insStmt = $conn->prepare("INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)");
             
@@ -39,6 +34,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_matrix'])
             $insStmt->close();
         }
 
+        createNotification(
+            'admin', 
+            (int)$_SESSION['user_id'], 
+            'Matriks Akses Diperbarui', 
+            'Matriks hubungan hak akses seluruh kelompok role pengguna berhasil diperbarui', 
+            'role_permissions.php'
+        );
+
         $conn->commit();
         $crudSuccess = "Matriks hak akses grup berhasil diperbarui!";
     } catch (Throwable $e) {
@@ -47,9 +50,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_matrix'])
     }
 }
 
-// =========================================================================
-// 1B. PROSES SAVE PER BARIS (VIA AJAX - action_save_row)
-// =========================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_row'])) {
     header('Content-Type: application/json');
     $permissionId = (int)($_POST['permission_id'] ?? 0);
@@ -70,13 +70,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_row'])) {
     try {
         $conn->begin_transaction();
         
-        // Hapus semua relasi untuk permission ini
         $delStmt = $conn->prepare("DELETE FROM role_permissions WHERE permission_id = ?");
         $delStmt->bind_param("i", $permissionId);
         $delStmt->execute();
         $delStmt->close();
         
-        // Insert relasi baru
         if (!empty($roleIds)) {
             $insStmt = $conn->prepare("INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)");
             foreach ($roleIds as $rid) {
@@ -86,6 +84,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_row'])) {
             $insStmt->close();
         }
         
+        $infoQuery = $conn->prepare("SELECT permission_name, module_name FROM permissions WHERE id = ? LIMIT 1");
+        $infoQuery->bind_param("i", $permissionId);
+        $infoQuery->execute();
+        $infoRes = $infoQuery->get_result()->fetch_assoc();
+        $permLabel = $infoRes ? $infoRes['permission_name'] . " (" . $infoRes['module_name'] . ")" : "ID " . $permissionId;
+        $infoQuery->close();
+
+        createNotification(
+            'admin', 
+            (int)$_SESSION['user_id'], 
+            'Izin Baris Diubah', 
+            "Relasi kelompok hak akses spesifik untuk '$permLabel' telah berhasil dimodifikasi", 
+            'role_permissions.php'
+        );
+
         $conn->commit();
         echo json_encode(['status' => 'success', 'message' => 'Izin baris berhasil disimpan!']);
     } catch (Throwable $e) {
@@ -95,9 +108,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_row'])) {
     exit;
 }
 
-// =========================================================================
-// 2. QUERY FETCH DATA: AMBIL DAFTAR ROLES, PERMISSIONS, & RELASI AKTIF
-// =========================================================================
 $roles = [];
 $rQuery = $conn->query("SELECT id, name FROM roles ORDER BY id ASC");
 if ($rQuery) {
@@ -107,7 +117,6 @@ if ($rQuery) {
 }
 
 $permissions = [];
-// PERBAIKAN: Menggunakan kolom 'permission_name' sesuai struktur riil database Anda
 $pQuery = $conn->query("SELECT id, permission_name, module_name FROM permissions ORDER BY module_name ASC, permission_name ASC");
 if ($pQuery) {
     while ($p = $pQuery->fetch_assoc()) {
@@ -115,7 +124,6 @@ if ($pQuery) {
     }
 }
 
-// Mengambil relasi perantara aktif untuk dicocokkan ke status 'checked' checkbox
 $activeMap = [];
 $mQuery = $conn->query("SELECT role_id, permission_id FROM role_permissions");
 if ($mQuery) {
@@ -123,7 +131,6 @@ if ($mQuery) {
         $activeMap[$m['role_id']][$m['permission_id']] = true;
     }
 }
-
 ?>
 
 <!DOCTYPE html>

@@ -5,9 +5,6 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// READ-ONLY: Tidak ada handler create/update/delete.
-
-// Ambil list tenants untuk filter
 $tenants = [];
 $tenantRes = $conn->query("SELECT id, name FROM tenants ORDER BY name ASC");
 if ($tenantRes) {
@@ -16,7 +13,6 @@ if ($tenantRes) {
     }
 }
 
-// Filter & Pagination
 $search     = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
 $tenant_id  = isset($_GET['tenant_id']) ? intval($_GET['tenant_id']) : 0;
 $rating     = isset($_GET['rating']) ? intval($_GET['rating']) : 0;
@@ -26,8 +22,6 @@ $page       = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $per_page   = isset($_GET['per_page']) ? max(5, min(100, intval($_GET['per_page']))) : 10;
 $offset     = ($page - 1) * $per_page;
 
-// Tergantung skema kolom tanggal di tenant_reviews, kita coba gunakan created_at.
-// Jika ternyata nama kolom berbeda, ubah $dateColumn agar sesuai.
 $dateColumn = 'created_at';
 
 $where = [];
@@ -58,7 +52,6 @@ if ($date_to !== '') {
     $types .= 's';
 }
 
-// Search (tenant_name, username/patient, review)
 if ($search !== '') {
     $where[] = '(t.name LIKE ? OR tr.review LIKE ?)';
     $params[] = '%' . $search . '%';
@@ -71,7 +64,6 @@ if (!empty($where)) {
     $whereSql = 'WHERE ' . implode(' AND ', $where);
 }
 
-// Data READ
 $tenant_reviews = [];
 $sqlBase = "
     SELECT tr.*, 
@@ -81,7 +73,6 @@ $sqlBase = "
     $whereSql
 ";
 
-// Total
 $total = 0;
 $countSql = "SELECT COUNT(*) AS cnt FROM tenant_reviews tr LEFT JOIN tenants t ON tr.tenant_id = t.id $whereSql";
 if ($stmtCount = $conn->prepare($countSql)) {
@@ -97,7 +88,6 @@ if ($stmtCount = $conn->prepare($countSql)) {
     $stmtCount->close();
 }
 
-// Pagination fetch
 $sql = $sqlBase . " ORDER BY tr.id DESC LIMIT ? OFFSET ?";
 $paramsFetch = $params;
 $typesFetch = $types;

@@ -19,11 +19,11 @@ if (isset($_POST['action_create_category'])) {
     if ($tenant_id > 0 && !empty($name)) { 
         $checkTenant = mysqli_query($conn, "SELECT id FROM tenants WHERE id = $tenant_id"); 
         if (mysqli_num_rows($checkTenant) > 0) { 
-            // Perbaikan sintaksis query INSERT yang terputus
             $query = "INSERT INTO categories (tenant_id, name) VALUES ($tenant_id, '$name')"; 
             
             if (mysqli_query($conn, $query)) {
-                createNotification('admin', $_SESSION['user_id'], 'Kategori Ditambahkan', "Kategori $name berhasil ditambahkan");
+                // SINKRONISASI HELPER: Menambahkan parameter tipe data casting dan link redirect 'categories.php'
+                createNotification('admin', (int)$_SESSION['user_id'], 'Kategori Ditambahkan', "Kategori $name berhasil ditambahkan", 'categories.php');
                 echo "<script>alert('Kategori berhasil disimpan!'); window.location='categories.php';</script>"; 
                 exit(); 
             } else {
@@ -49,7 +49,8 @@ if (isset($_POST['action_update_category'])) {
     if ($id > 0 && $tenant_id > 0 && !empty($name)) { 
         $query = "UPDATE categories SET tenant_id = $tenant_id, name = '$name' WHERE id = $id"; 
         if (mysqli_query($conn, $query)) { 
-            createNotification('admin', $_SESSION['user_id'], 'Kategori Diperbarui', "Kategori $name berhasil diperbarui"); 
+            // SINKRONISASI HELPER: Menambahkan parameter tipe data casting dan link redirect 'categories.php'
+            createNotification('admin', (int)$_SESSION['user_id'], 'Kategori Diperbarui', "Kategori $name berhasil diperbarui", 'categories.php');
             echo "<script>alert('Kategori berhasil diperbarui!'); window.location='categories.php';</script>"; 
             exit(); 
         } else { 
@@ -66,9 +67,15 @@ if (isset($_POST['action_update_category'])) {
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) { 
     $id = (int)$_GET['id']; 
     if ($id > 0) { 
+        // Mengambil nama kategori terlebih dahulu untuk dicatat di isi notifikasi sebelum dihapus
+        $name_query = mysqli_query($conn, "SELECT name FROM categories WHERE id = $id");
+        $category_data = mysqli_fetch_assoc($name_query);
+        $saved_name = $category_data ? $category_data['name'] : "ID " . $id;
+
         $query = "DELETE FROM categories WHERE id = $id"; 
         if (mysqli_query($conn, $query)) { 
-            createNotification('admin', $_SESSION['user_id'], 'Kategori Dihapus', "Kategori (ID: $id) berhasil dihapus"); 
+            // SINKRONISASI HELPER: Menambahkan parameter tipe data casting, nama teks asli kategori, dan link redirect 'categories.php'
+            createNotification('admin', (int)$_SESSION['user_id'], 'Kategori Dihapus', "Kategori '$saved_name' berhasil dihapus", 'categories.php');
             echo "<script>alert('Kategori berhasil dihapus!'); window.location='categories.php';</script>"; 
             exit(); 
         } else { 

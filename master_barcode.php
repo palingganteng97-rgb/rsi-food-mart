@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/notification_helper.php'; // INTEGRASI: Menyertakan fungsi pembuat notifikasi
 
 // db.php: diharapkan menyediakan $conn (mysqli)
 if (!($conn instanceof mysqli)) {
@@ -84,6 +85,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $fileName = sanitizeFileName($room_name) . '_' . $id . '.png';
                     $filePath = $uploadDir . $fileName;
                     ensureQrFile($qrUrl, $filePath);
+                    
+                    // INTEGRASI: Membuat notifikasi setelah berhasil tambah master barcode/ruangan
+                    createNotification(
+                        'admin', 
+                        (int)$_SESSION['user_id'], 
+                        'Barcode Barcode Ditambahkan', 
+                        "Barcode untuk ruangan '$room_name' (ID: $id) telah berhasil digenerate", 
+                        'master_barcode.php'
+                    );
+
                     set_flash('success', 'Barcode berhasil ditambahkan.');
                 } else {
                     set_flash('error', 'Gagal menambahkan barcode.');
@@ -111,6 +122,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $fileName = sanitizeFileName($room_name) . '_' . $id . '.png';
                     $filePath = $uploadDir . $fileName;
                     ensureQrFile($qrUrl, $filePath);
+                    
+                    // INTEGRASI: Membuat notifikasi setelah berhasil mengubah master barcode/ruangan
+                    createNotification(
+                        'admin', 
+                        (int)$_SESSION['user_id'], 
+                        'Barcode Diperbarui', 
+                        "Data barcode ruangan telah disesuaikan menjadi '$room_name' (ID: $id)", 
+                        'master_barcode.php'
+                    );
+
                     set_flash('success', 'Barcode berhasil diperbarui.');
                 } else {
                     set_flash('error', 'Gagal memperbarui barcode.');
@@ -125,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         json_redirect('master_barcode.php');
     }
 
-    if ($op === 'delete') {
+    if ($op === 'edit_id' || $op === 'delete') {
         $id = (int)($_POST['id'] ?? 0);
         if ($id > 0) {
             // Ambil nama ruangan untuk penghapusan file bila ada
@@ -153,6 +174,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             @unlink($filePath);
                         }
                     }
+                    
+                    // INTEGRASI: Membuat notifikasi setelah berhasil menghapus master barcode/ruangan
+                    createNotification(
+                        'admin', 
+                        (int)$_SESSION['user_id'], 
+                        'Barcode Dihapus', 
+                        "Barcode untuk ruangan '$room_name' (ID: $id) telah dihapus dari sistem", 
+                        'master_barcode.php'
+                    );
+
                     set_flash('success', 'Barcode berhasil dihapus.');
                 } else {
                     set_flash('error', 'Gagal menghapus barcode.');
@@ -208,9 +239,9 @@ if ($editId > 0) {
         $sel->close();
     }
 }
-
 ?>
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="utf-8" />
