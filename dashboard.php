@@ -65,8 +65,8 @@ $userName = $_SESSION['name'] ?? 'Admin';
                             <i class="bi bi-shop" style="font-size: 1.6rem; color: var(--green);"></i>
                         </div>
                         <div class="mt-3">
-                            <!-- PERBAIKAN: Tombol sekarang mengarah ke home.php dengan style hijau Bootstrap 5 -->
-                            <a href="home.php" class="btn btn-success w-100 rounded-3 fw-medium">
+                            <!-- PERBAIKAN: Tombol mengarah ke home.php dengan mode preview (tanpa session pasien) -->
+                            <a href="home.php?preview=1" class="btn btn-success w-100 rounded-3 fw-medium">
                                 Buka Home Pasien
                             </a>
                         </div>

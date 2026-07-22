@@ -458,11 +458,8 @@
             border-radius: 16px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.5);
             padding: 0;
-            min-width: 360px;
-            max-width: 400px;
             margin-top: 12px !important;
             overflow: hidden;
-            z-index: 9999;
         `;
 
         // Dropdown header
@@ -721,6 +718,36 @@
             }
             .notification-dropdown {
                 animation: dropdown-fade 0.2s ease;
+                position: fixed !important;
+                z-index: 1080 !important;
+                top: 60px;
+                left: 0.5rem;
+                right: 0.5rem;
+                width: auto;
+                max-width: 420px;
+                min-width: 0;
+                transform: none !important;
+                margin: 0 auto !important;
+                max-height: calc(100vh - 80px);
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+            /* Desktop: override position to absolute relative to bell button */
+            @media (min-width: 576px) {
+                .notification-dropdown {
+                    position: absolute !important;
+                    top: auto;
+                    left: auto;
+                    right: auto;
+                    width: auto;
+                    min-width: 360px;
+                    max-width: 400px;
+                    margin-top: 12px !important;
+                }
+            }
+            /* Ensure bell container has proper positioning for desktop dropdown anchor */
+            .notification-bell-container {
+                position: relative !important;
             }
             @keyframes dropdown-fade {
                 from {

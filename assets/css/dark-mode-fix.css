@@ -91,3 +91,74 @@ textarea:disabled {
 
 .modal-title {
     color: #ffffff !important;
+}
+
+/* === 4. NOTIFICATION DROPDOWN RESPONSIVE FIX === */
+/* Mobile: ensures dropdown stays within viewport */
+@media (max-width: 575.98px) {
+    .notification-dropdown {
+        position: fixed !important;
+        top: 60px !important;
+        left: 0.5rem !important;
+        right: 0.5rem !important;
+        width: auto !important;
+        max-width: 420px !important;
+        min-width: 0 !important;
+        transform: none !important;
+        margin: 0 auto !important;
+        max-height: calc(100vh - 80px) !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        z-index: 1080 !important;
+        border-radius: 16px !important;
+    }
+    
+    /* Prevent horizontal scroll on body when dropdown is open */
+    body.notification-open {
+        overflow-x: hidden !important;
+    }
+}
+
+/* Desktop: restore absolute positioning relative to bell button */
+@media (min-width: 576px) {
+    .notification-dropdown {
+        position: absolute !important;
+        top: auto !important;
+        left: auto !important;
+        right: auto !important;
+        width: auto !important;
+        min-width: 360px !important;
+        max-width: 400px !important;
+        margin-top: 12px !important;
+    }
+}
+
+/* Ensure bell container has proper positioning for desktop dropdown anchor */
+.notification-bell-container {
+    position: relative !important;
+}
+
+/* Scrollbar styling for notification list */
+.notification-list {
+    max-height: 400px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148,163,184,0.3) transparent;
+}
+
+.notification-list::-webkit-scrollbar {
+    width: 4px;
+}
+.notification-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.notification-list::-webkit-scrollbar-thumb {
+    background: rgba(148,163,184,0.3);
+    border-radius: 4px;
+}
+
+/* Safe area padding for notched devices */
+.container-fluid {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+}

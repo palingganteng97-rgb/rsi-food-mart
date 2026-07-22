@@ -110,7 +110,8 @@ function timeAgo($datetime): string {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 <style>
     :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
-    body { background:var(--bg)!important; color:var(--text); }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { background:var(--bg)!important; color:var(--text); overflow-x: hidden; }
     @media (min-width:992px) {main.content-shift { margin-left:280px; }}
     .notification-card { background:rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.15); border-radius:16px; transition:all .15s ease; }
     .notification-card:hover { background:rgba(15,23,42,.75); border-color:rgba(34,197,94,.35); }
@@ -122,6 +123,10 @@ function timeAgo($datetime): string {
     .pagination-custom .page-link:hover { background:rgba(148,163,184,.1); color:#fff; }
     .pagination-custom .page-item.active .page-link { background:rgba(34,197,94,.25); border-color:rgba(34,197,94,.55); color:#fff; }
     .pagination-custom .page-item.disabled .page-link { opacity:.4; }
+    .container-fluid { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+    @media (max-width: 575.98px) {
+        main.content-shift.p-4 { padding: 1rem 0.5rem !important; }
+    }
 </style>
 </head>
 <body>

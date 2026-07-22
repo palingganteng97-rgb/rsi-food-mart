@@ -17,8 +17,22 @@ function openDetailProduct(data) {
     const cartBtn = document.getElementById('btn_detail_add_cart');
     // prevent duplicate declarations from earlier merge versions
     if (cartBtn) {
-        cartBtn.innerHTML = '<i class="bi bi-cart-plus-fill"></i> Tambah ke Keranjang';
-        cartBtn.classList.remove('btn-warning');
+        // Jika preview mode, disable tombol
+        if (window.__isPreview) {
+            cartBtn.innerHTML = '<i class="bi bi-eye-slash-fill"></i> Mode Preview - Tidak bisa menambah';
+            cartBtn.classList.remove('btn-success');
+            cartBtn.classList.add('btn-secondary');
+            cartBtn.disabled = true;
+            cartBtn.style.cursor = 'not-allowed';
+            cartBtn.style.opacity = '0.6';
+        } else {
+            cartBtn.innerHTML = '<i class="bi bi-cart-plus-fill"></i> Tambah ke Keranjang';
+            cartBtn.classList.remove('btn-secondary');
+            cartBtn.classList.add('btn-success');
+            cartBtn.disabled = false;
+            cartBtn.style.cursor = '';
+            cartBtn.style.opacity = '';
+        }
     }
     document.getElementById('detail_product_name').innerText = data.name;
     document.getElementById('detail_product_category').innerText = data.category_name || 'General';
@@ -444,6 +458,12 @@ function resetFilters(){
 }
 
 function tambahKeKeranjang(id, name, price, image, notes) { 
+    // Cegah jika dalam mode preview
+    if (window.__isPreview) {
+        alert('Fitur ini tidak tersedia dalam mode preview.\nSilakan gunakan perangkat pasien (QR Code) untuk melakukan pemesanan.');
+        return;
+    }
+
     // Fungsi ini dipakai oleh tombol '+' di card (inline onclick di home.php)
     // Agar konsisten untuk semua produk, JANGAN bergantung pada DOM modal detail.
     const userNotes = notes ? String(notes) : '';

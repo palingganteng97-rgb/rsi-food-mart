@@ -5,11 +5,16 @@ include "db.php";
 // session_start sudah dipanggil di db.php
 
 // =========================================================================
+// Mode Preview: Admin dapat melihat etalase tanpa session pasien
+// =========================================================================
+$isPreview = isset($_GET['preview']) && $_GET['preview'] === '1' && isset($_SESSION['user_id']);
+
+// =========================================================================
 // Mode Pasien (standalone): Izinkan hanya jika ada sesi pasien aktif (patient QR)
 // =========================================================================
 $isPatient = isset($_SESSION['patient_session_id']) && $_SESSION['patient_session_id'] > 0;
 
-if (!$isPatient) {
+if (!$isPatient && !$isPreview) {
     // Setelah Form Pasien, alurnya harus mengarah ke home.php dengan session pasien.
     // Jika tidak ada, arahkan ke halaman entry awal.
     header("Location: index.php");
@@ -17,8 +22,11 @@ if (!$isPatient) {
 }
 
 // Menentukan nama sapaan di halaman katalog pasien
-$userName = $_SESSION['patient_name'] ?? 'Pasien';
-
+if ($isPreview) {
+    $userName = 'Admin (Preview)';
+} else {
+    $userName = $_SESSION['patient_name'] ?? 'Pasien';
+}
 
 // --- TAMBAHKAN QUERY INI UNTUK MENGHITUNG KELUARAN JUMLAH ITEM AWAL ---
 // Jika patient_session_id belum ada, set default 0 agar query tidak crash
@@ -95,6 +103,22 @@ if ($fetchQuery) {
 
 <main class="page-body content-shift">
     <div class="container py-3">
+
+        <?php if ($isPreview): ?>
+        <!-- BANNER PREVIEW MODE (hanya tampil untuk admin) -->
+        <div class="alert alert-warning d-flex align-items-center justify-content-between rounded-4 py-3 px-4 mb-3" style="background: rgba(255, 193, 7, 0.12); border: 1px solid rgba(255, 193, 7, 0.3); color: #ffc107;">
+            <div class="d-flex align-items-center gap-3">
+                <i class="bi bi-eye-fill fs-4"></i>
+                <div>
+                    <strong>Mode Preview</strong> — Anda sedang melihat etalase menu pasien. Beberapa fitur seperti menambah ke keranjang dan favorit tidak tersedia dalam mode ini.
+                </div>
+            </div>
+            <a href="dashboard.php" class="btn btn-outline-light btn-sm rounded-pill px-3 fw-medium" style="border-color: rgba(255,255,255,0.2); white-space: nowrap;">
+                <i class="bi bi-arrow-left me-1"></i> Kembali ke Dashboard
+            </a>
+        </div>
+        <?php endif; ?>
+
         <!-- HEADER ETALASE MENU -->
         <div class="d-flex align-items-center justify-content-between mb-3">
             <div>
@@ -102,6 +126,11 @@ if ($fetchQuery) {
                 <div class="text-white-50" style="font-size:.9rem;">Halo, <?php echo htmlspecialchars($userName); ?></div>
             </div>
             <div class="d-none d-md-flex gap-2 align-items-center">
+                <?php if ($isPreview): ?>
+                <a href="dashboard.php" class="btn btn-outline-success btn-sm rounded-pill px-3 fw-medium">
+                    <i class="bi bi-arrow-left me-1"></i> Dashboard
+                </a>
+                <?php endif; ?>
                 <span class="text-white-50">Diet hari ini:</span>
                 <span class="pill diet-pill">Sehat</span>
             </div>
@@ -164,12 +193,20 @@ if ($fetchQuery) {
                             <?php endif; ?>
 
                             <!-- TOMBOL INTERAKTIF: Klik Hati Tambah/Hapus Favorit Pasien -->
+                            <?php if ($isPreview): ?>
+                            <span class="btn p-0 rounded-circle shadow-sm d-flex align-items-center justify-content-center position-absolute" 
+                                  style="top: 12px; right: 12px; width: 32px; height: 32px; z-index: 10; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.15); opacity: 0.4; cursor: not-allowed;"
+                                  title="Tidak tersedia dalam mode preview">
+                                <i class="bi bi-heart text-white-50" style="font-size: 1rem;"></i>
+                            </span>
+                            <?php else: ?>
                             <a href="add_favorite.php?product_id=<?= (int)$prod['id']; ?>&tenant_id=<?= (int)($prod['tenant_id'] ?? 1); ?>" 
                                class="btn p-0 rounded-circle shadow-sm d-flex align-items-center justify-content-center position-absolute" 
                                onclick="event.stopPropagation();"
                                style="top: 12px; right: 12px; width: 32px; height: 32px; z-index: 10; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.15); transition: all 0.2s ease;">
                                 <i class="bi <?= $is_favorited ? 'bi-heart-fill text-danger' : 'bi-heart text-white-50'; ?>" style="font-size: 1rem;"></i>
                             </a>
+                            <?php endif; ?>
                         </div>
 
                         <!-- Detail Info Produk -->
@@ -188,10 +225,16 @@ if ($fetchQuery) {
                                 <div class="fw-bold text-success" style="font-size: 1rem;">
                                     Rp <?= number_format($prod['base_price'], 0, ',', '.') ?>
                                 </div>
+                                <?php if ($isPreview): ?>
+                                <span class="btn btn-sm btn-secondary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; cursor: not-allowed; opacity: 0.5;" title="Tidak tersedia dalam mode preview">
+                                    <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
+                                </span>
+                                <?php else: ?>
                                 <button type="button" class="btn btn-sm btn-success rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Tambah ke Keranjang" 
                                         onclick="event.stopPropagation(); tambahKeKeranjang(<?= (int)$prod['id'] ?>, '<?= addslashes(htmlspecialchars($prod['name'], ENT_QUOTES, 'UTF-8')) ?>', <?= floatval($prod['base_price']) ?>, '<?= addslashes($prod['image'] ?? '') ?>', '')">
                                     <i class="bi bi-plus-lg" style="font-size: 0.85rem;"></i>
                                 </button>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -215,6 +258,11 @@ if ($fetchQuery) {
 <?php include 'detail_product_modal.php'; ?>
 
 <?php include "bottom_nav.php"; ?>
+
+<script>
+// Flag untuk mode preview (admin melihat etalase tanpa session pasien)
+window.__isPreview = <?= $isPreview ? 'true' : 'false' ?>;
+</script>
 
 <!-- Hubungkan ke file eksternal JavaScript catalog handler -->
 <script src="catalog_handler.js?v=1.1"></script>
