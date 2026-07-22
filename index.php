@@ -51,11 +51,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $isLoginSukses = true;
                     
                 } else {
-                    $errorMsg = 'Login gagal. Username/Email atau password salah.';
+                    $errorMsg = 'Username / Email dan password salah, silahkan coba lagi';
                     $stmt->close();
                 }
             } else {
-                $errorMsg = 'Login gagal. Username/Email atau password salah.';
+                $errorMsg = 'Username / Email dan password salah, silahkan coba lagi';
                 if ($stmt) { $stmt->close(); }
             }
         } catch (Throwable $e) {

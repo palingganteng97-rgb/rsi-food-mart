@@ -48,6 +48,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_matrix'])
 }
 
 // =========================================================================
+// 1B. PROSES SAVE PER BARIS (VIA AJAX - action_save_row)
+// =========================================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_row'])) {
+    header('Content-Type: application/json');
+    $permissionId = (int)($_POST['permission_id'] ?? 0);
+    $roleIds = [];
+    
+    if (isset($_POST['role_ids'])) {
+        $decoded = json_decode($_POST['role_ids'], true);
+        if (is_array($decoded)) {
+            $roleIds = array_map('intval', $decoded);
+        }
+    }
+
+    if ($permissionId <= 0) {
+        echo json_encode(['status' => 'error', 'message' => 'ID permission tidak valid.']);
+        exit;
+    }
+
+    try {
+        $conn->begin_transaction();
+        
+        // Hapus semua relasi untuk permission ini
+        $delStmt = $conn->prepare("DELETE FROM role_permissions WHERE permission_id = ?");
+        $delStmt->bind_param("i", $permissionId);
+        $delStmt->execute();
+        $delStmt->close();
+        
+        // Insert relasi baru
+        if (!empty($roleIds)) {
+            $insStmt = $conn->prepare("INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)");
+            foreach ($roleIds as $rid) {
+                $insStmt->bind_param("ii", $rid, $permissionId);
+                $insStmt->execute();
+            }
+            $insStmt->close();
+        }
+        
+        $conn->commit();
+        echo json_encode(['status' => 'success', 'message' => 'Izin baris berhasil disimpan!']);
+    } catch (Throwable $e) {
+        $conn->rollback();
+        echo json_encode(['status' => 'error', 'message' => 'Kesalahan: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
+// =========================================================================
 // 2. QUERY FETCH DATA: AMBIL DAFTAR ROLES, PERMISSIONS, & RELASI AKTIF
 // =========================================================================
 $roles = [];

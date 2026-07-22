@@ -310,10 +310,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update_admin']
                               <i class="bi bi-pencil-square"></i>
                             </button>
                             <button type="button" class="btn btn-sm btn-danger" 
-                                    onclick="triggerDeleteUser('user.php?action=delete&id=<?php echo $row['id']; ?>', '<?php echo addslashes($row['email']); ?>')">
+                                    onclick="triggerDeleteUser('user.php?action=delete&id=<?php echo $userRow['id']; ?>', '<?php echo addslashes($userRow['email']); ?>')">
                                 <i class="bi bi-trash"></i>
                             </button>
-                            </a>
                           </div>
                         </td>
                       </tr>
