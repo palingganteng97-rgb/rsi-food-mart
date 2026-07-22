@@ -328,7 +328,7 @@ if ($result) {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Admin Pesanan - RSI Food &amp; Mart</title>
+<title>Pesanan Pelanggan - RSI Food &amp; Mart</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 <style>
@@ -355,7 +355,7 @@ body{background:var(--bg) !important;color:var(--text);}
 <div class="container-fluid rounded-4 p-4" style="background: rgba(15, 23, 42, 0.55) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3 pb-3" style="border-bottom:1px solid rgba(148,163,184,.15) !important;">
 <div>
-<h2 class="fw-bold m-0 text-white" style="font-size:2rem;">Admin Pesanan</h2>
+<h2 class="fw-bold m-0 text-white" style="font-size:2rem;"> Pesanan Pelanggan</h2>
 <div class="text-white-50 small">Kelola status pesanan dan lihat detail item</div>
 </div>
 </div>
