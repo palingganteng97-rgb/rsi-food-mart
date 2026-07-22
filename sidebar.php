@@ -13,7 +13,7 @@ $currentTenantId = $queryParams['tenant_id'] ?? '';
 $menu = [
     'dashboard.php' => [ 'href' => 'dashboard.php', 'label' => 'Dashboard', 'icon' => 'bi-speedometer2' ],
     'tenants_group' => [
-        'label' => 'Tenants', 'icon' => 'bi-building-gear', 'class' => '', // PERBAIKAN: Menghapus d-mobile-none agar grup Tenants muncul di mobile
+        'label' => 'Tenants', 'icon' => 'bi-building-gear', 'class' => '',
         'sub' => [
             'tenants.php' => [ 'href' => 'tenants.php', 'label' => 'Data Tenant', 'icon' => 'bi-house-lock-fill' ],
             'tenant_operating_hours.php' => [ 'href' => 'tenant_operating_hours.php', 'label' => 'Tenant Operating Hours', 'icon' => 'bi-clock-history' ],
@@ -77,8 +77,16 @@ $menu = [
     ],
     'master_barcode.php' => [ 'href' => 'master_barcode.php', 'label' => 'Master Barcode', 'icon' => 'bi-qr-code-scan' ],
     'user.php' => [ 'href' => 'user.php', 'label' => 'User', 'icon' => 'bi-person', 'class' => '' ],
-    'roles.php' => [ 'href' => 'roles.php', 'label' => 'Roles', 'icon' => 'bi-shield-lock', 'class' => '' ], // PERBAIKAN: Menghapus d-mobile-none agar menu Roles muncul di mobile
-    'permissions.php' => [ 'href' => 'permissions.php', 'label' => 'Permissions', 'icon' => 'bi-key', 'class' => '' ], // PERBAIKAN: Menghapus d-mobile-none agar menu Permissions muncul di mobile
+    'access_group' => [
+        'label' => 'Hak Akses', 'icon' => 'bi-shield-lock-fill', 'class' => '',
+        'sub' => [
+            'roles.php'            => [ 'href' => 'roles.php', 'label' => 'Roles Group', 'icon' => 'bi-people-fill' ],
+            'permissions.php'      => [ 'href' => 'permissions.php', 'label' => 'Permissions List', 'icon' => 'bi-key-fill' ],
+            'role_permissions.php' => [ 'href' => 'role_permissions.php', 'label' => 'Atur Hak Akses', 'icon' => 'bi-check-all' ],
+        ]
+    ],
+    'patient_sync_logs.php' => [ 'href' => 'patient_sync_logs.php', 'label' => 'Log Sinkronisasi Pasien', 'icon' => 'bi-database-fill-gear', 'class' => '' ],
+    'settings.php' => [ 'href' => 'settings.php', 'label' => 'Settings', 'icon' => 'bi-gear-fill', 'class' => '' ],
 ];
 
 foreach ($menu as $key => $item) {
