@@ -603,6 +603,7 @@
             '.navbar .ms-auto',
             '.navbar .d-flex.align-items-center.gap-2',
             '.navbar .d-flex.align-items-center',
+            '.mobile-topbar .topbar-right',          // Patient mobile topbar
             '.mobile-topbar .d-flex.align-items-center.w-100.justify-content-between',
             '.navbar-nav.ms-auto',
             '.navbar-collapse'
@@ -614,9 +615,24 @@
             if (target) break;
         }
 
-        // For desktop sidebar - find the sidebar footer area
+        // For desktop sidebar - find the sidebar notification area (patient) or sidebar footer (admin)
         if (!target) {
-            // Check if we're on a sidebar page
+            const sidebarNotifArea = document.querySelector('.sidebar-notification-area');
+            if (sidebarNotifArea) {
+                // Insert bell into the dedicated notification area in patient sidebar
+                const bellContainer = createBellIcon();
+                bellContainer.style.marginRight = '0';
+                bellContainer.style.marginLeft = '0';
+                bellContainer.style.marginBottom = '0';
+                bellContainer.style.width = '100%';
+                bellContainer.style.display = 'flex';
+                bellContainer.style.justifyContent = 'center';
+                sidebarNotifArea.appendChild(bellContainer);
+                log('Injected into sidebar notification area (patient desktop)');
+                return true;
+            }
+
+            // Check if we're on an admin sidebar page
             const sidebarFooter = document.querySelector('.sidebar-footer');
             const appBrand = document.querySelector('.app-brand');
             
@@ -645,7 +661,7 @@
             return false;
         }
 
-        // Create bell and inject
+        // Create bell and inject into navbar
         const bellContainer = createBellIcon();
         bellContainer.style.marginLeft = '12px';
         target.appendChild(bellContainer);

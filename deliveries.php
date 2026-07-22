@@ -34,27 +34,9 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($stmt->execute()) {
             error_log("[Deliveries] INSERT success: delivery created for order_id $order_id");
-            $infoQuery = $conn->prepare("SELECT order_number FROM orders WHERE id = ? LIMIT 1");
-            $infoQuery->bind_param("i", $order_id);
-            $infoQuery->execute();
-            $infoRes = $infoQuery->get_result()->fetch_assoc();
-            $orderNumber = $infoRes ? $infoRes['order_number'] : "ID " . $order_id;
-            $infoQuery->close();
-
-            $courierQuery = $conn->prepare("SELECT name FROM couriers WHERE id = ? LIMIT 1");
-            $courierQuery->bind_param("i", $courier_id);
-            $courierQuery->execute();
-            $courierRes = $courierQuery->get_result()->fetch_assoc();
-            $courierName = $courierRes ? $courierRes['name'] : "ID " . $courier_id;
-            $courierQuery->close();
-
-            createNotification(
-                'admin', 
-                (int)$_SESSION['user_id'], 
-                'Pengiriman Ditugaskan', 
-                "Pesanan #$orderNumber telah ditugaskan kepada kurir $courierName dengan status: $status", 
-                'deliveries.php'
-            );
+            // Patient notification is NOT sent on initial creation.
+            // Patient will see the initial 'Pending' status in their order history.
+            // Notifications are triggered only when the delivery status changes (see action=update).
 
             header("Location: deliveries.php?status=success_create");
         } else {
@@ -68,30 +50,95 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $id            = intval($_POST['id'] ?? 0);
     $order_id      = intval($_POST['order_id'] ?? 0);
     $courier_id    = intval($_POST['courier_id'] ?? 0);
-    $status        = trim($_POST['status'] ?? 'PENDING');
+    $status        = trim($_POST['status'] ?? 'Pending');
     $pickup_time   = !empty($_POST['pickup_time']) ? $_POST['pickup_time'] : null;
     $delivery_time = !empty($_POST['delivery_time']) ? $_POST['delivery_time'] : null;
     $proof_photo   = trim($_POST['proof_photo'] ?? '');
 
     if ($id > 0 && $order_id > 0 && $courier_id > 0) {
+        // === GET OLD STATUS BEFORE UPDATE (to detect changes) ===
+        $oldStatus = '';
+        $oldOrderId = 0;
+        $oldStmt = $conn->prepare("SELECT status, order_id FROM deliveries WHERE id = ? LIMIT 1");
+        if ($oldStmt) {
+            $oldStmt->bind_param("i", $id);
+            $oldStmt->execute();
+            $oldRes = $oldStmt->get_result();
+            if ($oldRow = $oldRes->fetch_assoc()) {
+                $oldStatus = trim($oldRow['status'] ?? '');
+                $oldOrderId = (int)($oldRow['order_id'] ?? 0);
+            }
+            $oldStmt->close();
+        }
+
         $stmt = $conn->prepare("UPDATE deliveries SET order_id = ?, courier_id = ?, status = ?, pickup_time = ?, delivery_time = ?, proof_photo = ? WHERE id = ?");
         $stmt->bind_param("iissssi", $order_id, $courier_id, $status, $pickup_time, $delivery_time, $proof_photo, $id);
         
         if ($stmt->execute()) {
-            $infoQuery = $conn->prepare("SELECT order_number FROM orders WHERE id = ? LIMIT 1");
-            $infoQuery->bind_param("i", $order_id);
-            $infoQuery->execute();
-            $infoRes = $infoQuery->get_result()->fetch_assoc();
-            $orderNumber = $infoRes ? $infoRes['order_number'] : "ID " . $order_id;
-            $infoQuery->close();
+            // --- DEBUG: Log delivery update ---
+            error_log("[DELIVERY UPDATE] id=$id, order_id=$order_id, old_status=$oldStatus, new_status=$status, changed=" . (strcasecmp($oldStatus, $status) !== 0 ? 'yes' : 'no'));
 
-            createNotification(
-                'admin', 
-                (int)$_SESSION['user_id'], 
-                'Pengiriman Diperbarui', 
-                "Data pengiriman ID $id (Order #$orderNumber) telah disesuaikan ke status baru: $status", 
-                'deliveries.php'
-            );
+            // === PATIENT NOTIFICATION (ONLY): Deliveries is source of truth for delivery status ===
+            // Notify ONLY the patient who owns the order. No admin notification for status changes.
+            $statusChanged = (strcasecmp($oldStatus, $status) !== 0);
+            if ($statusChanged && $oldOrderId > 0) {
+                // Fetch order data for patient
+                $orderStmt = $conn->prepare("SELECT order_number, patient_session_id FROM orders WHERE id = ? LIMIT 1");
+                $orderStmt->bind_param("i", $oldOrderId);
+                $orderStmt->execute();
+                $orderRes = $orderStmt->get_result();
+                if ($orderData = $orderRes->fetch_assoc()) {
+                    $orderNumberFull = $orderData['order_number'] ?? ('ID ' . $oldOrderId);
+                    $patientSessionId = (int)($orderData['patient_session_id'] ?? 0);
+
+                    // --- DEBUG: Log patient data ---
+                    error_log("[DELIVERY NOTIFICATION DEBUG] order_id=$oldOrderId, order_number=$orderNumberFull, patient_session_id=$patientSessionId, user_type=patient, user_reference=$patientSessionId");
+
+                    if ($patientSessionId > 0) {
+                        $notifTitle = 'Status Pengiriman Diperbarui';
+                        $notifLink = 'riwayat_pesanan.php?id=' . $oldOrderId;
+                        $notifMessage = "Pesanan Anda dengan nomor {$orderNumberFull} sekarang berstatus \"{$status}\".";
+
+                        // Prevent duplicate: check if notification for this specific status message already exists
+                        // This ensures each unique status transition (e.g., "Diambil", "Diproses", "Terkirim")
+                        // generates exactly ONE notification, while preventing duplicates on re-save.
+                        $dupCheck = $conn->prepare(
+                            "SELECT id FROM notifications 
+                             WHERE user_type = 'patient' AND user_reference = ? 
+                             AND link = ? 
+                             AND message = ? 
+                             LIMIT 1"
+                        );
+                        $dupCheck->bind_param("iss", $patientSessionId, $notifLink, $notifMessage);
+                        $dupCheck->execute();
+                        $dupRes = $dupCheck->get_result();
+                        $notificationExists = ($dupRes && $dupRes->num_rows > 0);
+                        $dupCheck->close();
+
+                        if (!$notificationExists) {
+                            $insertedId = createNotification(
+                                'patient',
+                                $patientSessionId,
+                                $notifTitle,
+                                $notifMessage,
+                                $notifLink
+                            );
+
+                            // --- DEBUG: Log notification insert result ---
+                            error_log("[DELIVERY NOTIFICATION INSERT] result_id=" . ($insertedId !== false ? $insertedId : 'FAILED') . ", user_type=patient, user_reference=$patientSessionId, title=$notifTitle, link=$notifLink");
+                        } else {
+                            error_log("[DELIVERY NOTIFICATION SKIP] Duplicate notification already exists for order_id=$oldOrderId, status=$status");
+                        }
+                    } else {
+                        error_log("[DELIVERY NOTIFICATION ERROR] patient_session_id is 0 or empty for order_id=$oldOrderId");
+                    }
+                } else {
+                    error_log("[DELIVERY NOTIFICATION ERROR] No order found for id=$oldOrderId");
+                }
+                $orderStmt->close();
+            } else {
+                error_log("[DELIVERY NOTIFICATION SKIP] Status unchanged or no order_id. changed=" . (strcasecmp($oldStatus, $status) !== 0 ? 'yes' : 'no') . ", oldOrderId=$oldOrderId");
+            }
 
             header("Location: deliveries.php?status=success_update");
         } else {
@@ -105,36 +152,11 @@ if ($action === 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id'] ?? 0);
 
     if ($id > 0) {
-        $infoQuery = $conn->prepare("SELECT order_id FROM deliveries WHERE id = ? LIMIT 1");
-        $infoQuery->bind_param("i", $id);
-        $infoQuery->execute();
-        $infoRes = $infoQuery->get_result()->fetch_assoc();
-        $savedOrderId = $infoRes ? $infoRes['order_id'] : 0;
-        $infoQuery->close();
-
-        if ($savedOrderId > 0) {
-            $orderQuery = $conn->prepare("SELECT order_number FROM orders WHERE id = ? LIMIT 1");
-            $orderQuery->bind_param("i", $savedOrderId);
-            $orderQuery->execute();
-            $orderRes = $orderQuery->get_result()->fetch_assoc();
-            $orderNumber = $orderRes ? $orderRes['order_number'] : "ID " . $savedOrderId;
-            $orderQuery->close();
-        } else {
-            $orderNumber = "Unknown";
-        }
-
         $stmt = $conn->prepare("DELETE FROM deliveries WHERE id = ?");
         $stmt->bind_param("i", $id);
         
         if ($stmt->execute()) {
-            createNotification(
-                'admin', 
-                (int)$_SESSION['user_id'], 
-                'Pengiriman Dibatalkan', 
-                "Data tugas logistik pengiriman untuk Pesanan #$orderNumber (ID Pengiriman: $id) telah dihapus", 
-                'deliveries.php'
-            );
-
+            // No notification sent on delete - delivery status changes only notify patients on update.
             header("Location: deliveries.php?status=success_delete");
         } else {
             header("Location: deliveries.php?status=error&msg=" . urlencode($stmt->error));
@@ -259,15 +281,23 @@ if ($courierRes) {
                     <td class="text-white-50"><?= htmlspecialchars($row['courier_name'] ?? '-') ?></td>
                     <td class="text-center">
                     <?php
-                        $st = strtolower(trim((string)($row['status'] ?? '')));
-                        if ($st === 'completed' || $st === 'delivered') {
-                        echo '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 px-3 py-1.5 rounded-pill">Completed</span>';
-                        } elseif ($st === 'cancelled') {
-                        echo '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-3 py-1.5 rounded-pill">Cancelled</span>';
-                        } elseif (in_array($st, ['delivering', 'picked_up', 'preparing', 'accepted'])) {
-                        echo '<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-50 px-3 py-1.5 rounded-pill">'.ucfirst($st).'</span>';
+                        $st = trim((string)($row['status'] ?? ''));
+                        // Indonesian delivery statuses
+                        $statusGreen = ['Terkirim', 'Diambil'];
+                        $statusRed = ['Gagal Kirim', 'Dibatalkan'];
+                        $statusYellow = ['Pending', 'Dalam Perjalanan', 'Sedang Diantar'];
+                        $statusBlue = ['Diproses', 'Dikembalikan'];
+                        
+                        if (in_array($st, $statusGreen)) {
+                            echo '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 px-3 py-1.5 rounded-pill">'.htmlspecialchars($st).'</span>';
+                        } elseif (in_array($st, $statusRed)) {
+                            echo '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50 px-3 py-1.5 rounded-pill">'.htmlspecialchars($st).'</span>';
+                        } elseif (in_array($st, $statusYellow)) {
+                            echo '<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-50 px-3 py-1.5 rounded-pill">'.htmlspecialchars($st).'</span>';
+                        } elseif (in_array($st, $statusBlue)) {
+                            echo '<span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-50 px-3 py-1.5 rounded-pill">'.htmlspecialchars($st).'</span>';
                         } else {
-                        echo '<span class="badge bg-secondary bg-opacity-25 text-white border border-secondary border-opacity-50 px-3 py-1.5 rounded-pill">'.htmlspecialchars($row['status'] ?? '-').'</span>';
+                            echo '<span class="badge bg-secondary bg-opacity-25 text-white border border-secondary border-opacity-50 px-3 py-1.5 rounded-pill">'.htmlspecialchars($st ?: '-').'</span>';
                         }
                     ?>
                     </td>
@@ -344,14 +374,15 @@ if ($courierRes) {
                 <div class="col-md-12">
                 <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Status <span class="text-danger">*</span></label>
                 <select class="form-select" name="status" id="delivery-status" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
-                    <option value="pending">pending</option>
-                    <option value="accepted">accepted</option>
-                    <option value="preparing">preparing</option>
-                    <option value="ready">ready</option>
-                    <option value="picked_up">picked_up</option>
-                    <option value="delivering">delivering</option>
-                    <option value="completed">completed</option>
-                    <option value="cancelled">cancelled</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Diambil">Diambil</option>
+                    <option value="Diproses">Diproses</option>
+                    <option value="Dalam Perjalanan">Dalam Perjalanan</option>
+                    <option value="Sedang Diantar">Sedang Diantar</option>
+                    <option value="Terkirim">Terkirim</option>
+                    <option value="Gagal Kirim">Gagal Kirim</option>
+                    <option value="Dikembalikan">Dikembalikan</option>
+                    <option value="Dibatalkan">Dibatalkan</option>
                 </select>
                 </div>
 

@@ -130,8 +130,11 @@ $menu = [
         <div class="text-white-50" style="font-size:.78rem;">Pemesanan Makanan Sehat</div>
       </div>
     </div>
-    <div class="text-white-50" style="width:38px; text-align:right;">
-      <i class="bi bi-moon-stars fs-4"></i>
+    <!-- NOTIFIKASI BELL: Target injection point for notifications.js on patient mobile -->
+    <div class="topbar-right d-flex align-items-center gap-2">
+      <div class="text-white-50" style="width:38px; text-align:right;">
+        <i class="bi bi-moon-stars fs-4"></i>
+      </div>
     </div>
   </div>
 </nav>
@@ -181,7 +184,9 @@ $menu = [
       </div>
     </div>
   </div>
-  <div class="sidebar-footer w-100">
+  <div class="sidebar-footer w-100 d-flex flex-column gap-2">
+      <!-- NOTIFIKASI BELL DESKTOP: Target injection for notifications.js on patient desktop -->
+      <div class="sidebar-notification-area px-2" style="border-bottom: 1px solid rgba(148,163,184,0.12); padding-bottom: 8px;"></div>
       <!-- PERBAIKAN DESKTOP: Mengubah warna background transparan, teks, dan ikon menjadi merah solid (#ef4444) -->
       <button type="button" class="btn-logout d-flex align-items-center gap-3 w-100 border-0 text-start" data-bs-toggle="modal" data-bs-target="#logoutModal" style="padding: 0.6rem 1rem; background: transparent; color: #ef4444; font-weight: 600;">
           <i class="bi bi-box-arrow-left d-inline-block text-center" style="width: 20px;"></i>
