@@ -1,6 +1,7 @@
 <?php
 // permissions.php
 include 'db.php'; 
+include 'notification_helper.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -46,6 +47,7 @@ if (isset($_POST['create'])) {
     $stmt->bind_param("ss", $module_name, $permission_name);
     if ($stmt->execute()) {
         $stmt->close();
+        createNotification('admin', $_SESSION['user_id'], 'Hak Akses Baru', "Permission $permission_name ($module_name) berhasil ditambahkan");
         header("Location: permissions.php?status=success_create");
         exit();
     } else {
@@ -84,6 +86,7 @@ if (isset($_POST['update'])) {
     $stmt->bind_param("ssi", $module_name, $permission_name, $id);
     if ($stmt->execute()) {
         $stmt->close();
+        createNotification('admin', $_SESSION['user_id'], 'Hak Akses Diperbarui', "Permission $permission_name ($module_name) berhasil diperbarui");
         header("Location: permissions.php?status=success_update");
         exit();
     } else {
@@ -103,6 +106,7 @@ if (isset($_GET['delete'])) {
         $stmt->bind_param("i", $id);
         if ($stmt->execute()) {
             $stmt->close();
+            createNotification('admin', $_SESSION['user_id'], 'Hak Akses Dihapus', "Permission (ID: $id) berhasil dihapus");
             header("Location: permissions.php?status=success_delete");
             exit();
         } else {

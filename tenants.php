@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 include 'db.php';
+include 'notification_helper.php';
 
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
@@ -51,6 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_create'])) {
                 
                 if ($stmt->execute()) {
                     $_SESSION['tenant_success'] = "Data tenant baru berhasil ditambahkan!";
+                    createNotification('admin', $_SESSION['user_id'], 'Tenant Baru', "Tenant $name ($type) berhasil ditambahkan");
                 } else {
                     $_SESSION['tenant_error'] = "Gagal menyimpan data tenant ke database.";
                 }
@@ -95,6 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                 
                 if ($updateStmt->execute()) {
                     $_SESSION['tenant_success'] = "Data tenant berhasil diperbarui!";
+                    createNotification('admin', $_SESSION['user_id'], 'Tenant Diperbarui', "Tenant $name ($type) berhasil diperbarui");
                 } else {
                     $_SESSION['tenant_error'] = "Gagal memperbarui data tenant di database.";
                 }
@@ -124,6 +127,7 @@ if (isset($_GET['action_delete'])) {
             $deleteStmt->bind_param("i", $deleteId);
             if ($deleteStmt->execute()) {
                 $_SESSION['tenant_success'] = "Data tenant berhasil dihapus dari sistem!";
+                createNotification('admin', $_SESSION['user_id'], 'Tenant Dihapus', "Tenant (ID: $deleteId) berhasil dihapus");
             } else {
                 $_SESSION['tenant_error'] = "Gagal menghapus data dari database.";
             }

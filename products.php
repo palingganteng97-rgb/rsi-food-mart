@@ -1,6 +1,7 @@
 <?php
 // products.php
 include 'db.php'; // Hubungkan ke koneksi database $conn
+include 'notification_helper.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -60,6 +61,7 @@ if (isset($_POST['action_add_product'])) {
               VALUES ($tenant_id, $category_id, $brand_id, $unit_id, '$sku', '$barcode', '$name', '$description', $base_price, $stock, '$imageName', $p_status, NOW())";
     
     if (mysqli_query($conn, $query)) {
+        createNotification('admin', $_SESSION['user_id'], 'Produk Baru', "Produk $name berhasil ditambahkan");
         header("Location: products.php?status=success_insert");
         exit();
     } else {
@@ -118,6 +120,7 @@ if (isset($_POST['action_update_product'])) {
               WHERE id = $id";
     
     if (mysqli_query($conn, $query)) {
+        createNotification('admin', $_SESSION['user_id'], 'Produk Diperbarui', "Produk $name berhasil diperbarui");
         header("Location: products.php?status=success_update");
         exit();
     } else {
@@ -149,6 +152,7 @@ if (isset($_GET['action_delete'])) {
     $query = "UPDATE products SET updated_at = NOW(), deleted_at = NOW() WHERE id = $id";
     
     if (mysqli_query($conn, $query)) {
+        createNotification('admin', $_SESSION['user_id'], 'Produk Dihapus', "Produk (ID: $id) berhasil dihapus");
         header("Location: products.php?status=success_delete");
         exit();
     } else {

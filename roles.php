@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 include 'db.php';
+include 'notification_helper.php';
 
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
@@ -42,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_create'])) {
                 $stmt->bind_param("s", $name);
                 if ($stmt->execute()) {
                     $_SESSION['roles_success'] = "Role baru berhasil ditambahkan!";
+                    createNotification('admin', $_SESSION['user_id'], 'Role Baru', "Role $name berhasil ditambahkan");
                 } else {
                     $_SESSION['roles_error'] = "Gagal menyimpan role baru ke database.";
                 }
@@ -77,6 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
                 $updateStmt->bind_param("si", $newName, $targetId);
                 if ($updateStmt->execute()) {
                     $_SESSION['roles_success'] = "Nama role berhasil diperbarui!";
+                    createNotification('admin', $_SESSION['user_id'], 'Role Diperbarui', "Role $newName berhasil diperbarui");
                 } else {
                     $_SESSION['roles_error'] = "Gagal memperbarui data role di database.";
                 }
@@ -111,6 +114,7 @@ if (isset($_GET['action_delete'])) {
                 $deleteStmt->bind_param("i", $deleteId);
                 if ($deleteStmt->execute()) {
                     $_SESSION['roles_success'] = "Role berhasil dihapus dari sistem!";
+                    createNotification('admin', $_SESSION['user_id'], 'Role Dihapus', "Role (ID: $deleteId) berhasil dihapus");
                 } else {
                     $_SESSION['roles_error'] = "Gagal menghapus data dari database.";
                 }
