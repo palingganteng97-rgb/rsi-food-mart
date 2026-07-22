@@ -1,13 +1,12 @@
 <?php
-// patient_sync_logs.php (Hanya Logika Atas Backend)
-include "db.php"; // Di dalam db.php harus sudah dipanggil session_start()
+// patient_sync_logs.php (Perbaikan Logika Atas)
+include "db.php"; 
 
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
-// 1. Logika Pemrosesan Pencarian (Filter Berdasarkan Nomor Rekam Medis atau Status)
 $search = trim($_GET['q'] ?? '');
 $statusFilter = trim($_GET['status'] ?? '');
 
@@ -23,7 +22,8 @@ if ($search !== '') {
 }
 
 if ($statusFilter !== '') {
-    $whereClauses[] = "sync_status = ?";
+    // FIX: Menggunakan UPPER untuk mengamankan kecocokan data string di database
+    $whereClauses[] = "UPPER(sync_status) = UPPER(?)";
     $params[] = &$statusFilter;
     $types .= "s";
 }
@@ -33,7 +33,6 @@ if (!empty($whereClauses)) {
     $whereSql = "WHERE " . implode(" AND ", $whereClauses);
 }
 
-// 2. Query Ambil Daftar Log Sinkronisasi Berdasarkan Filter
 $sql = "SELECT id, medical_record_number, sync_status, created_at, request_payload, response_payload 
         FROM patient_sync_logs 
         $whereSql 
