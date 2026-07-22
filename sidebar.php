@@ -13,16 +13,16 @@ parse_str(parse_url($currentUri, PHP_URL_QUERY) ?? '', $queryParams);
 $currentTenantId = $queryParams['tenant_id'] ?? '';
 
 $menu = [
-'dashboard.php' => [ 'href' => 'dashboard.php', 'label' => 'Dashboard', 'icon' => 'bi-speedometer2' ],
+    'dashboard.php' => [ 'href' => 'dashboard.php', 'label' => 'Dashboard', 'icon' => 'bi-speedometer2' ],
     'tenants_group' => [
-        'label' => 'Tenants', 'icon' => 'bi-building-gear', 'class' => 'd-mobile-none',
+        'label' => 'Tenants', 'icon' => 'bi-building-gear', 'class' => '',
         'sub' => [
             'tenants.php' => [ 'href' => 'tenants.php', 'label' => 'Data Tenant', 'icon' => 'bi-house-lock-fill' ],
             'tenant_operating_hours.php' => [ 'href' => 'tenant_operating_hours.php', 'label' => 'Tenant Operating Hours', 'icon' => 'bi-clock-history' ],
             'tenant_holidays.php' => [ 'href' => 'tenant_holidays.php', 'label' => 'Tenant Holidays', 'icon' => 'bi-calendar-x' ],
             'tenant_settings.php' => [ 'href' => 'tenant_settings.php', 'label' => 'Tenant Settings', 'icon' => 'bi-sliders' ],
             'tenant_reviews.php' => [ 'href' => 'tenant_reviews.php', 'label' => 'Ulasan Tenant', 'icon' => 'bi-star-half' ],
-            ]
+        ]
     ],
     'master_group' => [
         'label' => 'Master Data', 'icon' => 'bi-layers-half', 'class' => '',
@@ -44,6 +44,7 @@ $menu = [
         'label' => 'Produk', 'icon' => 'bi-bag-dash-fill', 'class' => '',
         'sub' => [
             'products.php'         => [ 'href' => 'products.php', 'label' => 'Data Produk', 'icon' => 'bi-box-seam-fill' ],
+            'stock_movements.php'  => [ 'href' => 'stock_movements.php', 'label' => 'Mutasi Stok', 'icon' => 'bi-arrow-left-right' ],
             'product_images.php'   => [ 'href' => 'product_images.php', 'label' => 'Gambar Produk', 'icon' => 'bi-images' ],
             'product_variants.php' => [ 'href' => 'product_variants.php', 'label' => 'Varian Produk', 'icon' => 'bi-grid-3x3-gap-fill' ],
             'product_addons.php'   => [ 'href' => 'product_addons.php', 'label' => 'Topping Produk', 'icon' => 'bi-egg-fried' ],
@@ -52,36 +53,43 @@ $menu = [
             'favorites.php'        => [ 'href' => 'favorites.php', 'label' => 'Menu Favorit', 'icon' => 'bi-heart-fill' ],
         ]
     ],
-
     'orders_group' => [
-        'label' => 'Pesanan', 'icon'  => 'bi-receipt-cutoff', 'class' => '','sub'   => [
+        'label' => 'Pesanan', 'icon'  => 'bi-receipt-cutoff', 'class' => '',
+        'sub'   => [
             'orders.php'                 => [ 'href' => 'orders.php', 'label' => 'Pesanan Pelanggan', 'icon' => 'bi-cart-check' ],
             'order_items.php'            => [ 'href' => 'order_items.php', 'label' => 'Detail Item Pesanan', 'icon' => 'bi-list-stars' ],
             'order_status_histories.php' => [ 'href' => 'order_status_histories.php', 'label' => 'Histori Status', 'icon' => 'bi-clock-history' ],
         ]
     ],
-
     'deliveries_group' => [
-        'label' => 'Pengiriman', 'icon'  => 'bi-truck', 'class' => '','sub'   => [
+        'label' => 'Pengiriman', 'icon'  => 'bi-truck', 'class' => '',
+        'sub'   => [
             'couriers.php'               => [ 'href' => 'couriers.php', 'label' => 'Data Kurir', 'icon' => 'bi-person-badge' ],
             'deliveries.php'             => [ 'href' => 'deliveries.php', 'label' => 'Daftar Pengiriman', 'icon' => 'bi-box-seam' ],
             'delivery_tracking.php'      => [ 'href' => 'delivery_tracking.php', 'label' => 'Pelacakan Live', 'icon' => 'bi-geo-alt' ],
         ]
     ],
-
     'payments_group' => [
-        'label' => 'Pembayaran', 'icon'  => 'bi-credit-card', 'class' => '','sub'   => [
+        'label' => 'Pembayaran', 'icon'  => 'bi-credit-card', 'class' => '',
+        'sub'   => [
             'payment_methods.php' => [ 'href' => 'payment_methods.php', 'label' => 'Metode Pembayaran', 'icon' => 'bi-wallet2' ],
             'payments.php'        => [ 'href' => 'payments.php', 'label' => 'Daftar Pembayaran', 'icon' => 'bi-cash-coin' ],
             'refunds.php'         => [ 'href' => 'refunds.php', 'label' => 'Pengembalian Dana (Refund)', 'icon' => 'bi-arrow-counterclockwise' ],
         ]
     ],
-
     'master_barcode.php' => [ 'href' => 'master_barcode.php', 'label' => 'Master Barcode', 'icon' => 'bi-qr-code-scan' ],
-    'user.php' => [ 'href' => 'user.php', 'label' => 'User', 'icon' => 'bi-person', 'class' => 'd-none d-lg-block' ],
-    'profile.php' => [ 'href' => 'profile.php', 'label' => 'User', 'icon' => 'bi-person-bounding-box', 'class' => 'd-block d-lg-none' ],
-    'roles.php' => [ 'href' => 'roles.php', 'label' => 'Roles', 'icon' => 'bi-shield-lock', 'class' => 'd-mobile-none' ],
-    'permissions.php' => [ 'href' => 'permissions.php', 'label' => 'Permissions', 'icon' => 'bi-key', 'class' => 'd-mobile-none' ],
+    'user.php' => [ 'href' => 'user.php', 'label' => 'User', 'icon' => 'bi-person', 'class' => '' ],
+    'access_group' => [
+        'label' => 'Hak Akses', 'icon' => 'bi-shield-lock-fill', 'class' => '',
+        'sub' => [
+            'roles.php'            => [ 'href' => 'roles.php', 'label' => 'Roles Group', 'icon' => 'bi-people-fill' ],
+            'permissions.php'      => [ 'href' => 'permissions.php', 'label' => 'Permissions List', 'icon' => 'bi-key-fill' ],
+            'role_permissions.php' => [ 'href' => 'role_permissions.php', 'label' => 'Atur Hak Akses', 'icon' => 'bi-check-all' ],
+        ]
+    ],
+    'notifications.php' => [ 'href' => 'notifications.php', 'label' => 'Notifikasi', 'icon' => 'bi-bell-fill', 'class' => '' ],
+    'patient_sync_logs.php' => [ 'href' => 'patient_sync_logs.php', 'label' => 'Log Sinkronisasi Pasien', 'icon' => 'bi-database-fill-gear', 'class' => '' ],
+    'settings.php' => [ 'href' => 'settings.php', 'label' => 'Settings', 'icon' => 'bi-gear-fill', 'class' => '' ],
 ];
 
 // =========================================================================
@@ -162,8 +170,10 @@ function activeClass(string $file, string $currentFile, string $currentTenantId)
         <div class="text-white-50" style="font-size:.78rem;">Pemesanan Makanan Sehat</div>
       </div>
     </div>
-    <div class="text-white-50" style="width:38px; text-align:right;">
-      <i class="bi bi-moon-stars fs-4"></i>
+    <div class="d-flex align-items-center gap-2">
+      <div class="text-white-50">
+        <i class="bi bi-moon-stars fs-4"></i>
+      </div>
     </div>
   </div>
 </nav>
@@ -226,49 +236,50 @@ function activeClass(string $file, string $currentFile, string $currentTenantId)
 <div class="offcanvas offcanvas-start text-white" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel" style="background:#0b1223; border-right:1px solid rgba(148,163,184,.25);">
   <div class="offcanvas-header">
     <div class="d-flex align-items-center gap-2">
-      <!-- Mengganti ikon bi-hospital dengan logo rsi.png dari folder uploads -->
       <div class="logo-badge d-flex align-items-center justify-content-center" aria-hidden="true" style="width: 32px; height: 32px;">
         <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
       </div>
       <div>
         <div class="fw-bold">RSI FOOD &amp; MART</div>
-        <div class="text-white-50" style="font-size:.82rem;">Menu Pasien</div>
+        <div class="text-white-50" style="font-size:.82rem;">Menu Panel Admin</div>
       </div>
     </div>
     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
   </div>
   <div class="offcanvas-body d-flex flex-column justify-content-between p-0">
-    <div class="sidebar-scroll-container py-3">
+    <div class="sidebar-scroll-container py-3" style="overflow-y: auto; flex-grow: 1;">
       <div class="navmenu">
         <?php foreach ($menu as $key => $item): ?>
-          <!-- FILTER MOBILE: Hanya izinkan key 'dashboard.php' dan 'profile.php' -->
-          <?php if (!in_array($key, ['dashboard.php', 'profile.php'])) { continue; } ?>
-
+          
           <?php if (isset($item['sub'])): $isSubActive = array_key_exists($currentFile, $item['sub']); ?>
+            <!-- JIKA BERBENTUK GRUP DROPDOWN (Tenants, Master Data, Produk, dll) -->
             <div class="w-100 mb-1 <?= $item['class'] ?? ''; ?>">
-              <button class="nav-link w-100 border-0 text-start d-flex align-items-center gap-2 <?= $isSubActive ? 'active' : ''; ?>" data-bs-toggle="collapse" data-bs-target="#dropMobileMenu-<?= $key ?>" aria-expanded="<?= $isSubActive ? 'true' : 'false'; ?>" style="background:transparent; color:inherit;" data-mobile-nav="1">
-                <i class="bi <?= $item['icon']; ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
+              <button class="nav-link w-100 border-0 text-start d-flex align-items-center justify-content-between gap-2 <?= $isSubActive ? 'active' : ''; ?>" data-bs-toggle="collapse" data-bs-target="#dropMobileMenu-<?= $key ?>" aria-expanded="<?= $isSubActive ? 'true' : 'false'; ?>" style="background:transparent; color:inherit; padding: 0.6rem 1rem;" data-mobile-nav="1">
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi <?= $item['icon']; ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
+                </div>
                 <i class="bi bi-chevron-down small transition-arrow" style="transition: transform 0.2s; font-size: 0.75rem; opacity: 0.7;"></i>
               </button>
               <div class="collapse <?= $isSubActive ? 'show' : ''; ?> ms-3" id="dropMobileMenu-<?= $key ?>">
                 <?php foreach ($item['sub'] as $subFile => $subItem): ?>
-                  <a class="nav-link <?= ($currentFile === $subFile) ? 'active' : ''; ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding-left:15px;" data-mobile-nav="1">
-                    <i class="bi <?= $subItem['icon']; ?> me-2"></i><?= htmlspecialchars($subItem['label']); ?>
+                  <a class="nav-link d-flex align-items-center gap-2 <?= ($currentFile === $subFile) ? 'active' : ''; ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding: 0.5rem 1rem 0.5rem 15px; color: #94a3b8;" data-mobile-nav="1">
+                    <i class="bi <?= $subItem['icon']; ?>"></i><?= htmlspecialchars($subItem['label']); ?>
                   </a>
                 <?php endforeach; ?>
               </div>
             </div>
           <?php else: ?>
-            <a class="nav-link <?= ($currentFile === $key) ? 'active' : ''; ?> <?= $item['class'] ?? ''; ?>" href="<?= htmlspecialchars($item['href']); ?>" data-mobile-nav="1">
-              <i class="bi <?= htmlspecialchars($item['icon']); ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
+            <!-- JIKA BERBENTUK SINGLE LINK MENU biasa (Dashboard, Master Barcode, User, dll) -->
+            <a class="nav-link d-flex align-items-center gap-2 <?= ($currentFile === $key) ? 'active' : ''; ?> <?= $item['class'] ?? ''; ?>" href="<?= htmlspecialchars($item['href'] ?? '#'); ?>" style="padding: 0.6rem 1rem;" data-mobile-nav="1">
+              <i class="bi <?= htmlspecialchars($item['icon'] ?? 'bi-link'); ?>"></i><span><?= htmlspecialchars($item['label'] ?? $key); ?></span>
             </a>
           <?php endif; ?>
+
         <?php endforeach; ?>
       </div>
     </div>
-    <div class="sidebar-footer w-100">
-        <!-- PERBAIKAN MOBILE: Mengubah warna background transparan, teks, dan ikon menjadi merah solid (#ef4444) -->
-        <button type="button" class="btn-logout d-flex align-items-center gap-3 w-100 border-0 text-start" data-bs-toggle="modal" data-bs-target="#logoutModal" style="padding: 0.6rem 1rem; background: transparent; color: #ef4444; font-weight: 600;">
+    <div class="sidebar-footer w-100" style="border-top: 1px solid rgba(148,163,184,.15); background: rgba(15,23,42,.3);">
+        <button type="button" class="btn-logout d-flex align-items-center gap-3 w-100 border-0 text-start" data-bs-toggle="modal" data-bs-target="#logoutModal" style="padding: 0.8rem 1rem; background: transparent; color: #ef4444; font-weight: 600;">
             <i class="bi bi-box-arrow-left"></i><span>Logout</span>
         </button>
     </div>
@@ -406,4 +417,5 @@ function activeClass(string $file, string $currentFile, string $currentTenantId)
     });
   })();
 </script>
+<script src="notifications.js?v=1.0"></script>
 

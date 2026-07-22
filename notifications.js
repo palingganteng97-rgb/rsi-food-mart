@@ -18,8 +18,6 @@
     // ============================================================
     const CONFIG = {
         POLL_INTERVAL: 5000,            // Poll every 5 seconds
-        SOUND_ENABLED: true,
-        SOUND_FILE: 'assets/notification.wav',
         MAX_DROPDOWN_ITEMS: 10,
         DEBUG: false                     // Set true for console logging
     };
@@ -33,7 +31,6 @@
         totalUnread: 0,
         notificationPermission: 'default',
         shownNotificationIds: new Set(),
-        audioElement: null,
         isPolling: false,
         pollTimer: null,
         dropdownOpen: false
@@ -48,8 +45,7 @@
         dropdown: null,
         dropdownMenu: null,
         dropdownList: null,
-        dropdownFooter: null,
-        soundToggle: null
+        dropdownFooter: null
     };
 
     // ============================================================
@@ -125,31 +121,6 @@
             return notif;
         } catch (e) {
             log('Error showing notification:', e);
-        }
-    }
-
-    // ============================================================
-    // PLAY NOTIFICATION SOUND
-    // ============================================================
-    function playNotificationSound() {
-        if (!CONFIG.SOUND_ENABLED) return;
-
-        try {
-            // Create audio element if not exists
-            if (!state.audioElement) {
-                state.audioElement = new Audio(CONFIG.SOUND_FILE);
-                state.audioElement.preload = 'auto';
-            }
-
-            // Clone and play to allow overlapping plays
-            const sound = state.audioElement.cloneNode(true);
-            sound.volume = 0.7;
-            sound.play().catch(function(err) {
-                // Autoplay may be blocked - this is handled
-                log('Sound play failed (may be blocked):', err);
-            });
-        } catch (e) {
-            log('Error playing sound:', e);
         }
     }
 
@@ -391,9 +362,6 @@
 
                     // Show browser notification
                     showBrowserNotification(n.title, n.message, n.link);
-
-                    // Play sound
-                    playNotificationSound();
                 });
 
                 // Refresh dropdown if open
