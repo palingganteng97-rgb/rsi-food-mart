@@ -121,16 +121,9 @@ if (!empty($photo)) {
 
 <style>
     :root { --bg:#0f172a; --text:#e5e7eb; --muted:#94a3b8; --green:#22c55e; }
-    
-    /* PERBAIKAN: Mengunci scrollbar halaman utama KECUALI jika file yang aktif adalah profile.php */
     body { background:var(--bg) !important; color:var(--text); overflow-y: hidden !important; } 
-    
-    /* Mengembalikan hak scroll vertikal murni khusus untuk halaman profile.php */
     body.profile-page, 
-    body[class*="profile"] { 
-        overflow-y: auto !important; 
-    }
-
+    body[class*="profile"] { overflow-y: auto !important; }
     .content-bg { background: transparent; }
     .search-box { background: rgba(2,6,23,.35); border:1px solid rgba(148,163,184,.25); border-radius: 18px; }
     .diet-pill { border:1px solid rgba(34,197,94,.35); background: rgba(34,197,94,.08); color:#86efac; }
@@ -141,23 +134,16 @@ if (!empty($photo)) {
     .food-img img { width:100%; height:100%; object-fit: cover; }
     .price-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.35rem .7rem; background: rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.25); border-radius: 999px; color: var(--text); }
     .bottom-nav { position: fixed; left:0; right:0; bottom:0; z-index: 1035; background: rgba(15,23,42,.88); backdrop-filter: blur(10px); border-top: 1px solid rgba(148,163,184,.25); display:block; }
-    
-    /* Penyelarasan Tabel & Sembunyikan Scrollbar Horizontal */
     #dragScrollUserContainer::-webkit-scrollbar, #dragScrollContainer::-webkit-scrollbar, .drag-scroll-container::-webkit-scrollbar { display: none !important; }
     #dragScrollUserContainer, #dragScrollContainer, .drag-scroll-container { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow-x: auto !important; cursor: grab !important; border: none !important; box-shadow: none !important; -webkit-box-shadow: none !important; }
     #dragScrollUserContainer:active, #dragScrollContainer:active, .drag-scroll-container:active { cursor: grabbing !important; }
     #dragScrollUserContainer table, #dragScrollContainer table, .drag-scroll-container table { border-collapse: collapse !important; border: none !important; }
     #dragScrollUserContainer table th, #dragScrollUserContainer table td, #dragScrollContainer table th, #dragScrollContainer table td, .drag-scroll-container table th, .drag-scroll-container table td { border-left: none !important; border-right: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; }
     .text-white-element { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
-    
-    /* PERBAIKAN: MODAL TENGAH MELEBAR BERSIH TANPA SCROLLBAR FISIK BROWSER */
     .modal, .modal-open { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow-y: hidden !important; }
     .modal::-webkit-scrollbar { display: none !important; }
-    
-    /* MENGUBAH overflow-y JADI auto AGAR KONTEKS SCROLLABLE BOOTSTRAP BEKERJA DI DALAM MODAL-BODY */
     .modal-body { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow-y: auto !important; }
     .modal-body::-webkit-scrollbar { display: none !important; }
-
     @media (min-width: 992px) { main.content-shift { margin-left: 280px; } .bottom-nav { display:none; } }
 </style>
 
@@ -165,10 +151,6 @@ if (!empty($photo)) {
 <body>
   <?php require __DIR__ . '/sidebar.php'; ?>
 
-
-<!-- ==================================================================== -->
-<!-- TAHAP 1: PEMBUNGKUS LUAR UTAMA (MAIN CONTAINER TRANSPARAN PENUH)     -->
-<!-- ==================================================================== -->
 <main class="p-3">
     <!-- KARTU ATAS: FOTO PROFILE, NAMA LENGKAP & TOMBOL INTERAKSI -->
     <div class="card-profile-top p-4 text-center mb-3 text-white rounded-4" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
@@ -249,9 +231,6 @@ if (!empty($photo)) {
     </div>
 </main>
 
-<!-- ==================================================================== -->
-<!-- MODAL DIALOG: EDIT PROFIL MANDIRI KHUSUS PERANGKAT MOBILE            -->
-<!-- ==================================================================== -->
 <div class="modal fade" id="modalEditProfilSaya" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable px-3">
         <div class="modal-content text-white rounded-4 border" style="background: #1e293b; border-color: rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.5);">
@@ -298,12 +277,6 @@ if (!empty($photo)) {
     </div>
 </div>
 
-<!-- ==================================================================== -->
-<!-- TAHAP 5: LOGIKA JAVASCRIPT HALAMAN PROFIL TRANSPARAN SELULER         -->
-<!-- ==================================================================== -->
-<!-- ==================================================================== -->
-<!-- TAHAP 5: PERBAIKAN LOGIKA JAVASCRIPT IMAGE FAILSAFE & SCROLL PROFILE -->
-<!-- ==================================================================== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // 1. Memaksa halaman profile melepas penguncian scroll bar dari file dashboard utama
