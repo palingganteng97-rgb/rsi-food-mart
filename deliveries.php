@@ -8,13 +8,60 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $action = isset($_GET['action']) ? trim((string)$_GET['action']) : '';
 
+$uploadDir = 'uploads/deliveries/';
+if (!is_dir($uploadDir)) {
+    if (!mkdir($uploadDir, 0775, true)) {
+        error_log("[DELIVERIES] Gagal membuat direktori upload: $uploadDir");
+    }
+}
+
 if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $order_id      = intval($_POST['order_id'] ?? 0);
     $courier_id    = intval($_POST['courier_id'] ?? 0);
     $status        = trim($_POST['status'] ?? 'PENDING');
     $pickup_time   = !empty($_POST['pickup_time']) ? $_POST['pickup_time'] : null;
     $delivery_time = !empty($_POST['delivery_time']) ? $_POST['delivery_time'] : null;
-    $proof_photo   = trim($_POST['proof_photo'] ?? '');
+    $proof_photo   = '';
+
+    // === PROSES UPLOAD FOTO ===
+    if (isset($_FILES['proof_photo']) && $_FILES['proof_photo']['error'] !== UPLOAD_ERR_NO_FILE) {
+        error_log("[DELIVERIES CREATE] \$_FILES[proof_photo] = " . print_r($_FILES['proof_photo'], true));
+        if ($_FILES['proof_photo']['error'] !== UPLOAD_ERR_OK) {
+            $uploadErrorCode = $_FILES['proof_photo']['error'];
+            error_log("[DELIVERIES CREATE] Upload error code: $uploadErrorCode");
+            $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Gagal mengunggah foto. Kode error: ' . $uploadErrorCode];
+            header("Location: deliveries.php");
+            exit();
+        }
+
+        $fileTmpPath  = $_FILES['proof_photo']['tmp_name'];
+        $fileNameOrig = $_FILES['proof_photo']['name'];
+        $fileSize     = $_FILES['proof_photo']['size'];
+        $fileExtension = strtolower(pathinfo($fileNameOrig, PATHINFO_EXTENSION));
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+
+        if (!in_array($fileExtension, $allowedExtensions)) {
+            error_log("[DELIVERIES CREATE] Format file tidak valid: $fileExtension");
+            $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Format foto harus: ' . implode(', ', $allowedExtensions)];
+            header("Location: deliveries.php");
+            exit();
+        }
+
+        $photoName = 'delivery_' . time() . '_' . uniqid() . '.' . $fileExtension;
+        $destPath = $uploadDir . $photoName;
+
+        if (!move_uploaded_file($fileTmpPath, $destPath)) {
+            error_log("[DELIVERIES CREATE] move_uploaded_file() gagal: tmp=$fileTmpPath, dest=$destPath");
+            $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Gagal menyimpan file upload ke server.'];
+            header("Location: deliveries.php");
+            exit();
+        }
+
+        error_log("[DELIVERIES CREATE] Upload sukses: $photoName");
+        $proof_photo = $photoName;
+    } else {
+        error_log("[DELIVERIES CREATE] Tidak ada file upload. \$_FILES[proof_photo] = " . print_r($_FILES['proof_photo'] ?? 'UNDEFINED', true));
+    }
 
     if ($order_id <= 0 || $courier_id <= 0) {
         $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Order dan Kurir harus dipilih!'];
@@ -78,13 +125,13 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $status        = trim($_POST['status'] ?? 'Pending');
     $pickup_time   = !empty($_POST['pickup_time']) ? $_POST['pickup_time'] : null;
     $delivery_time = !empty($_POST['delivery_time']) ? $_POST['delivery_time'] : null;
-    $proof_photo   = trim($_POST['proof_photo'] ?? '');
 
     if ($id > 0 && $order_id > 0 && $courier_id > 0) {
-        // === GET OLD STATUS BEFORE UPDATE (to detect changes) ===
+        // === GET OLD DATA BEFORE UPDATE ===
         $oldStatus = '';
         $oldOrderId = 0;
-        $oldStmt = $conn->prepare("SELECT status, order_id FROM deliveries WHERE id = ? LIMIT 1");
+        $oldProofPhoto = '';
+        $oldStmt = $conn->prepare("SELECT status, order_id, proof_photo FROM deliveries WHERE id = ? LIMIT 1");
         if ($oldStmt) {
             $oldStmt->bind_param("i", $id);
             $oldStmt->execute();
@@ -92,8 +139,80 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($oldRow = $oldRes->fetch_assoc()) {
                 $oldStatus = trim($oldRow['status'] ?? '');
                 $oldOrderId = (int)($oldRow['order_id'] ?? 0);
+                $oldProofPhoto = trim($oldRow['proof_photo'] ?? '');
             }
             $oldStmt->close();
+        }
+
+        // === PROSES UPLOAD FOTO (Edit) ===
+        $proof_photo = $oldProofPhoto; // Default: pertahankan foto lama
+
+        // Cek apakah user mengklik tombol hapus foto (tanpa upload file baru)
+        $deletePhotoFlag = isset($_POST['delete_photo_flag']) && $_POST['delete_photo_flag'] === '1';
+
+        if ($deletePhotoFlag && empty($_FILES['proof_photo']['name'])) {
+            // User ingin menghapus foto tanpa mengganti dengan file baru
+            if (!empty($oldProofPhoto)) {
+                $oldFilePath = $uploadDir . $oldProofPhoto;
+                if (file_exists($oldFilePath)) {
+                    if (unlink($oldFilePath)) {
+                        error_log("[DELIVERIES UPDATE] File foto dihapus (flag hapus): $oldFilePath");
+                    } else {
+                        error_log("[DELIVERIES UPDATE] Gagal menghapus file foto (flag hapus): $oldFilePath");
+                    }
+                }
+            }
+            $proof_photo = '';
+        }
+
+        if (isset($_FILES['proof_photo']) && $_FILES['proof_photo']['error'] !== UPLOAD_ERR_NO_FILE) {
+            error_log("[DELIVERIES UPDATE] \$_FILES[proof_photo] = " . print_r($_FILES['proof_photo'], true));
+            if ($_FILES['proof_photo']['error'] !== UPLOAD_ERR_OK) {
+                $uploadErrorCode = $_FILES['proof_photo']['error'];
+                error_log("[DELIVERIES UPDATE] Upload error code: $uploadErrorCode");
+                $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Gagal mengunggah foto. Kode error: ' . $uploadErrorCode];
+                header("Location: deliveries.php");
+                exit();
+            }
+
+            $fileTmpPath  = $_FILES['proof_photo']['tmp_name'];
+            $fileNameOrig = $_FILES['proof_photo']['name'];
+            $fileExtension = strtolower(pathinfo($fileNameOrig, PATHINFO_EXTENSION));
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+
+            if (!in_array($fileExtension, $allowedExtensions)) {
+                error_log("[DELIVERIES UPDATE] Format file tidak valid: $fileExtension");
+                $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Format foto harus: ' . implode(', ', $allowedExtensions)];
+                header("Location: deliveries.php");
+                exit();
+            }
+
+            $photoName = 'delivery_' . time() . '_' . uniqid() . '.' . $fileExtension;
+            $destPath = $uploadDir . $photoName;
+
+            if (!move_uploaded_file($fileTmpPath, $destPath)) {
+                error_log("[DELIVERIES UPDATE] move_uploaded_file() gagal: tmp=$fileTmpPath, dest=$destPath");
+                $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Gagal menyimpan file upload ke server.'];
+                header("Location: deliveries.php");
+                exit();
+            }
+
+            error_log("[DELIVERIES UPDATE] Upload sukses: $photoName");
+            $proof_photo = $photoName;
+
+            // Hapus file foto lama jika ada
+            if (!empty($oldProofPhoto)) {
+                $oldFilePath = $uploadDir . $oldProofPhoto;
+                if (file_exists($oldFilePath)) {
+                    if (unlink($oldFilePath)) {
+                        error_log("[DELIVERIES UPDATE] File lama dihapus: $oldFilePath");
+                    } else {
+                        error_log("[DELIVERIES UPDATE] Gagal menghapus file lama: $oldFilePath");
+                    }
+                }
+            }
+        } else {
+            error_log("[DELIVERIES UPDATE] Tidak ada file upload baru. Menggunakan foto lama: $oldProofPhoto");
         }
 
         $stmt = $conn->prepare("UPDATE deliveries SET order_id = ?, courier_id = ?, status = ?, pickup_time = ?, delivery_time = ?, proof_photo = ? WHERE id = ?");
@@ -162,10 +281,32 @@ if ($action === 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id'] ?? 0);
 
     if ($id > 0) {
+        // Ambil data foto lama sebelum hapus
+        $oldStmt = $conn->prepare("SELECT proof_photo FROM deliveries WHERE id = ? LIMIT 1");
+        $oldStmt->bind_param("i", $id);
+        $oldStmt->execute();
+        $oldRes = $oldStmt->get_result();
+        $oldPhoto = '';
+        if ($oldRow = $oldRes->fetch_assoc()) {
+            $oldPhoto = trim($oldRow['proof_photo'] ?? '');
+        }
+        $oldStmt->close();
+
         $stmt = $conn->prepare("DELETE FROM deliveries WHERE id = ?");
         $stmt->bind_param("i", $id);
         
         if ($stmt->execute()) {
+            // Hapus file foto jika ada
+            if (!empty($oldPhoto)) {
+                $oldFilePath = $uploadDir . $oldPhoto;
+                if (file_exists($oldFilePath)) {
+                    if (unlink($oldFilePath)) {
+                        error_log("[DELIVERIES DELETE] File foto dihapus: $oldFilePath");
+                    } else {
+                        error_log("[DELIVERIES DELETE] Gagal menghapus file foto: $oldFilePath");
+                    }
+                }
+            }
             // No notification sent on delete - delivery status changes only notify patients on update.
             $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Data pengiriman berhasil dihapus!'];
             header("Location: deliveries.php");
@@ -313,7 +454,13 @@ if ($courierRes) {
                     </td>
                     <td class="text-white-50"><?= htmlspecialchars($row['pickup_time'] ?? '-') ?></td>
                     <td class="text-white-50"><?= htmlspecialchars($row['delivery_time'] ?? '-') ?></td>
-                    <td class="text-white-50"><?= htmlspecialchars($row['proof_photo'] ?? '-') ?></td>
+                    <td class="text-white-50">
+                        <?php if (!empty($row['proof_photo']) && file_exists($uploadDir . $row['proof_photo'])): ?>
+                            <img src="<?= $uploadDir . $row['proof_photo'] ?>" class="rounded-2 border border-secondary" style="max-height: 45px; max-width:100px; object-fit: cover;" alt="Proof Photo">
+                        <?php else: ?>
+                            <span class="text-muted small"><?= !empty($row['proof_photo']) ? htmlspecialchars($row['proof_photo']) : '-' ?></span>
+                        <?php endif; ?>
+                    </td>
                     <td class="text-center">
                     <div class="d-flex justify-content-center gap-2">
                         <button class="btn btn-sm btn-outline-warning rounded-2" data-bs-toggle="modal" data-bs-target="#modalDelivery"
@@ -358,6 +505,7 @@ if ($courierRes) {
 
         <form id="formDelivery" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="id" id="delivery-id" value="">
+            <input type="hidden" name="delete_photo_flag" id="delete-photo-flag" value="0">
 
             <div class="modal-body" style="overflow: visible !important;">
             <div class="row g-3">
@@ -408,7 +556,19 @@ if ($courierRes) {
 
                 <div class="col-md-12">
                 <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Proof Photo</label>
-                <input type="file" class="form-control" name="proof_photo" id="delivery-proof-photo" accept="image/*" capture="environment" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
+                <div class="input-group">
+                    <input type="file" class="form-control" name="proof_photo" id="delivery-proof-photo" accept="image/*" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
+                    <button class="btn btn-primary px-3" type="button" id="btn-open-camera" title="Ambil dari Kamera">
+                        <i class="bi bi-camera-fill"></i>
+                    </button>
+                    <button class="btn btn-danger px-3" type="button" id="btn-remove-photo" title="Hapus Foto">
+                        <i class="bi bi-trash-fill"></i>
+                    </button>
+                </div>
+                <div id="edit-photo-preview-container" class="mt-2" style="display: none;">
+                    <span class="text-white-50 small d-block mb-1">Foto saat ini:</span>
+                    <img id="edit-photo-preview" src="" class="rounded border" style="width: 80px; height: 80px; object-fit: cover;">
+                </div>
                 </div>
             </div>
             </div>
@@ -420,6 +580,26 @@ if ($courierRes) {
         </form>
         </div>
     </div>
+</div>
+
+<!-- CONTAINER MODAL KAMERA INTERAKTIF (POP-UP DI ATAS MODAL UTAMA) -->
+<div class="modal fade" id="cameraModal" tabindex="-1" aria-hidden="true" style="z-index: 1060; backdrop-filter: blur(8px);">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-white" style="border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 16px;">
+      <div class="modal-header border-bottom border-secondary">
+        <h6 class="modal-title fw-bold text-white"><i class="bi bi-camera me-2"></i> Kamera Pengiriman</h6>
+        <button type="button" class="btn-close btn-close-white" id="btn-close-camera-x"></button>
+      </div>
+      <div class="modal-body text-center p-0 overflow-hidden bg-black" style="max-height: 400px;">
+        <video id="webcamVideo" autoplay playsinline style="width: 100%; height: auto; max-height: 380px; object-fit: cover; transform: scaleX(-1);"></video>
+        <canvas id="webcamCanvas" style="display: none;"></canvas>
+      </div>
+      <div class="modal-footer border-top border-secondary d-flex justify-content-center gap-2">
+        <button type="button" class="btn btn-outline-light btn-sm px-3" id="btn-cancel-camera">Batal</button>
+        <button type="button" class="btn btn-success btn-sm px-4 fw-medium" id="btn-capture-photo"><i class="bi bi-camera me-1"></i> Ambil Gambar</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!--Modal Hapus -->
@@ -444,108 +624,227 @@ if ($courierRes) {
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // DISESUAIKAN: Mengganti ID menjadi dragScrollDeliveryContainer agar pas dengan HTML tabel pengiriman
-    const deliverySlider = document.getElementById('dragScrollDeliveryContainer');
-    if (!deliverySlider) return;
-    
-    let isDown = false, startX, scrollLeft;
-    
-    deliverySlider.addEventListener('mousedown', (e) => {
-        // Mencegah gangguan geser jika admin mengklik tombol edit atau hapus di dalam tabel
-        if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
-        isDown = true; 
-        deliverySlider.style.cursor = 'grabbing';
-        startX = e.pageX - deliverySlider.offsetLeft; 
-        scrollLeft = deliverySlider.scrollLeft;
-    });
-    
-    deliverySlider.addEventListener('mouseleave', () => { isDown = false; deliverySlider.style.cursor = 'grab'; });
-    deliverySlider.addEventListener('mouseup', () => { isDown = false; deliverySlider.style.cursor = 'grab'; });
-    
-    deliverySlider.addEventListener('mousemove', (e) => {
-        if (!isDown) return; 
-        e.preventDefault();
-        const x = e.pageX - deliverySlider.offsetLeft;
-        // Kalikan 1.5 atau 2 jika ingin pergeseran tabel terasa lebih cepat dan ringan
-        deliverySlider.scrollLeft = scrollLeft - ((x - startX) * 1.5);
-    });
-});
+    let streamInstance = null;
+    let cameraModalObj = null;
+    let videoEl = null;
+    let canvasEl = null;
+    let fileInputEl = null;
 
-function openTambahDelivery() {
-    document.getElementById('formDelivery').reset();
-    document.getElementById('formDelivery').action = 'deliveries.php?action=create';
-    document.getElementById('modalDeliveryLabel').innerText = 'Tambah Data Pengiriman';
-    document.getElementById('delivery-id').value = '';
-    document.getElementById('btnSubmitDelivery').className = 'btn btn-success';
-    document.getElementById('btnSubmitDelivery').innerText = 'Simpan Data';
-    document.getElementById('btnSubmitDelivery').disabled = false;
-}
-
-function openEditDelivery(btn) {
-    const data = {
-        id: btn.getAttribute('data-id'),
-        order_id: btn.getAttribute('data-order-id'),
-        courier_id: btn.getAttribute('data-courier-id'),
-        status: btn.getAttribute('data-status'),
-        pickup_time: btn.getAttribute('data-pickup-time'),
-        delivery_time: btn.getAttribute('data-delivery-time'),
-        proof_photo: btn.getAttribute('data-proof-photo')
-    };
-
-    document.getElementById('formDelivery').reset();
-    document.getElementById('formDelivery').action = 'deliveries.php?action=update';
-    document.getElementById('modalDeliveryLabel').innerText = 'Perbarui Data Pengiriman';
-    document.getElementById('delivery-id').value = data.id;
-    document.getElementById('delivery-order-id').value = data.order_id;
-    document.getElementById('delivery-courier-id').value = data.courier_id;
-    document.getElementById('delivery-status').value = data.status || '';
-
-    // Convert datetime from MySQL format (YYYY-MM-DD HH:MM:SS) to browser format (YYYY-MM-DDTHH:MM)
-    if (data.pickup_time) {
-        document.getElementById('delivery-pickup-time').value = data.pickup_time.replace(' ', 'T').substring(0, 16);
-    } else {
-        document.getElementById('delivery-pickup-time').value = '';
-    }
-    if (data.delivery_time) {
-        document.getElementById('delivery-delivery-time').value = data.delivery_time.replace(' ', 'T').substring(0, 16);
-    } else {
-        document.getElementById('delivery-delivery-time').value = '';
-    }
-
-    document.getElementById('btnSubmitDelivery').className = 'btn btn-warning text-dark fw-medium';
-    document.getElementById('btnSubmitDelivery').innerText = 'Perbarui Data';
-    document.getElementById('btnSubmitDelivery').disabled = false;
-}
-
-// FUNGSI BARU: Untuk mengisi data ke Modal Konfirmasi Hapus secara dinamis
-function openHapusDelivery(id, orderNumber) {
-    const btnConfirmDelete = document.getElementById('btnConfirmDeleteDelivery');
-    const txtOrderInfo = document.getElementById('txtDeleteOrderInfo');
-    
-    if (btnConfirmDelete) {
-        btnConfirmDelete.href = 'deliveries.php?action=delete&id=' + id;
-    }
-    if (txtOrderInfo) {
-        txtOrderInfo.innerText = orderNumber;
-    }
-}
-
-// CEK GANDA: Mencegah double submit pada form delivery
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('formDelivery');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            const btn = document.getElementById('btnSubmitDelivery');
-            if (btn.disabled) {
-                e.preventDefault();
-                return false;
-            }
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Memproses...';
+    document.addEventListener('DOMContentLoaded', function() {
+        const deliverySlider = document.getElementById('dragScrollDeliveryContainer');
+        if (!deliverySlider) return;
+        
+        let isDown = false, startX, scrollLeft;
+        
+        deliverySlider.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+            isDown = true; 
+            deliverySlider.style.cursor = 'grabbing';
+            startX = e.pageX - deliverySlider.offsetLeft; 
+            scrollLeft = deliverySlider.scrollLeft;
         });
+        
+        deliverySlider.addEventListener('mouseleave', () => { isDown = false; deliverySlider.style.cursor = 'grab'; });
+        deliverySlider.addEventListener('mouseup', () => { isDown = false; deliverySlider.style.cursor = 'grab'; });
+        
+        deliverySlider.addEventListener('mousemove', (e) => {
+            if (!isDown) return; 
+            e.preventDefault();
+            const x = e.pageX - deliverySlider.offsetLeft;
+            deliverySlider.scrollLeft = scrollLeft - ((x - startX) * 1.5);
+        });
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const cameraModalEl = document.getElementById('cameraModal');
+        if (cameraModalEl) {
+            cameraModalObj = new bootstrap.Modal(cameraModalEl);
+            videoEl = document.getElementById('webcamVideo');
+            canvasEl = document.getElementById('webcamCanvas');
+            fileInputEl = document.getElementById('delivery-proof-photo');
+
+            const btnOpenCamera = document.getElementById('btn-open-camera');
+            if (btnOpenCamera) {
+                btnOpenCamera.addEventListener('click', async () => {
+                    try {
+                        streamInstance = await navigator.mediaDevices.getUserMedia({ 
+                            video: { facingMode: "environment" }, 
+                            audio: false 
+                        });
+                        if (videoEl) videoEl.srcObject = streamInstance;
+                        cameraModalObj.show();
+                    } catch (err) {
+                        alert("Gagal mengakses kamera: Pastikan izin kamera browser Anda telah diizinkan.");
+                    }
+                });
+            }
+
+            const btnCapturePhoto = document.getElementById('btn-capture-photo');
+            if (btnCapturePhoto) {
+                btnCapturePhoto.addEventListener('click', () => {
+                    if (!streamInstance || !canvasEl || !videoEl || !fileInputEl) return;
+
+                    canvasEl.width = videoEl.videoWidth;
+                    canvasEl.height = videoEl.videoHeight;
+                    
+                    const ctx = canvasEl.getContext('2d');
+                    ctx.translate(canvasEl.width, 0);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+
+                    canvasEl.toBlob((blob) => {
+                        if (blob) {
+                            const capturedFile = new File([blob], `proof_${Date.now()}.jpg`, { type: "image/jpeg" });
+                            
+                            const dataTransferContainer = new DataTransfer();
+                            dataTransferContainer.items.add(capturedFile);
+                            fileInputEl.files = dataTransferContainer.files;
+
+                            fileInputEl.dispatchEvent(new Event('change'));
+                            document.getElementById('delete-photo-flag').value = "0";
+                            
+                            stopCameraStream();
+                        }
+                    }, 'image/jpeg', 0.9);
+                });
+            }
+
+            const btnCancelCamera = document.getElementById('btn-cancel-camera');
+            const btnCloseCameraX = document.getElementById('btn-close-camera-x');
+            if (btnCancelCamera) btnCancelCamera.addEventListener('click', stopCameraStream);
+            if (btnCloseCameraX) btnCloseCameraX.addEventListener('click', stopCameraStream);
+        }
+
+        const btnRemovePhoto = document.getElementById('btn-remove-photo');
+        if (btnRemovePhoto) {
+            btnRemovePhoto.addEventListener('click', function() {
+                if (fileInputEl) fileInputEl.value = "";
+                document.getElementById('delete-photo-flag').value = "1";
+                const previewContainer = document.getElementById('edit-photo-preview-container');
+                if (previewContainer) previewContainer.style.display = "none";
+            });
+        }
+
+        // Live preview ketika user memilih file foto baru
+        const proofPhotoInput = document.getElementById('delivery-proof-photo');
+        if (proofPhotoInput) {
+            proofPhotoInput.addEventListener('change', function(e) {
+                const previewContainer = document.getElementById('edit-photo-preview-container');
+                const previewImg = document.getElementById('edit-photo-preview');
+                
+                if (this.files && this.files.length > 0) {
+                    const file = this.files[0];
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        if (previewImg) previewImg.src = evt.target.result;
+                        if (previewContainer) previewContainer.style.display = "block";
+                    };
+                    reader.readAsDataURL(file);
+                    document.getElementById('delete-photo-flag').value = "0";
+                }
+            });
+        }
+    });
+
+    function stopCameraStream() {
+        if (streamInstance) {
+            streamInstance.getTracks().forEach(track => track.stop());
+            streamInstance = null;
+        }
+        if (videoEl) videoEl.srcObject = null;
+        if (cameraModalObj) cameraModalObj.hide();
     }
-});
+
+    function openTambahDelivery() {
+        document.getElementById('formDelivery').reset();
+        document.getElementById('formDelivery').action = 'deliveries.php?action=create';
+        document.getElementById('modalDeliveryLabel').innerText = 'Tambah Data Pengiriman';
+        document.getElementById('delivery-id').value = '';
+        document.getElementById('delete-photo-flag').value = "0";
+        document.getElementById('btnSubmitDelivery').className = 'btn btn-success';
+        document.getElementById('btnSubmitDelivery').innerText = 'Simpan Data';
+        document.getElementById('btnSubmitDelivery').disabled = false;
+        
+        const previewContainer = document.getElementById('edit-photo-preview-container');
+        if (previewContainer) previewContainer.style.display = "none";
+        
+        if (streamInstance) stopCameraStream();
+    }
+
+    function openEditDelivery(btn) {
+        const data = {
+            id: btn.getAttribute('data-id'),
+            order_id: btn.getAttribute('data-order-id'),
+            courier_id: btn.getAttribute('data-courier-id'),
+            status: btn.getAttribute('data-status'),
+            pickup_time: btn.getAttribute('data-pickup-time'),
+            delivery_time: btn.getAttribute('data-delivery-time'),
+            proof_photo: btn.getAttribute('data-proof-photo')
+        };
+
+        document.getElementById('formDelivery').reset();
+        document.getElementById('formDelivery').action = 'deliveries.php?action=update';
+        document.getElementById('modalDeliveryLabel').innerText = 'Perbarui Data Pengiriman';
+        document.getElementById('delivery-id').value = data.id;
+        document.getElementById('delivery-order-id').value = data.order_id;
+        document.getElementById('delivery-courier-id').value = data.courier_id;
+        document.getElementById('delivery-status').value = data.status || '';
+        document.getElementById('delete-photo-flag').value = "0";
+
+        if (data.pickup_time) {
+            document.getElementById('delivery-pickup-time').value = data.pickup_time.replace(' ', 'T').substring(0, 16);
+        } else {
+            document.getElementById('delivery-pickup-time').value = '';
+        }
+        if (data.delivery_time) {
+            document.getElementById('delivery-delivery-time').value = data.delivery_time.replace(' ', 'T').substring(0, 16);
+        } else {
+            document.getElementById('delivery-delivery-time').value = '';
+        }
+
+        const previewContainer = document.getElementById('edit-photo-preview-container');
+        const previewImg = document.getElementById('edit-photo-preview');
+        const uploadDir = 'uploads/deliveries/';
+        
+        if (data.proof_photo && data.proof_photo.trim() !== "" && data.proof_photo !== "null") {
+            previewImg.src = uploadDir + data.proof_photo;
+            previewContainer.style.display = "block";
+        } else {
+            previewImg.src = "";
+            previewContainer.style.display = "none";
+        }
+
+        document.getElementById('btnSubmitDelivery').className = 'btn btn-warning text-dark fw-medium';
+        document.getElementById('btnSubmitDelivery').innerText = 'Perbarui Data';
+        document.getElementById('btnSubmitDelivery').disabled = false;
+    }
+
+    function openHapusDelivery(id, orderNumber) {
+        const btnConfirmDelete = document.getElementById('btnConfirmDeleteDelivery');
+        const txtOrderInfo = document.getElementById('txtDeleteOrderInfo');
+        
+        if (btnConfirmDelete) {
+            btnConfirmDelete.href = 'deliveries.php?action=delete&id=' + id;
+        }
+        if (txtOrderInfo) {
+            txtOrderInfo.innerText = orderNumber;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('formDelivery');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const btn = document.getElementById('btnSubmitDelivery');
+                if (btn.disabled) {
+                    e.preventDefault();
+                    return false;
+                }
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Memproses...';
+            });
+        }
+    });
 </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

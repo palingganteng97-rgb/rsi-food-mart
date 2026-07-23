@@ -4,6 +4,20 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Ambil Nama Aplikasi & Slogan dari tabel settings (dinamis)
+$appName = 'RSI FOOD &amp; MART';
+$appSlogan = 'Pemesanan Makanan Sehat';
+$settingsQuery = $conn->query("SELECT `key`, `value` FROM settings WHERE `key` IN ('app_name', 'app_slogan')");
+if ($settingsQuery) {
+    while ($sRow = $settingsQuery->fetch_assoc()) {
+        if ($sRow['key'] === 'app_name') {
+            $appName = htmlspecialchars($sRow['value'], ENT_QUOTES, 'UTF-8');
+        } elseif ($sRow['key'] === 'app_slogan') {
+            $appSlogan = htmlspecialchars($sRow['value'], ENT_QUOTES, 'UTF-8');
+        }
+    }
+}
+
 // Mengambil nama file saat ini beserta query string (misal: products.php?id=1)
 $currentUri = $_SERVER['REQUEST_URI'] ?? '';
 $currentFile = basename(parse_url($currentUri, PHP_URL_PATH));
@@ -69,8 +83,8 @@ $menu = [
         <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
       </div>
       <div>
-        <div class="fw-bold">RSI FOOD &amp; MART</div>
-        <div class="text-white-50" style="font-size:.82rem;">Menu Panel Admin</div>
+        <div class="fw-bold"><?= $appName ?></div>
+        <div class="text-white-50" style="font-size:.82rem;"><?= $appSlogan ?></div>
       </div>
     </div>
     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -127,8 +141,8 @@ $menu = [
         <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
       </div>
       <div class="lh-tight">
-        <div class="fw-bold text-white" style="font-size:.95rem;">RSI FOOD &amp; MART</div>
-        <div class="text-white-50" style="font-size:.78rem;">Pemesanan Makanan Sehat</div>
+        <div class="fw-bold text-white" style="font-size:.95rem;"><?= $appName ?></div>
+        <div class="text-white-50" style="font-size:.78rem;"><?= $appSlogan ?></div>
       </div>
     </div>
     <!-- NOTIFIKASI BELL: Target injection point for notifications.js on patient mobile -->
@@ -149,8 +163,8 @@ $menu = [
         <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
       </div>
       <div>
-        <div class="fw-bold" style="letter-spacing:.2px;">RSI FOOD &amp; MART</div>
-        <div class="text-white-50" style="font-size:.82rem;">Pemesanan Makanan Sehat</div>
+        <div class="fw-bold" style="letter-spacing:.2px;"><?= $appName ?></div>
+        <div class="text-white-50" style="font-size:.82rem;"><?= $appSlogan ?></div>
       </div>
     </div>
     <div class="sidebar-scroll-container">

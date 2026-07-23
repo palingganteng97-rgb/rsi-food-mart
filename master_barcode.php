@@ -94,17 +94,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($op === 'edit') {
         $id = (int)($_POST['id'] ?? 0);
-        $room_name = trim((string)($_POST['room_name'] ?? ''));
-        if ($id > 0 && $room_name !== '') {
+        $new_room_name = trim((string)($_POST['room_name'] ?? ''));
+        if ($id > 0 && $new_room_name !== '') {
+            // 1. Ambil room_name lama dari database untuk identifikasi file QR lama
+            $oldRoomName = '';
+            $selOld = $conn->prepare("SELECT room_name FROM master_barcode WHERE id = ?");
+            if ($selOld) {
+                $selOld->bind_param('i', $id);
+                $selOld->execute();
+                $resOld = $selOld->get_result();
+                if ($resOld && $rowOld = $resOld->fetch_assoc()) {
+                    $oldRoomName = $rowOld['room_name'];
+                }
+                $selOld->close();
+            }
+
+            // 2. Update database terlebih dahulu
             $sql = "UPDATE master_barcode SET room_name = ?, updated_at = NOW() WHERE id = ?";
             $stmt = $conn->prepare($sql);
             if ($stmt) {
-                $stmt->bind_param('si', $room_name, $id);
+                $stmt->bind_param('si', $new_room_name, $id);
                 if ($stmt->execute()) {
-                    $qrUrl = getPatientUrl($room_name);
-                    $fileName = sanitizeFileName($room_name) . '_' . $id . '.png';
-                    $filePath = $uploadDir . $fileName;
-                    ensureQrFile($qrUrl, $filePath);
+                    // 3. Generate QR baru
+                    $qrUrl = getPatientUrl($new_room_name);
+                    $newFileName = sanitizeFileName($new_room_name) . '_' . $id . '.png';
+                    $newFilePath = $uploadDir . $newFileName;
+                    ensureQrFile($qrUrl, $newFilePath);
+
+                    // 4. Jika QR baru berhasil dibuat dan room_name berubah, hapus file QR lama
+                    if (file_exists($newFilePath) && $oldRoomName !== '' && $oldRoomName !== $new_room_name) {
+                        $oldFileName = sanitizeFileName($oldRoomName) . '_' . $id . '.png';
+                        $oldFilePath = $uploadDir . $oldFileName;
+                        if (file_exists($oldFilePath)) {
+                            if (!unlink($oldFilePath)) {
+                                error_log("[MASTER_BARCODE EDIT] Gagal menghapus file QR lama: $oldFilePath");
+                            }
+                        }
+                    }
+
                     set_flash('success', 'Barcode berhasil diperbarui.');
                 } else {
                     set_flash('error', 'Gagal memperbarui barcode.');

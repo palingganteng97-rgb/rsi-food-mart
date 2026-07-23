@@ -10,17 +10,24 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-$status = "";
-$msg = "";
+// Ambil notifikasi status dari session agar tidak hilang saat diredirect
+$status = $_SESSION['brand_status'] ?? "";
+$msg = $_SESSION['brand_msg'] ?? "";
+unset($_SESSION['brand_status'], $_SESSION['brand_msg']);
+
 $uploadDir = "uploads/brands/";
 
 if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0775, true);
 }
 
+// =========================================================================
+// 1. LOGIKA TAMBAH DATA (CREATE + REDIRECT)
+// =========================================================================
 if (isset($_POST['action_add_brand'])) {
     $name = mysqli_real_escape_string($conn, $_POST['name']);
     $logoName = "";
+    $uploadOk = true;
 
     if (isset($_FILES['logo']) && !empty($_FILES['logo']['name'])) {
         $fileName = $_FILES['logo']['name'];
@@ -33,26 +40,34 @@ if (isset($_POST['action_add_brand'])) {
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
         if (in_array($fileExt, $allowedExtensions)) {
             if (!move_uploaded_file($fileTmp, $targetFile)) {
-                $status = "error";
-                $msg = "Gagal mengunggah gambar logo ke server.";
+                $_SESSION['brand_status'] = "error";
+                $_SESSION['brand_msg'] = "Gagal mengunggah gambar logo ke server.";
+                $uploadOk = false;
             }
         } else {
-            $status = "error";
-            $msg = "Format file tidak didukung! Hanya diperbolehkan: " . implode(', ', $allowedExtensions);
+            $_SESSION['brand_status'] = "error";
+            $_SESSION['brand_msg'] = "Format file tidak didukung! Hanya: " . implode(', ', $allowedExtensions);
+            $uploadOk = false;
         }
     }
 
-    if ($status !== "error") {
+    if ($uploadOk) {
         $query = "INSERT INTO brands (name, logo) VALUES ('$name', '$logoName')";
         if (mysqli_query($conn, $query)) {
-            $status = "success_insert";
+            $_SESSION['brand_status'] = "success_insert";
         } else {
-            $status = "error";
-            $msg = "Gagal menyimpan data ke database: " . mysqli_error($conn);
+            $_SESSION['brand_status'] = "error";
+            $_SESSION['brand_msg'] = "Gagal menyimpan data: " . mysqli_error($conn);
         }
     }
+    // REDIRECT UNTUK MENCEGAH DUPLIKASI SAAT REFRESH
+    header("Location: brands.php");
+    exit();
 }
 
+// =========================================================================
+// 2. LOGIKA UBAH DATA (UPDATE + REDIRECT)
+// =========================================================================
 if (isset($_POST['action_update_brand'])) {
     $id = intval($_POST['id']);
     $name = mysqli_real_escape_string($conn, $_POST['name']);
@@ -62,6 +77,7 @@ if (isset($_POST['action_update_brand'])) {
     $oldLogo = $currentData['logo'];
 
     $logoName = $oldLogo;
+    $uploadOk = true;
 
     if (isset($_FILES['logo']) && !empty($_FILES['logo']['name'])) {
         $fileName = $_FILES['logo']['name'];
@@ -78,49 +94,104 @@ if (isset($_POST['action_update_brand'])) {
                     unlink($uploadDir . $oldLogo);
                 }
             } else {
-                $status = "error";
-                $msg = "Gagal mengunggah logo baru ke server.";
+                $_SESSION['brand_status'] = "error";
+                $_SESSION['brand_msg'] = "Gagal mengunggah logo baru ke server.";
+                $uploadOk = false;
             }
         } else {
-            $status = "error";
-            $msg = "Format file baru tidak didukung.";
+            $_SESSION['brand_status'] = "error";
+            $_SESSION['brand_msg'] = "Format file baru tidak didukung.";
+            $uploadOk = false;
         }
     }
 
-    if ($status !== "error") {
+    if ($uploadOk) {
         $query = "UPDATE brands SET name = '$name', logo = '$logoName' WHERE id = $id";
         if (mysqli_query($conn, $query)) {
-            $status = "success_update";
+            $_SESSION['brand_status'] = "success_update";
         } else {
-            $status = "error";
-            $msg = "Gagal memperbarui database: " . mysqli_error($conn);
+            $_SESSION['brand_status'] = "error";
+            $_SESSION['brand_msg'] = "Gagal memperbarui database: " . mysqli_error($conn);
         }
     }
+    header("Location: brands.php");
+    exit();
 }
 
+// =========================================================================
+// 3. LOGIKA HAPUS DATA (DELETE + REDIRECT)
+// =========================================================================
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
     $id = intval($_GET['id']);
 
+    // 1. Ambil nama file logo dari database SEBELUM operasi hapus
     $checkQuery = mysqli_query($conn, "SELECT logo FROM brands WHERE id = $id");
     if (mysqli_num_rows($checkQuery) > 0) {
         $currentData = mysqli_fetch_assoc($checkQuery);
         $oldLogo = $currentData['logo'];
 
-        $query = "DELETE FROM brands WHERE id = $id";
-        if (mysqli_query($conn, $query)) {
-            if (!empty($oldLogo) && file_exists($uploadDir . $oldLogo)) {
-                unlink($uploadDir . $oldLogo);
+        // 2. Hapus file logo terlebih dahulu jika ada dan bukan placeholder
+        $logoDeleted = false;
+        if (!empty($oldLogo)) {
+            $logoPath = $uploadDir . $oldLogo;
+            if (file_exists($logoPath)) {
+                if (unlink($logoPath)) {
+                    $logoDeleted = true;
+                } else {
+                    error_log("[BRANDS DELETE] Gagal menghapus file logo: $logoPath");
+                }
             }
-            $status = "success_delete";
-        } else {
-            $status = "error";
-            $msg = "Gagal menghapus data dari database: " . mysqli_error($conn);
+        }
+
+        // 3. Gunakan transaksi untuk menjaga konsistensi data
+        mysqli_begin_transaction($conn);
+
+        try {
+            // 4. Lepas relasi brand dari produk
+            $updateStmt = mysqli_prepare($conn, "UPDATE products SET brand_id = NULL WHERE brand_id = ?");
+            mysqli_stmt_bind_param($updateStmt, 'i', $id);
+            $updateResult = mysqli_stmt_execute($updateStmt);
+            mysqli_stmt_close($updateStmt);
+
+            if (!$updateResult) {
+                throw new mysqli_sql_exception("Gagal mengupdate produk: " . mysqli_error($conn));
+            }
+
+            // 5. Hapus data brand
+            $deleteStmt = mysqli_prepare($conn, "DELETE FROM brands WHERE id = ?");
+            mysqli_stmt_bind_param($deleteStmt, 'i', $id);
+            $deleteResult = mysqli_stmt_execute($deleteStmt);
+            mysqli_stmt_close($deleteStmt);
+
+            if (!$deleteResult) {
+                throw new mysqli_sql_exception("Gagal menghapus brand: " . mysqli_error($conn));
+            }
+
+            // 6. Commit transaksi
+            mysqli_commit($conn);
+            $_SESSION['brand_status'] = "success_delete";
+
+        } catch (mysqli_sql_exception $e) {
+            // 7. Rollback jika ada kegagalan
+            mysqli_rollback($conn);
+            error_log("[BRANDS DELETE] Transaksi gagal: " . $e->getMessage());
+
+            // Jika file sudah terhapus tetapi transaksi gagal, catat sebagai orphan
+            if (!empty($oldLogo) && $logoDeleted) {
+                error_log("[BRANDS DELETE] WARNING: File logo '$oldLogo' sudah terhapus tetapi transaksi gagal. Potensi orphan file.");
+            }
+
+            $_SESSION['brand_status'] = "error";
+            $_SESSION['brand_msg'] = "Gagal menghapus brand karena kesalahan database.";
         }
     }
+
+    header("Location: brands.php");
+    exit();
 }
 
 $listBrands = [];
-$fetchQuery = mysqli_query($conn, "SELECT * FROM brands ORDER BY id DESC");
+$fetchQuery = mysqli_query($conn, "SELECT * FROM brands ORDER BY id ASC");
 if ($fetchQuery) {
     while ($row = mysqli_fetch_assoc($fetchQuery)) {
         $listBrands[] = $row;
@@ -320,39 +391,38 @@ if ($fetchQuery) {
 
 <!-- JAVASCRIPT EVENT MOUSE DRAG TO SCROLL & HANDLER MODAL -->
 <script>
-let deleteBrandModalInstance = null;
+    let deleteBrandModalInstance = null;
 
-function openTambahBrand() {
-    document.getElementById('formBrand').reset();
-    document.getElementById('modalBrandLabel').innerText = 'Tambah Brand Baru';
-    document.getElementById('brand_id').value = '';
-    document.getElementById('btnSubmitBrand').className = "btn btn-success";
-    document.getElementById('btnSubmitBrand').innerText = "Simpan Data";
-    document.getElementById('brand_action_flag').innerHTML = '<input type="hidden" name="action_add_brand" value="1">';
-}
-
-function openEditBrand(data) {
-    openTambahBrand();
-    document.getElementById('modalBrandLabel').innerText = 'Ubah Data Brand';
-    document.getElementById('brand_id').value = data.id;
-    document.getElementById('brand_name').value = data.name;
-    document.getElementById('btnSubmitBrand').className = "btn btn-warning text-dark fw-medium";
-    document.getElementById('btnSubmitBrand').innerText = "Simpan Perubahan";
-    document.getElementById('brand_action_flag').innerHTML = '<input type="hidden" name="action_update_brand" value="1">';
-    var myModal = new bootstrap.Modal(document.getElementById('modalBrand'));
-    myModal.show();
-}
-
-function confirmDeleteBrand(data) {
-    document.getElementById('delete_brand_name').innerText = '"' + data.name + '"';
-    document.getElementById('btn_confirm_delete_brand').href = 'brands.php?action=delete&id=' + data.id;
-    
-    if (!deleteBrandModalInstance) {
-        deleteBrandModalInstance = new bootstrap.Modal(document.getElementById('modalDeleteBrand'));
+    function openTambahBrand() {
+        document.getElementById('formBrand').reset();
+        document.getElementById('modalBrandLabel').innerText = 'Tambah Brand Baru';
+        document.getElementById('brand_id').value = '';
+        document.getElementById('btnSubmitBrand').className = "btn btn-success";
+        document.getElementById('btnSubmitBrand').innerText = "Simpan Data";
+        document.getElementById('brand_action_flag').innerHTML = '<input type="hidden" name="action_add_brand" value="1">';
     }
-    deleteBrandModalInstance.show();
-}
 
+    function openEditBrand(data) {
+        openTambahBrand();
+        document.getElementById('modalBrandLabel').innerText = 'Ubah Data Brand';
+        document.getElementById('brand_id').value = data.id;
+        document.getElementById('brand_name').value = data.name;
+        document.getElementById('btnSubmitBrand').className = "btn btn-warning text-dark fw-medium";
+        document.getElementById('btnSubmitBrand').innerText = "Simpan Perubahan";
+        document.getElementById('brand_action_flag').innerHTML = '<input type="hidden" name="action_update_brand" value="1">';
+        var myModal = new bootstrap.Modal(document.getElementById('modalBrand'));
+        myModal.show();
+    }
+
+    function confirmDeleteBrand(data) {
+        document.getElementById('delete_brand_name').innerText = '"' + data.name + '"';
+        document.getElementById('btn_confirm_delete_brand').href = 'brands.php?action=delete&id=' + data.id;
+        
+        if (!deleteBrandModalInstance) {
+            deleteBrandModalInstance = new bootstrap.Modal(document.getElementById('modalDeleteBrand'));
+        }
+        deleteBrandModalInstance.show();
+    }
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

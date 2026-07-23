@@ -4,6 +4,20 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Ambil Nama Aplikasi & Slogan dari tabel settings (dinamis)
+$appName = 'RSI FOOD &amp; MART';
+$appSlogan = 'Pemesanan Makanan Sehat';
+$settingsQuery = $conn->query("SELECT `key`, `value` FROM settings WHERE `key` IN ('app_name', 'app_slogan')");
+if ($settingsQuery) {
+    while ($sRow = $settingsQuery->fetch_assoc()) {
+        if ($sRow['key'] === 'app_name') {
+            $appName = htmlspecialchars($sRow['value'], ENT_QUOTES, 'UTF-8');
+        } elseif ($sRow['key'] === 'app_slogan') {
+            $appSlogan = htmlspecialchars($sRow['value'], ENT_QUOTES, 'UTF-8');
+        }
+    }
+}
+
 // Mengambil nama file saat ini beserta query string (misal: products.php?id=1)
 $currentUri = $_SERVER['REQUEST_URI'] ?? '';
 $currentFile = basename(parse_url($currentUri, PHP_URL_PATH));
@@ -32,14 +46,6 @@ $menu = [
             'units.php' => [ 'href' => 'units.php', 'label' => 'Satuan / Units', 'icon' => 'bi-calculator-fill' ],
         ]
     ],
-    'marketing_group' => [
-        'label' => 'Marketing', 'icon' => 'bi-megaphone', 'class' => '',
-        'sub' => [
-            'banners.php' => [ 'href' => 'banners.php', 'label' => 'Banners', 'icon' => 'bi-card-image' ],
-            'promos.php' => [ 'href' => 'promos.php', 'label' => 'Promos', 'icon' => 'bi-tags-fill' ],
-            'vouchers.php' => [ 'href' => 'vouchers.php', 'label' => 'Vouchers', 'icon' => 'bi-ticket-perforated-fill' ],
-        ]
-    ],
     'produk_group' => [
         'label' => 'Produk', 'icon' => 'bi-bag-dash-fill', 'class' => '',
         'sub' => [
@@ -51,6 +57,14 @@ $menu = [
             'addon_items.php'      => [ 'href' => 'addon_items.php', 'label' => 'Item Topping', 'icon' => 'bi-list-ul' ],
             'product_reviews.php'  => [ 'href' => 'product_reviews.php', 'label' => 'Ulasan Produk', 'icon' => 'bi-star-fill' ],
             'favorites.php'        => [ 'href' => 'favorites.php', 'label' => 'Menu Favorit', 'icon' => 'bi-heart-fill' ],
+        ]
+    ],
+    'marketing_group' => [
+        'label' => 'Marketing', 'icon' => 'bi-megaphone', 'class' => '',
+        'sub' => [
+            'banners.php' => [ 'href' => 'banners.php', 'label' => 'Banners', 'icon' => 'bi-card-image' ],
+            'promos.php' => [ 'href' => 'promos.php', 'label' => 'Promos', 'icon' => 'bi-tags-fill' ],
+            'vouchers.php' => [ 'href' => 'vouchers.php', 'label' => 'Vouchers', 'icon' => 'bi-ticket-perforated-fill' ],
         ]
     ],
     'orders_group' => [
@@ -165,8 +179,8 @@ function activeClass(string $file, string $currentFile, string $currentTenantId)
         <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
       </div>
       <div class="lh-tight">
-        <div class="fw-bold text-white" style="font-size:.95rem;">RSI FOOD &amp; MART</div>
-        <div class="text-white-50" style="font-size:.78rem;">Pemesanan Makanan Sehat</div>
+        <div class="fw-bold text-white" style="font-size:.95rem;"><?= $appName ?></div>
+        <div class="text-white-50" style="font-size:.78rem;"><?= $appSlogan ?></div>
       </div>
     </div>
     <div class="d-flex align-items-center gap-2">
@@ -186,8 +200,8 @@ function activeClass(string $file, string $currentFile, string $currentTenantId)
         <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
       </div>
       <div>
-        <div class="fw-bold" style="letter-spacing:.2px;">RSI FOOD &amp; MART</div>
-        <div class="text-white-50" style="font-size:.82rem;">Pemesanan Makanan Sehat</div>
+        <div class="fw-bold" style="letter-spacing:.2px;"><?= $appName ?></div>
+        <div class="text-white-50" style="font-size:.82rem;"><?= $appSlogan ?></div>
       </div>
     </div>
     <div class="sidebar-scroll-container">
@@ -239,8 +253,8 @@ function activeClass(string $file, string $currentFile, string $currentTenantId)
         <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
       </div>
       <div>
-        <div class="fw-bold">RSI FOOD &amp; MART</div>
-        <div class="text-white-50" style="font-size:.82rem;">Menu Panel Admin</div>
+        <div class="fw-bold"><?= $appName ?></div>
+        <div class="text-white-50" style="font-size:.82rem;"><?= $appSlogan ?></div>
       </div>
     </div>
     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -301,7 +315,7 @@ function activeClass(string $file, string $currentFile, string $currentTenantId)
                     <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 65px; object-fit: contain;">
                 </div>
                 <h5 class="modal-title fw-bold mb-2" id="logoutModalLabel">Konfirmasi Keluar</h5>
-                <p class="text-white-50 small mb-4">Apakah Anda yakin ingin keluar dari sistem keamanan aplikasi RSI FOOD &amp; MART?</p>
+<p class="text-white-50 small mb-4">Apakah Anda yakin ingin keluar dari sistem keamanan aplikasi <?= $appName ?>?</p>
                 
                 <div class="row g-2 justify-content-center mt-3">
                     <div class="col-12">

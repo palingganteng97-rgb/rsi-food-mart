@@ -560,8 +560,13 @@ function openEditOperatingHour(data) {
     document.getElementById('operating_is_open').value = data.is_open;
     toggleTimeRequired(data.is_open.toString());
 
+    // Parse array_days (comma-separated string like "1,2,3,4,5") and check corresponding checkboxes
+    var selectedDays = [];
+    if (data.array_days) {
+        selectedDays = data.array_days.toString().split(',');
+    }
     document.querySelectorAll('.operating-day-checkbox').forEach(cb => {
-        cb.checked = (cb.value == data.day_of_week);
+        cb.checked = selectedDays.includes(cb.value);
         cb.disabled = false; 
     });
     

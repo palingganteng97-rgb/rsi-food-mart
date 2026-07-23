@@ -246,7 +246,7 @@ if ($list) {
                 <a href="banners.php" class="btn btn-outline-light rounded-3">Reset</a>
             <?php endif; ?>
         </form>
-        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalBanner" onclick="openTambahBanner()">
+        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" onclick="openTambahBanner()">
           <i class="bi bi-image"></i> Tambah Banner
         </button>
       </div>
@@ -308,7 +308,7 @@ if ($list) {
                     </td>
                     <td class="text-center" style="background: transparent !important; border: none !important;">
                       <div class="d-flex justify-content-center gap-2">
-                        <button class="btn btn-sm btn-outline-warning rounded-2" data-bs-toggle="modal" data-bs-target="#modalBanner" onclick='openEditBanner(<?= json_encode($row) ?>)'>
+                        <button class="btn btn-sm btn-outline-warning rounded-2" onclick='openEditBanner(<?= json_encode($row) ?>)'>
                           <i class="bi bi-pencil-square"></i>
                         </button>
                         <a href="banners.php?action=delete&id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger rounded-2" onclick="return confirm('Apakah Anda yakin ingin menghapus aset banner ini?')">
@@ -443,10 +443,35 @@ if ($list) {
     }
 });
 
+// Singleton: hanya SATU instance Bootstrap Modal untuk modalBanner
+let modalBannerInstance = null;
+function getModalBanner() {
+    if (!modalBannerInstance) {
+        modalBannerInstance = new bootstrap.Modal(document.getElementById('modalBanner'));
+    }
+    return modalBannerInstance;
+}
+
 let deleteBannerUrlTarget = '';
 let bootstrapDeleteBannerModalInstance = null;
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Safety cleanup: pastikan backdrop & class modal-open bersih saat modal ditutup
+    const modalBannerEl = document.getElementById('modalBanner');
+    if (modalBannerEl) {
+        modalBannerEl.addEventListener('hidden.bs.modal', function () {
+            // Hapus sisa backdrop yang mungkin tertinggal
+            document.querySelectorAll('.modal-backdrop').forEach(function(el) {
+                el.remove();
+            });
+            // Hapus class modal-open dari body
+            document.body.classList.remove('modal-open');
+            // Kembalikan style body ke normal
+            document.body.style.removeProperty('padding-right');
+            document.body.style.removeProperty('overflow');
+        });
+    }
+
     const prodSlider = document.getElementById('dragScrollProductContainer');
     if (prodSlider) {
         let isDown = false;
@@ -515,6 +540,8 @@ function openTambahBanner() {
         submitBtn.className = "btn btn-success";
         submitBtn.innerText = "Simpan Data";
     }
+
+    getModalBanner().show();
 }
 
 function openEditBanner(data) {
@@ -533,10 +560,8 @@ function openEditBanner(data) {
         submitBtn.className = "btn btn-warning text-dark fw-medium";
         submitBtn.innerText = "Perbarui Data";
     }
-    
-    const modalElement = document.getElementById('modalBanner');
-    const myModal = new bootstrap.Modal(modalElement);
-    myModal.show();
+
+    getModalBanner().show();
 }
 
 function triggerDeleteBanner(url, bannerTitle) {
