@@ -13,27 +13,17 @@ function money($val) {
     return 'Rp ' . number_format((float)$val, 0, ',', '.');
 }
 
-// =========================================================================
-// Validasi session pasien (sama seperti di home.php)
-// =========================================================================
 $isPatient = isset($_SESSION['patient_session_id']) && $_SESSION['patient_session_id'] > 0;
 
 if (!$isPatient) {
-    // Jika tidak ada session pasien, arahkan ke halaman entry awal (index.php)
     header("Location: index.php");
     exit;
 }
 
 $patient_session_id = intval($_SESSION['patient_session_id']);
-
-// Ambil order_id dari URL
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-// =========================================================================
-// MODE DETAIL: Jika ada parameter ?id=
-// =========================================================================
 if ($order_id > 0) {
-    // Ambil data orders — pastikan hanya milik session pasien ini
     $order = null;
     $stmtOrder = $conn->prepare("SELECT id, order_number, grand_total, payment_status, status, created_at, cancel_reason FROM orders WHERE id = ? AND patient_session_id = ? LIMIT 1");
     if ($stmtOrder) {
@@ -43,7 +33,6 @@ if ($order_id > 0) {
         $order = $resOrder ? $resOrder->fetch_assoc() : null;
     }
 
-    // Jika order tidak ditemukan atau bukan milik session ini, tampilkan pesan error
     if (!$order) {
         ?>
         <!DOCTYPE html>
@@ -80,7 +69,6 @@ if ($order_id > 0) {
         exit;
     }
 
-    // Ambil data order_items
     $items = [];
     $stmtItems = $conn->prepare("SELECT product_id, qty, price, notes FROM order_items WHERE order_id = ? ORDER BY id ASC");
     if ($stmtItems) {
@@ -111,7 +99,6 @@ if ($order_id > 0) {
         }
     }
 
-    // Ambil data payments
     $payment = null;
     $stmtPay = $conn->prepare("SELECT id, payment_method_id, amount, transaction_number, status, paid_at FROM payments WHERE order_id = ? LIMIT 1");
     if ($stmtPay) {
@@ -121,9 +108,6 @@ if ($order_id > 0) {
         $payment = $resPay ? $resPay->fetch_assoc() : null;
     }
 
-    // =========================================================================
-    // AMBIL STATUS PENGIRIMAN TERBARU DARI TABEL deliveries (source of truth)
-    // =========================================================================
     $deliveryStatus = null;
     $deliveryTime = null;
     $stmtDel = $conn->prepare("SELECT status, delivery_time FROM deliveries WHERE order_id = ? ORDER BY id DESC LIMIT 1");
@@ -139,7 +123,6 @@ if ($order_id > 0) {
         $stmtDel->close();
     }
 
-    // Ambil nama metode pembayaran
     $payment_method_name = '-';
     if ($payment && intval($payment['payment_method_id'] ?? 0) > 0) {
         $pmid = intval($payment['payment_method_id']);
@@ -165,9 +148,6 @@ if ($order_id > 0) {
         $totalQty += intval($it['qty'] ?? 0);
     }
 
-    // =========================================================================
-    // PROSES BATALKAN PESANAN (hanya jika status masih PENDING)
-    // =========================================================================
     $cancelSuccess = isset($_GET['cancelled']) && $_GET['cancelled'] === '1';
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_order']) && $_POST['cancel_order'] === '1') {
@@ -179,7 +159,6 @@ if ($order_id > 0) {
             $canCancel = true;
         }
 
-        // Ambil alasan pembatalan dari form
         $alasanCancel = isset($_POST['alasan_cancel']) ? trim($_POST['alasan_cancel']) : '';
 
         if ($canCancel && $alasanCancel !== '') {
@@ -187,8 +166,6 @@ if ($order_id > 0) {
             if ($stmtCancel) {
                 $stmtCancel->bind_param('sii', $alasanCancel, $order_id, $patient_session_id);
                 $stmtCancel->execute();
-
-                // INSERT ke tabel order_status_histories untuk mencatat log pembatalan
                 $stmtHist = $conn->prepare("INSERT INTO order_status_histories (order_id, status, changed_by, notes, created_at) VALUES (?, 'cancelled', 'Customer', ?, NOW())");
                 if ($stmtHist) {
                     $stmtHist->bind_param('is', $order_id, $alasanCancel);
@@ -197,19 +174,15 @@ if ($order_id > 0) {
                 }
 
                 $stmtCancel->close();
-
-                // Redirect (PRG) untuk mencegah resubmission form
                 header("Location: riwayat_pesanan.php?id=" . $order_id . "&cancelled=1&reason=" . urlencode($alasanCancel));
                 exit;
             }
         } else {
-            // Jika tidak bisa dibatalkan atau alasan kosong, redirect tanpa parameter sukses
             header("Location: riwayat_pesanan.php?id=" . $order_id . "&error=cannot_cancel");
             exit;
         }
     }
 
-    // Tampilkan badge status
     function statusBadge($status, $type = 'payment') {
         $status = strtoupper($status);
         if ($status === 'PAID' || $status === 'COMPLETED' || $status === 'DELIVERED') {
@@ -222,6 +195,24 @@ if ($order_id > 0) {
             return 'bg-danger bg-opacity-25 text-danger border-danger border-opacity-50';
         }
         return 'bg-secondary bg-opacity-25 text-secondary border-secondary border-opacity-50';
+    }
+
+    /**
+     * Returns Bootstrap badge classes for order statuses (orders.status).
+     */
+    function orderStatusBadge($status) {
+        $st = strtolower(trim((string)$status));
+        $map = [
+            'pending'   => 'bg-warning bg-opacity-25 text-warning border-warning border-opacity-50',
+            'accepted'  => 'bg-primary bg-opacity-25 text-primary border-primary border-opacity-50',
+            'preparing' => 'bg-info bg-opacity-25 text-info border-info border-opacity-50',
+            'ready'     => 'bg-success bg-opacity-25 text-success border-success border-opacity-50',
+            'picked_up' => 'bg-success bg-opacity-25 text-success border-success border-opacity-50',
+            'delivering'=> 'bg-primary bg-opacity-25 text-primary border-primary border-opacity-50',
+            'completed' => 'bg-success bg-opacity-25 text-success border-success border-opacity-50',
+            'cancelled' => 'bg-danger bg-opacity-25 text-danger border-danger border-opacity-50',
+        ];
+        return $map[$st] ?? 'bg-secondary bg-opacity-25 text-secondary border-secondary border-opacity-50';
     }
 
     /**
@@ -333,6 +324,10 @@ if ($order_id > 0) {
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-white-50 small">Status Pembayaran</span>
                         <span class="badge <?php echo statusBadge($paymentStatus); ?> px-3 py-1 rounded-pill"><?php echo h($paymentStatus); ?></span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-white-50 small">Status Pesanan</span>
+                        <span class="badge <?php echo orderStatusBadge($orderStatus); ?> px-3 py-1 rounded-pill"><?php echo ucfirst(strtolower($orderStatus)); ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-white-50 small">Status Pengiriman</span>
@@ -581,6 +576,7 @@ if ($stmtOrders) {
                     $ordDate = date('d M Y H:i', strtotime($ord['created_at'] ?? 'now'));
                     $payStatus = $ord['payment_status'] ?? 'unpaid';
                     $deliveryStatus = $ord['delivery_status'] ?? null;
+                    $orderStatus = $ord['status'] ?? 'pending';
 
                     // Tentukan badge status pembayaran
                     $payBadgeClass = 'bg-warning bg-opacity-25 text-warning border-warning border-opacity-50';
@@ -592,6 +588,22 @@ if ($stmtOrders) {
                     } elseif (in_array(strtoupper($payStatus), ['FAILED', 'REFUND'])) {
                         $payBadgeClass = 'bg-danger bg-opacity-25 text-danger border-danger border-opacity-50';
                     }
+
+                    // Tentukan badge status pesanan dari orders.status
+                    $orderStatusBadgeClass = 'bg-secondary bg-opacity-25 text-secondary border-secondary border-opacity-50';
+                    $orderStatusText = ucfirst(strtolower($orderStatus));
+                    $orderSt = strtolower(trim((string)$orderStatus));
+                    $orderBadgeMap = [
+                        'pending'   => 'bg-warning bg-opacity-25 text-warning border-warning border-opacity-50',
+                        'accepted'  => 'bg-primary bg-opacity-25 text-primary border-primary border-opacity-50',
+                        'preparing' => 'bg-info bg-opacity-25 text-info border-info border-opacity-50',
+                        'ready'     => 'bg-success bg-opacity-25 text-success border-success border-opacity-50',
+                        'picked_up' => 'bg-success bg-opacity-25 text-success border-success border-opacity-50',
+                        'delivering'=> 'bg-primary bg-opacity-25 text-primary border-primary border-opacity-50',
+                        'completed' => 'bg-success bg-opacity-25 text-success border-success border-opacity-50',
+                        'cancelled' => 'bg-danger bg-opacity-25 text-danger border-danger border-opacity-50',
+                    ];
+                    $orderStatusBadgeClass = $orderBadgeMap[$orderSt] ?? 'bg-secondary bg-opacity-25 text-secondary border-secondary border-opacity-50';
 
                     // Tentukan badge status pengiriman dari tabel deliveries (source of truth)
                     $deliveryBadgeClass = 'bg-secondary bg-opacity-25 text-secondary border-secondary border-opacity-50';
@@ -626,6 +638,9 @@ if ($stmtOrders) {
                                         <div class="d-flex flex-wrap gap-1">
                                             <span class="badge <?php echo $payBadgeClass; ?> px-2 py-1 rounded-pill" style="font-size:0.7rem;">
                                                 Pembayaran: <?php echo $payBadgeText; ?>
+                                            </span>
+                                            <span class="badge <?php echo $orderStatusBadgeClass; ?> px-2 py-1 rounded-pill" style="font-size:0.7rem;">
+                                                Pesanan: <?php echo $orderStatusText; ?>
                                             </span>
                                             <span class="badge <?php echo $deliveryBadgeClass; ?> px-2 py-1 rounded-pill" style="font-size:0.7rem;">
                                                 Pengiriman: <?php echo $deliveryBadgeText; ?>

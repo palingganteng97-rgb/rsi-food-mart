@@ -41,9 +41,25 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($stmt->execute()) {
             error_log("[Deliveries] INSERT success: delivery created for order_id $order_id");
-            // Patient notification is NOT sent on initial creation.
-            // Patient will see the initial 'Pending' status in their order history.
-            // Notifications are triggered only when the delivery status changes (see action=update).
+            // NOTIFIKASI PASIEN: Beri tahu pasien bahwa kurir telah ditugaskan
+            $orderStmt = $conn->prepare("SELECT order_number, patient_session_id FROM orders WHERE id = ? LIMIT 1");
+            if ($orderStmt) {
+                $orderStmt->bind_param("i", $order_id);
+                $orderStmt->execute();
+                $orderRes = $orderStmt->get_result();
+                if ($orderData = $orderRes->fetch_assoc()) {
+                    $orderNumberFull = $orderData['order_number'] ?? ('ID ' . $order_id);
+                    $patientSessionId = (int)($orderData['patient_session_id'] ?? 0);
+                    if ($patientSessionId > 0) {
+                        $notifTitle = 'Kurir Ditugaskan';
+                        $notifMessage = "Kurir telah ditugaskan untuk pesanan {$orderNumberFull} dan pengiriman sedang diproses.";
+                        $notifLink = 'riwayat_pesanan.php?id=' . $order_id;
+                        createNotification('patient', $patientSessionId, $notifTitle, $notifMessage, $notifLink);
+                        error_log("[DELIVERIES NOTIFICATION] CREATE: order_id=$order_id, patient_session_id=$patientSessionId");
+                    }
+                }
+                $orderStmt->close();
+            }
 
             $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Data pengiriman berhasil ditambahkan!'];
             header("Location: deliveries.php");
