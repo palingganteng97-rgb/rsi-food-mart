@@ -13,9 +13,10 @@ parse_str(parse_url($currentUri, PHP_URL_QUERY) ?? '', $queryParams);
 $currentTenantId = $queryParams['tenant_id'] ?? '';
 
 $menu = [
-    'home.php' => ['href' => 'home.php', 'label' => 'Etalase', 'icon' => 'bi-shop'],
-    'riwayat_pesanan.php' => ['href' => 'riwayat_pesanan.php', 'label' => 'Riwayat Pesanan', 'icon' => 'bi-credit-card-2-front'],
-    'refund_patients.php' => ['href' => 'refund_patients.php', 'label' => 'Refund', 'icon' => 'bi-arrow-return-left'],
+    'home.php' => ['href' => 'home.php', 'label' => 'Etalase', 'icon' => 'bi-shop', 'badge' => null],
+    'riwayat_pesanan.php' => ['href' => 'riwayat_pesanan.php', 'label' => 'Riwayat Pesanan', 'icon' => 'bi-credit-card-2-front', 'badge' => null],
+    'refund_patients.php' => ['href' => 'refund_patients.php', 'label' => 'Refund', 'icon' => 'bi-arrow-return-left', 'badge' => null],
+    'notifications.php' => ['href' => 'notifications.php', 'label' => 'Notifikasi', 'icon' => 'bi-bell', 'badge' => (($unreadCount ?? 0) > 0) ? $unreadCount : null]
 ];
 
   // =========================================================================

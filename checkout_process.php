@@ -1,5 +1,6 @@
 <?php
 include 'db.php';
+include 'notification_helper.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -45,7 +46,13 @@ if (empty($cart_items)) {
     if ($failsafe_result && mysqli_num_rows($failsafe_result) > 0) {
         $cart_items = mysqli_fetch_all($failsafe_result, MYSQLI_ASSOC);
         $patient_session_id = intval($cart_items[0]['patient_session_id']);
-        $_SESSION['patient_session_id'] = $patient_session_id;
+        // Only overwrite session if patient doesn't already have one
+        if (!isset($_SESSION['patient_session_id']) || $_SESSION['patient_session_id'] <= 0) {
+            $_SESSION['patient_session_id'] = $patient_session_id;
+        } else {
+            // Preserve existing session ID - use it instead
+            $patient_session_id = (int)$_SESSION['patient_session_id'];
+        }
     }
 }
 if (empty($cart_items)) {
@@ -181,6 +188,14 @@ try {
     }
     
     mysqli_commit($conn);
+    
+    // NOTIFIKASI: Beri tahu pasien bahwa pesanan berhasil dibuat
+    // Dilakukan setelah COMMIT untuk memastikan data order sudah tersimpan
+    $notifTitle = 'Pesanan Berhasil Dibuat';
+    $notifMessage = "Pesanan Anda dengan nomor {$order_number} berhasil dibuat dan sedang menunggu diproses.";
+    $notifLink = 'riwayat_pesanan.php?id=' . $new_order_id;
+    $notifResult = createNotification('patient', $patient_session_id, $notifTitle, $notifMessage, $notifLink);
+    error_log("[CHECKOUT NOTIFICATION] order_id=$new_order_id, patient_session_id=$patient_session_id, result=" . ($notifResult !== false ? $notifResult : 'FAILED'));
     
     // Redirect ke riwayat_pesanan.php dengan order_id untuk melihat detail pesanan
     header("Location: riwayat_pesanan.php?id=" . $new_order_id);

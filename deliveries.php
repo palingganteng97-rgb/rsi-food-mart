@@ -16,6 +16,12 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $delivery_time = !empty($_POST['delivery_time']) ? $_POST['delivery_time'] : null;
     $proof_photo   = trim($_POST['proof_photo'] ?? '');
 
+    if ($order_id <= 0 || $courier_id <= 0) {
+        $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Order dan Kurir harus dipilih!'];
+        header("Location: deliveries.php");
+        exit();
+    }
+
     if ($order_id > 0 && $courier_id > 0) {
         // CEK DUPLIKAT: Pastikan order_id belum memiliki data delivery
         $checkStmt = $conn->prepare("SELECT id FROM deliveries WHERE order_id = ? LIMIT 1");
@@ -24,7 +30,8 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $checkResult = $checkStmt->get_result();
         if ($checkResult && $checkResult->num_rows > 0) {
             error_log("[Deliveries] DUPLICATE BLOCKED: order_id $order_id already has a delivery record");
-            header("Location: deliveries.php?status=error&msg=" . urlencode("Pengiriman untuk pesanan ini sudah tersedia."));
+            $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Pengiriman untuk pesanan ini sudah tersedia.'];
+            header("Location: deliveries.php");
             exit();
         }
         $checkStmt->close();
@@ -38,9 +45,11 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             // Patient will see the initial 'Pending' status in their order history.
             // Notifications are triggered only when the delivery status changes (see action=update).
 
-            header("Location: deliveries.php?status=success_create");
+            $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Data pengiriman berhasil ditambahkan!'];
+            header("Location: deliveries.php");
         } else {
-            header("Location: deliveries.php?status=error&msg=" . urlencode($stmt->error));
+            $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Operasi gagal: ' . $stmt->error];
+            header("Location: deliveries.php");
         }
         exit();
     }
@@ -140,9 +149,11 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 error_log("[DELIVERY NOTIFICATION SKIP] Status unchanged or no order_id. changed=" . (strcasecmp($oldStatus, $status) !== 0 ? 'yes' : 'no') . ", oldOrderId=$oldOrderId");
             }
 
-            header("Location: deliveries.php?status=success_update");
+            $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Data pengiriman berhasil diperbarui!'];
+            header("Location: deliveries.php");
         } else {
-            header("Location: deliveries.php?status=error&msg=" . urlencode($stmt->error));
+            $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Operasi gagal: ' . $stmt->error];
+            header("Location: deliveries.php");
         }
         exit();
     }
@@ -157,9 +168,11 @@ if ($action === 'delete' && isset($_GET['id'])) {
         
         if ($stmt->execute()) {
             // No notification sent on delete - delivery status changes only notify patients on update.
-            header("Location: deliveries.php?status=success_delete");
+            $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Data pengiriman berhasil dihapus!'];
+            header("Location: deliveries.php");
         } else {
-            header("Location: deliveries.php?status=error&msg=" . urlencode($stmt->error));
+            $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Operasi gagal: ' . $stmt->error];
+            header("Location: deliveries.php");
         }
         exit();
     }
@@ -178,8 +191,12 @@ if ($result) {
     }
 }
 
-$status = isset($_GET['status']) ? (string)$_GET['status'] : '';
-$msg = isset($_GET['msg']) ? (string)$_GET['msg'] : '';
+// ===== SESSION FLASH MESSAGE =====
+$flash_message = null;
+if (isset($_SESSION['flash_message'])) {
+    $flash_message = $_SESSION['flash_message'];
+    unset($_SESSION['flash_message']);
+}
 
 $orders = [];
 $orderRes = $conn->query("SELECT id, order_number FROM orders ORDER BY id DESC");
@@ -244,16 +261,10 @@ if ($courierRes) {
         </div>
         </div>
 
-        <?php if (!empty($status)): ?>
-        <div class="alert <?= strpos($status, 'success') !== false ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4 rounded-3 border-0" role="alert" style="background:<?= strpos($status, 'success') !== false ? 'rgba(34,197,94,.15)' : 'rgba(239,68,68,.15)'; ?>; color:#e5e7eb;">
-            <i class="bi <?= strpos($status, 'success') !== false ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'; ?> me-2"></i>
-            <?php 
-                if ($status === 'success_create') echo "Data pengiriman berhasil ditambahkan!";
-                elseif ($status === 'success_update') echo "Data pengiriman berhasil diperbarui!";
-                elseif ($status === 'success_delete') echo "Data pengiriman berhasil dihapus!";
-                elseif ($status === 'error') echo "Operasi gagal: " . htmlspecialchars($msg);
-                else echo "Operasi: " . htmlspecialchars($status);
-            ?>
+        <?php if ($flash_message !== null): ?>
+        <div class="alert <?= $flash_message['type'] === 'success' ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show mb-4 rounded-3 border-0" role="alert" style="background:<?= $flash_message['type'] === 'success' ? 'rgba(34,197,94,.15)' : 'rgba(239,68,68,.15)'; ?>; color:#e5e7eb;">
+            <i class="bi <?= $flash_message['type'] === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'; ?> me-2"></i>
+            <?= htmlspecialchars($flash_message['text']) ?>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
         <?php endif; ?>

@@ -60,7 +60,7 @@ if (!function_exists('createNotification')) {
             return false;
         }
         
-        $stmt->bind_param("siiss", $userType, $userReference, $title, $message, $link);
+$stmt->bind_param("sisss", $userType, $userReference, $title, $message, $link);
         
         if ($stmt->execute()) {
             $insertId = (int)$stmt->insert_id;

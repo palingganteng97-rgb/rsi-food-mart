@@ -1,21 +1,5 @@
 <?php
-/**
- * get_notifications.php
- * 
- * AJAX endpoint that returns JSON notifications for the current logged-in user.
- * 
- * GET Parameters:
- *   - since_id (int, optional): Only return notifications with ID > since_id (for polling)
- *   - type (string, optional): 'admin' or 'patient' - auto-detected from session if not provided
- * 
- * Returns JSON:
- * {
- *   "success": true,
- *   "notifications": [...],
- *   "unread_count": 5,
- *   "total_unread": 10
- * }
- */
+// get_notifications.php
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-cache, must-revalidate');
@@ -40,6 +24,10 @@ elseif (isset($_SESSION['patient_session_id']) && !empty($_SESSION['patient_sess
     $userType = 'patient';
     $userReference = (int)$_SESSION['patient_session_id'];
 }
+
+// DEBUG: Log session info
+error_log("[NOTIF_DEBUG] get_notifications.php called. Session: user_id=" . ($_SESSION['user_id'] ?? 'not set') . ", patient_session_id=" . ($_SESSION['patient_session_id'] ?? 'not set'));
+error_log("[NOTIF_DEBUG] Detected: userType=$userType, userReference=$userReference");
 
 // Allow override via GET parameter
 if (isset($_GET['type']) && in_array($_GET['type'], ['admin', 'patient'])) {

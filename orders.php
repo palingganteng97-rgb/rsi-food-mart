@@ -52,6 +52,17 @@ if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST' && isse
     $newStatus = trim((string)$_POST['status']);
     $ok = ($orderId > 0 && in_array($newStatus, $allowedOrderStatuses, true));
     if ($ok) {
+        // Ambil status lama dan data pasien SEBELUM UPDATE untuk deteksi perubahan
+        $oldStmt = $conn->prepare("SELECT status, patient_session_id, order_number FROM orders WHERE id = ? LIMIT 1");
+        $oldStmt->bind_param("i", $orderId);
+        $oldStmt->execute();
+        $oldRes = $oldStmt->get_result();
+        $oldData = $oldRes->fetch_assoc();
+        $oldStatus = $oldData['status'] ?? '';
+        $oldPatientId = (int)($oldData['patient_session_id'] ?? 0);
+        $oldOrderNumber = $oldData['order_number'] ?? ('#' . $orderId);
+        $oldStmt->close();
+
         $stmt = $conn->prepare('UPDATE orders SET status = ? WHERE id = ?');
         $stmt->bind_param('si', $newStatus, $orderId);
         $stmt->execute();
@@ -60,6 +71,18 @@ if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST' && isse
         $stmt_log = $conn->prepare('INSERT INTO order_status_histories (order_id, status, changed_by, notes, created_at) VALUES (?, ?, ?, ?, NOW())');
         $stmt_log->bind_param('isis', $orderId, $newStatus, $user_id, $log_notes);
         $stmt_log->execute();
+
+        // NOTIFIKASI PASIEN: Kirim hanya jika status benar-benar berubah
+        if ($oldStatus !== $newStatus && $oldPatientId > 0) {
+            include_once 'notification_helper.php';
+            $notifTitle = 'Status Pesanan Diperbarui';
+            $notifMessage = "Pesanan Anda dengan nomor {$oldOrderNumber} sekarang berstatus \"" . ucfirst($newStatus) . "\".";
+            $notifLink = 'riwayat_pesanan.php?id=' . $orderId;
+            $notifResult = createNotification('patient', $oldPatientId, $notifTitle, $notifMessage, $notifLink);
+            error_log("[ORDERS NOTIFICATION] order_id=$orderId, patient_session_id=$oldPatientId, old=$oldStatus, new=$newStatus, result=" . ($notifResult !== false ? $notifResult : 'FAILED'));
+        } else {
+            error_log("[ORDERS NOTIFICATION SKIP] order_id=$orderId, old=$oldStatus, new=$newStatus, patient_id=$oldPatientId, changed=" . ($oldStatus !== $newStatus ? 'yes' : 'no'));
+        }
     }
     header('Location: orders.php' . $writeBackParams());
     exit;
