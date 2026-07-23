@@ -25,10 +25,6 @@ elseif (isset($_SESSION['patient_session_id']) && !empty($_SESSION['patient_sess
     $userReference = (int)$_SESSION['patient_session_id'];
 }
 
-// DEBUG: Log session info
-error_log("[NOTIF_DEBUG] get_notifications.php called. Session: user_id=" . ($_SESSION['user_id'] ?? 'not set') . ", patient_session_id=" . ($_SESSION['patient_session_id'] ?? 'not set'));
-error_log("[NOTIF_DEBUG] Detected: userType=$userType, userReference=$userReference");
-
 // Allow override via GET parameter
 if (isset($_GET['type']) && in_array($_GET['type'], ['admin', 'patient'])) {
     $userType = $_GET['type'];

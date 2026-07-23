@@ -113,11 +113,6 @@ if ($fetchQuery) {
             <div>
         <div class="fw-bold fs-5">Etalase Menu</div>
                 <div class="text-white-50" style="font-size:.9rem;">Halo, <?php echo htmlspecialchars($userName); ?></div>
-                <!-- DEBUG: Session patient_session_id -->
-                <div style="font-size:0.7rem; color:#94a3b8; background:rgba(34,197,94,0.08); padding:2px 6px; border-radius:4px; margin-top:2px;">
-                    🔍 Debug: patient_session_id = <strong><?php echo $patient_session_id ?: 'TIDAK ADA'; ?></strong> | 
-                    unread = <strong><?php echo $unreadCount; ?></strong>
-                </div>
             </div>
             <div class="d-none d-md-flex gap-2 align-items-center">
                 <span class="text-white-50">Diet hari ini:</span>

@@ -543,12 +543,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const btn = document.getElementById('btnSubmitDelivery');
             if (btn.disabled) {
                 e.preventDefault();
-                console.log('[Deliveries] Double submit prevented');
                 return false;
             }
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Memproses...';
-            console.log('[Deliveries] Form submitted, button disabled');
         });
     }
 });
