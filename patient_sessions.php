@@ -44,6 +44,35 @@ if (isset($_POST['submit'])) {
         $_SESSION['login_at']                = $login_at;
         $_SESSION['expired_at']              = $expired_at;
 
+        // === INSERT SYNC LOG ===
+        // Catat setiap pembuatan patient_sessions ke tabel patient_sync_logs
+        $requestPayload = json_encode([
+            'medical_record_number' => $medical_record_number,
+            'patient_name'          => $patient_name,
+            'phone'                 => $phone,
+            'room'                  => $room,
+            'bed'                   => $bed,
+            'class'                 => $class,
+            'doctor'                => $doctor,
+            'login_at'              => $login_at,
+            'expired_at'            => $expired_at
+        ]);
+        $responsePayload = json_encode([
+            'status'    => 'SUCCESS',
+            'session_id'=> $patient_session_id,
+            'message'   => 'Patient session created successfully'
+        ]);
+        $syncStatus  = 'SUCCESS';
+        $mrForLog    = mysqli_real_escape_string($conn, $medical_record_number);
+        $reqEsc      = mysqli_real_escape_string($conn, $requestPayload);
+        $resEsc      = mysqli_real_escape_string($conn, $responsePayload);
+
+        $logSql = "INSERT INTO patient_sync_logs (medical_record_number, request_payload, response_payload, sync_status, created_at) 
+                   VALUES ('$mrForLog', '$reqEsc', '$resEsc', '$syncStatus', NOW())";
+        if (!mysqli_query($conn, $logSql)) {
+            error_log("[PATIENT_SYNC_LOG ERROR] Gagal insert log untuk session_id=$patient_session_id: " . mysqli_error($conn));
+        }
+
         // Dialihkan dengan aman ke etalase menu tanpa hambatan
         header("Location: home.php");
         exit;

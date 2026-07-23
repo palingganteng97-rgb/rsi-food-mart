@@ -82,6 +82,29 @@ if ($patient_session_id <= 0 || !$check_ps || mysqli_num_rows($check_ps) === 0) 
         $main_cart_id = intval($cart_items[0]['main_cart_id']);
         mysqli_query($conn, "UPDATE carts SET patient_session_id = $patient_session_id WHERE id = $main_cart_id");
     }
+
+    // === INSERT SYNC LOG ===
+    // Catat pembuatan patient_sessions fallback (dari checkout) ke patient_sync_logs
+    $requestPayload = json_encode([
+        'source'       => 'checkout_fallback',
+        'cart_items'   => !empty($cart_items) ? count($cart_items) . ' items' : 'empty',
+        'main_cart_id' => $main_cart_id ?? 0
+    ]);
+    $responsePayload = json_encode([
+        'status'    => 'SUCCESS',
+        'session_id'=> $patient_session_id,
+        'message'   => 'Patient session created via checkout fallback'
+    ]);
+    $mrForLog   = 'UNKNOWN';
+    $reqEsc     = mysqli_real_escape_string($conn, $requestPayload);
+    $resEsc     = mysqli_real_escape_string($conn, $responsePayload);
+    $syncStatus = 'SUCCESS';
+
+    $logSql = "INSERT INTO patient_sync_logs (medical_record_number, request_payload, response_payload, sync_status, created_at) 
+               VALUES ('$mrForLog', '$reqEsc', '$resEsc', '$syncStatus', NOW())";
+    if (!mysqli_query($conn, $logSql)) {
+        error_log("[PATIENT_SYNC_LOG ERROR] Gagal insert log checkout fallback session_id=$patient_session_id: " . mysqli_error($conn));
+    }
 }
 if (empty($cart_items)) {
     header("Location: carts.php?status=error&msg=" . urlencode("Keranjang belanja kosong. Silakan scan ulang QR Code Ruangan."));
