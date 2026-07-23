@@ -3,7 +3,6 @@ require_once __DIR__ . '/db.php';
 
 // db.php: diharapkan menyediakan $conn (mysqli)
 if (!($conn instanceof mysqli)) {
-    // fallback: jika db.php memakai variabel lain
     if (isset($mysqli) && $mysqli instanceof mysqli) {
         $conn = $mysqli;
     }
@@ -27,9 +26,7 @@ function getPatientUrl($roomName) {
     return $base_url . '/patient_sessions.php?room=' . urlencode($roomName);
 }
 
-
 function ensureQrFile($qrUrl, $filePath) {
-    // QR via layanan online (tanpa library phpqrcode)
     if (file_exists($filePath)) return;
 
     $dir = dirname($filePath);
@@ -37,7 +34,7 @@ function ensureQrFile($qrUrl, $filePath) {
         @mkdir($dir, 0775, true);
     }
 
-    $size = 500; // generate kualitas tinggi
+    $size = 500; 
     $apiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=' . $size . 'x' . $size . '&data=' . urlencode($qrUrl);
     $pngData = @file_get_contents($apiUrl);
     if ($pngData !== false) {
@@ -51,8 +48,6 @@ if (!is_dir($uploadDir)) {
 }
 
 $qrBaseDirPublic = 'uploads/qrcode/';
-
-// Actions
 $action = $_GET['action'] ?? '';
 
 function json_redirect($url) {
@@ -64,21 +59,20 @@ function set_flash($key, $value) {
     $_SESSION[$key] = $value;
 }
 
-// session_start sudah ada di db.php
-
-// Tambah / Edit / Hapus
+// =========================================================================
+// OPRASI POST (ADD, EDIT, DELETE)
+// =========================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $op = $_POST['op'] ?? '';
 
     if ($op === 'add') {
         $room_name = trim((string)($_POST['room_name'] ?? ''));
         if ($room_name !== '') {
-            $sql = "INSERT INTO master_barcode (room_name, created_at, updated_at) VALUES (?, NOW(), NOW())";
+            $sql = "INSERT INTO master_barcode (room_name) VALUES (?)";
             $stmt = $conn->prepare($sql);
             if ($stmt) {
                 $stmt->bind_param('s', $room_name);
                 if ($stmt->execute()) {
-                    // QR otomatis tersedia
                     $id = $stmt->insert_id;
                     $qrUrl = getPatientUrl($room_name);
                     $fileName = sanitizeFileName($room_name) . '_' . $id . '.png';
@@ -128,7 +122,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($op === 'delete') {
         $id = (int)($_POST['id'] ?? 0);
         if ($id > 0) {
-            // Ambil nama ruangan untuk penghapusan file bila ada
             $room_name = '';
             $sel = $conn->prepare("SELECT room_name FROM master_barcode WHERE id = ?");
             if ($sel) {
@@ -145,7 +138,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($del) {
                 $del->bind_param('i', $id);
                 if ($del->execute()) {
-                    // Hapus file QR terkait (best-effort)
                     if ($room_name !== '') {
                         $fileName = sanitizeFileName($room_name) . '_' . $id . '.png';
                         $filePath = $uploadDir . $fileName;
@@ -164,8 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Read all
-// Jika tabel belum ada, buat otomatis via SQL migration
+// Migration database check
 $createTableSql = "CREATE TABLE IF NOT EXISTS master_barcode (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     room_name VARCHAR(100) NOT NULL,
@@ -174,10 +165,28 @@ $createTableSql = "CREATE TABLE IF NOT EXISTS master_barcode (
 )";
 $conn->query($createTableSql);
 
+// =========================================================================
+// LOGIKA AMBIL DATA + FILTER PENCARIAN + URUTAN ID ASC (ID 1)
+// =========================================================================
+$search = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
+
 $rows = [];
-$sql = "SELECT id, room_name, created_at, updated_at FROM master_barcode ORDER BY id DESC";
+$sql = "SELECT id, room_name, created_at, updated_at FROM master_barcode";
+
+// Jika user menginputkan kata kunci pencarian
+if ($search !== '') {
+    $sql .= " WHERE room_name LIKE ?";
+}
+
+// MENGUBAH URUTAN MENJADI ASC AGAR DIMULAI DARI ID 1
+$sql .= " ORDER BY id ASC";
+
 $stmt = $conn->prepare($sql);
 if ($stmt) {
+    if ($search !== '') {
+        $searchParam = '%' . $search . '%';
+        $stmt->bind_param('s', $searchParam);
+    }
     $stmt->execute();
     $res = $stmt->get_result();
     if ($res) {
@@ -188,12 +197,10 @@ if ($stmt) {
     $stmt->close();
 }
 
-// Flash
 $success = $_SESSION['success'] ?? '';
 $error = $_SESSION['error'] ?? '';
 unset($_SESSION['success'], $_SESSION['error']);
 
-// Fetch current data for edit modal (optional)
 $editId = isset($_GET['edit_id']) ? (int)$_GET['edit_id'] : 0;
 $editRoomName = '';
 if ($editId > 0) {
@@ -208,8 +215,8 @@ if ($editId > 0) {
         $sel->close();
     }
 }
-
 ?>
+
 <!doctype html>
 <html lang="id">
 <head>
@@ -264,80 +271,83 @@ if ($editId > 0) {
     <?php endif; ?>
 
     <div id="tableDragContainer" class="table-drag-container table-responsive" aria-label="Daftar Barcode" >
-<table class="table table-hover align-middle mb-0" id="barcodeTable" style="--bs-table-bg: transparent; --bs-table-hover-bg: rgba(255,255,255,0.03); border-collapse: collapse;">
-  <thead>
-    <tr class="text-white-50" style="border-bottom: 2px solid rgba(148,163,184,0.2);">
-      <th style="width: 60px; background: transparent; color: rgba(255,255,255,0.5); white-space: nowrap; border-right: 1px solid rgba(148,163,184,0.15); padding: 12px;">No</th>
-      <th style="width: 180px; background: transparent; color: rgba(255,255,255,0.5); white-space: nowrap; border-right: 1px solid rgba(148,163,184,0.15); padding: 12px;">Nama Ruangan</th>
-      <th style="width: 150px; background: transparent; color: rgba(255,255,255,0.5); white-space: nowrap; border-right: 1px solid rgba(148,163,184,0.15); padding: 12px;">Preview QR</th>
-      <th style="background: transparent; color: rgba(255,255,255,0.5); white-space: nowrap; border-right: 1px solid rgba(148,163,184,0.15); padding: 12px;">URL</th>
-      <th style="width: 120px; background: transparent; color: rgba(255,255,255,0.5); white-space: nowrap; border-right: 1px solid rgba(148,163,184,0.15); padding: 12px;">Print</th>
-      <th style="width: 140px; background: transparent; color: rgba(255,255,255,0.5); white-space: nowrap; border-right: 1px solid rgba(148,163,184,0.15); padding: 12px;">Download</th>
-      <th style="width: 150px; background: transparent; color: rgba(255,255,255,0.5); white-space: nowrap; padding: 12px;">Aksi</th>
-    </tr>
-  </thead>
-  <tbody>
-    <?php if (empty($rows)): ?>
-      <tr>
-        <td colspan="7" class="text-center text-white-50 py-5" style="background: transparent;">Belum ada data.</td>
+  <table class="table table-hover align-middle mb-0" id="barcodeTable" style="--bs-table-bg: transparent; --bs-table-hover-bg: rgba(255,255,255,0.03); border-collapse: collapse;">
+    <thead>
+      <tr class="text-white-50" style="border-bottom: 2px solid rgba(148,163,184,0.2);">
+        <th style="width: 80px; background: transparent; color: rgba(255,255,255,0.5); white-space: nowrap; border-right: 1px solid rgba(148,163,184,0.15); padding: 12px;" class="text-center">ID</th>
+        <th style="width: 200px; background: transparent; color: rgba(255,255,255,0.5); white-space: nowrap; border-right: 1px solid rgba(148,163,184,0.15); padding: 12px;">Nama Ruangan</th>
+        <th style="width: 160px; background: transparent; color: rgba(255,255,255,0.5); white-space: nowrap; border-right: 1px solid rgba(148,163,184,0.15); padding: 12px;" class="text-center">Preview QR</th>
+        <th style="background: transparent; color: rgba(255,255,255,0.5); white-space: nowrap; border-right: 1px solid rgba(148,163,184,0.15); padding: 12px;">URL</th>
+        <th style="width: 100px; background: transparent; color: rgba(255,255,255,0.5); white-space: nowrap; border-right: 1px solid rgba(148,163,184,0.15); padding: 12px;" class="text-center">Print</th>
+        <th style="width: 130px; background: transparent; color: rgba(255,255,255,0.5); white-space: nowrap; border-right: 1px solid rgba(148,163,184,0.15); padding: 12px;" class="text-center">Download</th>
+        <th style="width: 120px; background: transparent; color: rgba(255,255,255,0.5); white-space: nowrap; padding: 12px;" class="text-center">Aksi</th>
       </tr>
-    <?php else: ?>
-      <?php foreach ($rows as $i => $row):
-        $id = (int)$row['id'];
-        $room_name = $row['room_name'];
-        $qrUrl = getPatientUrl($room_name);
-        $fileName = sanitizeFileName($room_name) . '_' . $id . '.png';
-        $filePath = $uploadDir . $fileName;
-        if (!file_exists($filePath)) {
-            ensureQrFile($qrUrl, $filePath);
-        }
-        $publicQr = $qrBaseDirPublic . $fileName;
-      ?>
-        <tr style="border-bottom: 1px solid rgba(148,163,184,0.12);">
-          <td class="fw-semibold text-white" style="background: transparent; border-right: 1px solid rgba(148,163,184,0.12); padding: 12px;">#<?= $i + 1 ?></td>
-          <td class="fw-semibold text-white" style="background: transparent; border-right: 1px solid rgba(148,163,184,0.12); padding: 12px; max-width: 180px; word-break: break-word; white-space: normal;"><?= h($room_name) ?></td>
-          <td style="background: transparent; border-right: 1px solid rgba(148,163,184,0.12); padding: 12px;">
-            <img class="qr-preview" src="<?= h($publicQr) ?>" alt="QR <?= h($room_name) ?>">
-          </td>
-          <td style="background: transparent; border-right: 1px solid rgba(148,163,184,0.12); padding: 12px;">
-            <div class="mono small text-white-50" style="max-width: 220px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;" title="<?= h($qrUrl) ?>">
-              <?= h($qrUrl) ?>
-            </div>
-          </td>
-          <td style="background: transparent; border-right: 1px solid rgba(148,163,184,0.12); padding: 12px;">
-            <button type="button" class="btn btn-sm btn-outline-light" onclick="window.open('print_qr_room.php?room_name=<?= urlencode($room_name) ?>','_blank','noopener,noreferrer');">
-              <i class="bi bi-printer me-1"></i>Print
-            </button>
-          </td>
-          <td style="background: transparent; border-right: 1px solid rgba(148,163,184,0.12); padding: 12px;">
-            <a class="btn btn-sm btn-success" download href="<?= h($publicQr) ?>">
-              <i class="bi bi-download me-1"></i>Download
-            </a>
-          </td>
-          <td style="background: transparent; padding: 12px;">
-            <div class="d-flex flex-column flex-sm-row gap-2">
-              <button type="button" class="btn btn-sm btn-primary" 
-                data-bs-toggle="modal" data-bs-target="#modalEdit"
-                onclick="fillEdit(<?= (int)$id ?>, <?= json_encode($room_name) ?>)">
-                <i class="bi bi-pencil-square me-1"></i>Edit
-              </button>
-              <form method="post" action="master_barcode.php" onsubmit="return confirm('Hapus barcode ini?');">
-                <input type="hidden" name="op" value="delete">
-                <input type="hidden" name="id" value="<?= (int)$id ?>">
-                <button class="btn btn-sm btn-danger" type="submit">
-                  <i class="bi bi-trash text-white me-1"></i>Hapus
-                </button>
-              </form>
-            </div>
-          </td>
+    </thead>
+    <tbody>
+      <?php if (empty($rows)): ?>
+        <tr>
+          <td colspan="7" class="text-center text-white-50 py-5" style="background: transparent;">Belum ada data.</td>
         </tr>
-      <?php endforeach; ?>
-    <?php endif; ?>
-  </tbody>
-</table>
-
+      <?php else: ?>
+        <?php foreach ($rows as $row):
+          $id = (int)$row['id'];
+          $room_name = $row['room_name'];
+          $qrUrl = getPatientUrl($room_name);
+          $fileName = sanitizeFileName($room_name) . '_' . $id . '.png';
+          $filePath = $uploadDir . $fileName;
+          if (!file_exists($filePath)) {
+              ensureQrFile($qrUrl, $filePath);
+          }
+          $publicQr = $qrBaseDirPublic . $fileName;
+        ?>
+          <tr style="border-bottom: 1px solid rgba(148,163,184,0.12);">
+            <td class="fw-semibold text-center" style="color: #94a3b8 !important; background: transparent; border-right: 1px solid rgba(148,163,184,0.12); padding: 12px;"><?= $id ?></td>
+            <td class="fw-semibold text-white" style="background: transparent; border-right: 1px solid rgba(148,163,184,0.12); padding: 12px; max-width: 180px; word-break: break-word; white-space: normal;"><?= h($room_name) ?></td>
+            
+            <!-- SEKSI PREVIEW QR: UKURAN DIPERBESAR DAN DIBERI BACKGROUND PUTIH AGAR JELAS -->
+            <td style="background: transparent; border-right: 1px solid rgba(148,163,184,0.12); padding: 12px;" class="text-center">
+              <div style="background: #ffffff; padding: 6px; display: inline-block; id: qrContainer_<?= $id ?>; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
+                <img class="qr-preview" src="<?= h($publicQr) ?>" alt="QR <?= h($room_name) ?>" style="width: 90px; height: 90px; display: block; object-fit: contain;" draggable="false">
+              </div>
+            </td>
+            
+            <td style="background: transparent; border-right: 1px solid rgba(148,163,184,0.12); padding: 12px;">
+              <div class="mono small text-white-50" style="max-width: 250px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;" title="<?= h($qrUrl) ?>">
+                <?= h($qrUrl) ?>
+              </div>
+            </td>
+            <td style="background: transparent; border-right: 1px solid rgba(148,163,184,0.12); padding: 12px;" class="text-center">
+              <button type="button" class="btn btn-sm btn-outline-light border-0 rounded-2 text-white" title="Print" onclick="window.open('print_qr_room.php?room_name=<?= urlencode($room_name) ?>','_blank','noopener,noreferrer');">
+                <i class="bi bi-printer" style="font-size: 1.1rem;"></i>
+              </button>
+            </td>
+            <td style="background: transparent; border-right: 1px solid rgba(148,163,184,0.12); padding: 12px;" class="text-center">
+              <a class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Download" download href="<?= h($publicQr) ?>">
+                <i class="bi bi-download" style="font-size: 1.1rem;"></i>
+              </a>
+            </td>
+            <td style="background: transparent; padding: 12px;" class="text-center">
+              <div class="d-flex justify-content-center gap-1">
+                <button type="button" class="btn btn-sm btn-outline-primary border-0 rounded-2 text-primary" title="Edit"
+                  data-bs-toggle="modal" data-bs-target="#modalEdit"
+                  onclick="fillEdit(<?= (int)$id ?>, <?= json_encode($room_name) ?>)">
+                  <i class="bi bi-pencil-square" style="font-size: 1.1rem;"></i>
+                </button>
+                <form method="post" action="master_barcode.php" onsubmit="return confirm('Hapus barcode ini?');" class="m-0">
+                  <input type="hidden" name="op" value="delete">
+                  <input type="hidden" name="id" value="<?= (int)$id ?>">
+                  <button class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" type="submit" title="Hapus">
+                    <i class="bi bi-trash-fill" style="font-size: 1.1rem;"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      <?php endif; ?>
+    </tbody>
+  </table>
     </div>
-
   </div>
 </main>
 
