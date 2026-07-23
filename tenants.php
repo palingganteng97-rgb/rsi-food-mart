@@ -199,14 +199,15 @@ $menu = [
     #dragScrollUserContainer table, #dragScrollContainer table, .drag-scroll-container table { border-collapse: collapse !important; border: none !important; }
     #dragScrollUserContainer table th, #dragScrollUserContainer table td, #dragScrollContainer table th, #dragScrollContainer table td, .drag-scroll-container table th, .drag-scroll-container table td { border-left: none !important; border-right: none !important; border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; }
     .text-white-element { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
-    .text-white-element { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
     .modal-lg-custom { max-width: 800px !important; }
     .modal-body::-webkit-scrollbar { display: none !important; }
-    .modal-body { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow: visible !important; }
+    .modal-body { -ms-overflow-style: none !important; scrollbar-width: none !important; overflow-y: auto !important; }
     .bi-clock-history, .text-white-icon { color: #ffffff !important; opacity: 1 !important; filter: drop-shadow(0 0 1px rgba(255,255,255,0.2)); }
-    input[type="time"]::-webkit-calendar-picker-indicator,
-    input[type="date"]::-webkit-calendar-picker-indicator {filter: invert(1) brightness(100%) contrast(100%) !important;cursor: pointer;}
+    input[type="time"]::-webkit-calendar-picker-indicator, input[type="date"]::-webkit-calendar-picker-indicator {filter: invert(1) brightness(100%) contrast(100%) !important;cursor: pointer;}
     @media (min-width: 992px) { main.content-shift { margin-left: 280px; } .bottom-nav { display:none; } }
+    /* Modal Kustom Persegi Panjang Melebar */
+    .modal.modal-right .modal-dialog { max-width: 850px !important; width: 90%; margin: 1.75rem auto; }
+    .modal.modal-right .modal-content { border-radius: 14px !important; border: 1px solid rgba(148, 163, 184, 0.2); }
 </style>
 
 </head>
@@ -223,9 +224,9 @@ $menu = [
         <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;"> Data Tenant </h2>
       </div>
       <div>
-<button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" onclick="openTambahModal()">
-    <i class="bi bi-house-add-fill"></i> Tambah Tenant
-</button>
+        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" onclick="openTambahModal()">
+            <i class="bi bi-house-add-fill"></i> Tambah Tenant
+        </button>
       </div>
     </div>
 
@@ -322,22 +323,20 @@ $menu = [
   </div>
 </main>
 
-<!-- Modal CRUD (Memanjang Ke Kanan & Transparan Gelap Selaras) -->
+<!-- Modal CRUD -->
 <div class="modal fade modal-right" id="modalTenantRight" tabindex="-1" aria-labelledby="modalTenantLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content" style="background: rgba(15, 23, 42, 0.88) !important; backdrop-filter: blur(10px); border-left: 1px solid rgba(148, 163, 184, 0.2); color: #e5e7eb;">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.92) !important; backdrop-filter: blur(10px); color: #e5e7eb;">
             <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
                 <h5 class="modal-title fw-bold text-white" id="modalTenantLabel">Form Tenant</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="formTenant" action="tenants.php" method="POST" enctype="multipart/form-data">
-                <div class="modal-body" style="overflow-y: auto; max-height: calc(100vh - 130px); padding-bottom: 80px;">
-                    
+                <div class="modal-body" style="padding: 25px;">
                     <input type="hidden" name="id" id="tenant_id">
                     <input type="hidden" name="action_add_tenant" id="action_add_trigger" value="1">
                     <input type="hidden" name="action_update_tenant" id="action_update_trigger" value="1" disabled>
                     <input type="hidden" name="old_photo" id="tenant_old_photo">
-
                     <div class="mb-3">
                         <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Nama Tenant</label>
                         <input type="text" class="form-control" name="name" id="tenant_name" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" required>
@@ -354,13 +353,10 @@ $menu = [
                             <option value="lainnya">Lainnya</option>
                         </select>
                     </div>
-                    
-                    <!-- PERBAIKAN: Wadah Input Ketik Manual Saat Memilih Opsi "Lainnya" -->
                     <div class="mb-3" id="custom_type_container" style="display: none;">
                         <label class="form-label" style="color: #22c55e !important; font-weight: 500;">Masukkan Tipe Baru</label>
                         <input type="text" class="form-control" id="tenant_type_custom" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(34, 197, 94, 0.4) !important; color: #e5e7eb !important;">
                     </div>
-
                     <div class="mb-3">
                         <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Upload Logo</label>
                         <input type="file" class="form-control" name="logo" id="tenant_logo" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
@@ -381,10 +377,11 @@ $menu = [
                         <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;">Waktu Persiapan (Menit)</label>
                         <input type="number" class="form-control" name="preparation_time" id="tenant_prep" value="15" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;">
                     </div>
-                </div>
-                <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.15); position: absolute; bottom: 0; width: 100%; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px);">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-success">Simpan Data</button>
+                    <!-- TOMBOL UTAMA: Dipindahkan ke bagian paling bawah form -->
+                    <div class="d-flex gap-2 justify-content-end pt-3 mt-4" style="border-top: 1px solid rgba(148, 163, 184, 0.15);">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-success" id="btnSubmitTenant">Simpan Data</button>
+                    </div>
                 </div>
             </form>
         </div>

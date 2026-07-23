@@ -1,110 +1,161 @@
 <?php
 // roles.php
-include "db.php"; // Pastikan di dalam db.php sudah dipanggil session_start()
-
-// Proteksi Halaman: Jika sesi user_id kosong, tendang kembali ke login.php
+include "db.php";
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
-
-// Menghubungkan logika modular penghapusan data dan berkas fisik
 include "delete_handler.php";
-
 $crudError = '';
 $crudSuccess = '';
-
+if (isset($_GET['status'])) {
+    $status = $_GET['status'];
+    if ($status === 'created') {
+        $crudSuccess = 'Role baru berhasil ditambahkan!';
+    } elseif ($status === 'updated') {
+        $crudSuccess = 'Nama role berhasil diperbarui!';
+    } elseif ($status === 'deleted') {
+        $crudSuccess = 'Role berhasil dihapus dari sistem!';
+    } elseif ($status === 'duplicate_create') {
+        $crudError = 'Nama Role sudah terdaftar!';
+    } elseif ($status === 'duplicate_update') {
+        $crudError = 'Nama role sudah digunakan oleh role lain!';
+    } elseif ($status === 'invalid') {
+        $crudError = 'Input nama role tidak valid.';
+    } elseif ($status === 'delete_error' || $status === 'error') {
+        $errorMsg = isset($_GET['msg']) ? urldecode($_GET['msg']) : 'Terjadi kesalahan sistem.';
+        $crudError = htmlspecialchars($errorMsg);
+    }
+}
 // ==========================================
 // 1. PROSES CRUD: TAMBAH ROLE BARU (CREATE)
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_create'])) {
     $name = trim($_POST['name'] ?? '');
-
     if (!empty($name)) {
         try {
-            // Cek apakah nama role sudah ada agar tidak duplikat
             $check = $conn->prepare("SELECT id FROM roles WHERE name = ? LIMIT 1");
             $check->bind_param("s", $name);
             $check->execute();
             if ($check->get_result()->num_rows > 0) {
-                $crudError = "Nama Role sudah terdaftar!";
+                header("Location: roles.php?status=duplicate_create");
+                exit;
             } else {
-                // Kolom created_at diisi otomatis menggunakan NOW()
                 $stmt = $conn->prepare("INSERT INTO roles (name, created_at) VALUES (?, NOW())");
                 $stmt->bind_param("s", $name);
-                
                 if ($stmt->execute()) {
-                    $crudSuccess = "Role baru berhasil ditambahkan!";
+                    header("Location: roles.php?status=created");
+                    exit;
                 } else {
-                    $crudError = "Gagal menyimpan role baru ke database.";
+                    header("Location: roles.php?status=error&msg=" . urlencode("Gagal menyimpan role baru ke database."));
+                    exit;
                 }
                 $stmt->close();
             }
             $check->close();
         } catch (Throwable $e) {
-            $crudError = "Kesalahan sistem: " . $e->getMessage();
+            header("Location: roles.php?status=error&msg=" . urlencode("Kesalahan sistem: " . $e->getMessage()));
+            exit;
         }
     } else {
-        $crudError = "Nama Role wajib diisi!";
+        header("Location: roles.php?status=error&msg=" . urlencode("Nama Role wajib diisi!"));
+        exit;
     }
 }
-
 // ==========================================
 // 2. PROSES CRUD: SIMPAN PERUBAHAN ROLE (UPDATE)
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_update'])) {
     $targetId = (int)($_POST['edit_id'] ?? 0);
     $newName = trim($_POST['update_name'] ?? '');
-
     if ($targetId > 0 && !empty($newName)) {
         try {
-            // Update data role dan isi kolom updated_at dengan waktu saat ini (NOW())
-            $updateStmt = $conn->prepare("UPDATE roles SET name = ?, updated_at = NOW() WHERE id = ?");
-            $updateStmt->bind_param("si", $newName, $targetId);
-            
-            if ($updateStmt->execute()) {
-                $crudSuccess = "Nama role berhasil diperbarui!";
+            $check = $conn->prepare("SELECT id FROM roles WHERE name = ? AND id != ? LIMIT 1");
+            $check->bind_param("si", $newName, $targetId);
+            $check->execute();
+            if ($check->get_result()->num_rows > 0) {
+                header("Location: roles.php?status=duplicate_update");
+                exit;
             } else {
-                $crudError = "Gagal memperbarui data role di database.";
+                $updateStmt = $conn->prepare("UPDATE roles SET name = ?, updated_at = NOW() WHERE id = ?");
+                $updateStmt->bind_param("si", $newName, $targetId);
+                if ($updateStmt->execute()) {
+                    header("Location: roles.php?status=updated");
+                    exit;
+                } else {
+                    header("Location: roles.php?status=error&msg=" . urlencode("Gagal memperbarui data role di database."));
+                    exit;
+                }
+                $updateStmt->close();
             }
-            $updateStmt->close();
+            $check->close();
         } catch (Throwable $e) {
-            $crudError = "Kesalahan sistem saat mengubah data: " . $e->getMessage();
+            header("Location: roles.php?status=error&msg=" . urlencode("Kesalahan sistem saat mengubah data: " . $e->getMessage()));
+            exit;
         }
     } else {
-        $crudError = "Input nama role tidak valid.";
+        header("Location: roles.php?status=invalid");
+        exit;
     }
 }
-
 // ==========================================
 // 3. PROSES CRUD: HAPUS ROLE (DELETE)
 // ==========================================
 if (isset($_GET['action_delete'])) {
     $deleteId = (int)$_GET['action_delete'];
-
+    error_log("[DELETE_ROLE] action_delete ID: " . $deleteId);
     if ($deleteId > 0) {
         try {
-            // Keamanan tambahan: Cek apakah role ini sedang dipakai oleh user di tabel users
-            $checkUsed = $conn->prepare("SELECT id FROM users WHERE role_id = ? LIMIT 1");
-            $checkUsed->bind_param("i", $deleteId);
-            $checkUsed->execute();
-            if ($checkUsed->get_result()->num_rows > 0) {
-                $crudError = "Role tidak bisa dihapus karena masih digunakan oleh beberapa pengguna!";
+            $findPrev = $conn->prepare("SELECT id FROM roles WHERE id < ? ORDER BY id DESC LIMIT 1");
+            $findPrev->bind_param("i", $deleteId);
+            $findPrev->execute();
+            $resPrev = $findPrev->get_result();
+            if ($resPrev->num_rows > 0) {
+                $targetRole = $resPrev->fetch_assoc()['id'];
             } else {
-                $deleteStmt = $conn->prepare("DELETE FROM roles WHERE id = ?");
-                $deleteStmt->bind_param("i", $deleteId);
-                
-                if ($deleteStmt->execute()) {
-                    $crudSuccess = "Role berhasil dihapus dari sistem!";
-                } else {
-                    $crudError = "Gagal menghapus data dari database.";
-                }
-                $deleteStmt->close();
+                $findNext = $conn->prepare("SELECT id FROM roles WHERE id > ? ORDER BY id ASC LIMIT 1");
+                $findNext->bind_param("i", $deleteId);
+                $findNext->execute();
+                $resNext = $findNext->get_result();
+                $targetRole = ($resNext->num_rows > 0) ? $resNext->fetch_assoc()['id'] : 0;
+                $findNext->close();
             }
-            $checkUsed->close();
+            $findPrev->close();
+            if ($targetRole > 0) {
+                $updateUser = $conn->prepare("UPDATE users SET role_id = ? WHERE role_id = ?");
+                $updateUser->bind_param("ii", $targetRole, $deleteId);
+                $updateUser->execute();
+                $updateUser->close();
+            }
+            $deletePerms = $conn->prepare("DELETE FROM role_permissions WHERE role_id = ?");
+            $deletePerms->bind_param("i", $deleteId);
+            $deletePerms->execute();
+            $deletePerms->close();
+            $deleteStmt = $conn->prepare("DELETE FROM roles WHERE id = ?");
+            $deleteStmt->bind_param("i", $deleteId);
+            if ($deleteStmt->execute()) {
+                error_log("[DELETE_ROLE] affected_rows: " . $deleteStmt->affected_rows);
+                $resultMax = $conn->query("SELECT MAX(id) as max_id FROM roles");
+                $rowMax = $resultMax->fetch_assoc();
+                $nextId = $rowMax['max_id'] ? $rowMax['max_id'] + 1 : 1;
+                $conn->query("ALTER TABLE roles AUTO_INCREMENT = $nextId");
+                header("Location: roles.php?status=deleted");
+                exit;
+            } else {
+                $sqlError = $deleteStmt->error;
+                error_log("[DELETE_ROLE] SQL Error: " . $sqlError);
+                header("Location: roles.php?status=delete_error&msg=" . urlencode("Gagal menghapus data dari database. SQL Error: " . $sqlError));
+                exit;
+            }
+            $deleteStmt->close();
         } catch (Throwable $e) {
-            $crudError = "Kesalahan sistem saat menghapus data: " . $e->getMessage();
+            error_log("[DELETE_ROLE] Exception: " . $e->getMessage());
+            header("Location: roles.php?status=delete_error&msg=" . urlencode("Kesalahan sistem saat menghapus data: " . $e->getMessage()));
+            exit;
         }
+    } else {
+        header("Location: roles.php?status=delete_error&msg=" . urlencode("ID role tidak valid."));
+        exit;
     }
 }
 ?>
@@ -154,31 +205,28 @@ if (isset($_GET['action_delete'])) {
 <main class="content-shift p-4">
   <!-- Container tabel dengan tema gelap transparan menyatu dengan background halaman -->
   <div class="container-fluid rounded-4 p-4 text-white" style="background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; box-shadow: 0 10px 30px rgba(0,0,0,.25);">
-    
     <!-- HEADER TABEL & TOMBOL TAMBAH ROLE -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;">
+      <div><h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Manajemen Data Roles</h2></div>
       <div>
-        <h2 class="fw-bold m-0 text-white" style="font-size: 2rem;">Manajemen Data Roles</h2>
-      </div>
-      <div>
-        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalTambahRole">
+        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" onclick="openModalRole('create')">
           <i class="bi bi-shield-plus"></i> Tambah Role
         </button>
       </div>
     </div>
-
     <!-- NOTIFIKASI INFORMASI ALERT STATUS OPERASI CRUD -->
     <?php if (!empty($crudSuccess)): ?>
-      <div class="alert alert-success border-0 rounded-3 mb-4" role="alert" style="background: rgba(34, 197, 94, 0.12) !important; color: #86efac !important;">
+      <div class="alert alert-success alert-dismissible fade show border-0 rounded-3 mb-4" role="alert" style="background: rgba(34, 197, 94, 0.12) !important; color: #86efac !important; padding-right: 3rem;">
         <i class="bi bi-check-circle-fill me-2"></i> <?= htmlspecialchars($crudSuccess) ?>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close" style="position: absolute; top: 50%; right: 10px; transform: translateY(-50%); opacity: 0.8;"></button>
       </div>
     <?php endif; ?>
     <?php if (!empty($crudError)): ?>
-      <div class="alert alert-danger border-0 rounded-3 mb-4" role="alert" style="background: rgba(239, 68, 68, 0.12) !important; color: #fecaca !important;">
+      <div class="alert alert-danger alert-dismissible fade show border-0 rounded-3 mb-4" role="alert" style="background: rgba(239, 68, 68, 0.12) !important; color: #fecaca !important; padding-right: 3rem;">
         <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= htmlspecialchars($crudError) ?>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close" style="position: absolute; top: 50%; right: 10px; transform: translateY(-50%); opacity: 0.8;"></button>
       </div>
     <?php endif; ?>
-
     <!-- TABEL LIST DATA ROLES (4 KOLOM LENGKAP SESUAI DATABASE) -->
     <div class="table-responsive border rounded-3" style="border-color: rgba(148, 163, 184, 0.15) !important; background: transparent !important;">
       <table class="table table-hover align-middle mb-0 text-white" style="background: transparent !important; color: #e5e7eb !important;">
@@ -194,41 +242,24 @@ if (isset($_GET['action_delete'])) {
         <tbody style="background: transparent !important;">
           <?php
           try {
-              // Ambil 4 kolom lengkap dari tabel roles sesuai struktur database
               $queryRoles = "SELECT id, name, created_at, updated_at FROM roles ORDER BY id ASC";
               $resultRoles = $conn->query($queryRoles);
-              
               if ($resultRoles && $resultRoles->num_rows > 0) {
                   while ($roleRow = $resultRoles->fetch_assoc()) {
                       ?>
                       <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.9rem;">
-                        <!-- #1 id (BIGINT - AUTO_INCREMENT) -->
                         <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important;"><?= $roleRow['id'] ?></td>
-                        
-                        <!-- #2 name (VARCHAR 100) -->
                         <td class="fw-semibold text-white" style="background: transparent !important;"><?= htmlspecialchars($roleRow['name'] ?? '-') ?></td>
-                        
-                        <!-- #3 created_at (TIMESTAMP) -->
                         <td class="text-white-50 small" style="background: transparent !important;"><?= $roleRow['created_at'] ?? 'NULL' ?></td>
-                        
-                        <!-- #4 updated_at (TIMESTAMP) -->
                         <td class="text-white-50 small" style="background: transparent !important;"><?= $roleRow['updated_at'] ?? 'NULL' ?></td>
-                        
-                        <!-- TOMBOL AKSI CRUD -->
                         <td class="text-center" style="background: transparent !important;">
                           <div class="d-flex justify-content-center gap-1">
-                            <!-- Tombol Edit memicu pengisian data otomatis ke modal edit via JS -->
-                            <button class="btn btn-sm btn-outline-success border-0 rounded-2" title="Edit Role" data-bs-toggle="modal" data-bs-target="#modalEditRole" onclick="populateEditRoleModal(<?= htmlspecialchars(json_encode($roleRow)) ?>)">
+                            <button class="btn btn-sm btn-outline-success border-0 rounded-2" title="Edit Role" onclick="openModalRole('update', <?= htmlspecialchars(json_encode($roleRow)) ?>)">
                               <i class="bi bi-pencil"></i>
                             </button>
-                            <button type="button" 
-                                    class="btn btn-sm btn-danger" 
-                                    data-bs-toggle="modal" 
-                                    data-bs-target="#modalDeleteRole" 
-                                    onclick="document.getElementById('delete_role_name').innerText = '<?php echo addslashes($row['role_name']); ?>'; document.getElementById('btn_confirm_delete_role').setAttribute('href', 'roles.php?action_delete=<?php echo $row['id']; ?>')">
+                            <button type="button" class="btn btn-sm btn-danger" onclick="triggerDeleteRole('roles.php?action_delete=<?= $roleRow['id'] ?>', '<?= addslashes($roleRow['name']) ?>')">
                                 <i class="bi bi-trash"></i>
                             </button>
-                            </a>
                           </div>
                         </td>
                       </tr>
@@ -244,54 +275,33 @@ if (isset($_GET['action_delete'])) {
         </tbody>
       </table>
     </div>
-
   </div>
 </main>
 
-<!-- MODAL TAMBAH ROLE (Hitam Gelap) -->
-<div class="modal fade" id="modalTambahRole" tabindex="-1" aria-hidden="true">
+<!-- GABUNGAN MODAL CRUD (SATU FORM GANDA: TAMBAH & EDIT) -->
+<div class="modal fade" id="modalCrudRole" tabindex="-1" aria-labelledby="modalRoleLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <form action="roles.php" method="POST" class="modal-content" style="background: #1e293b; color: #e5e7eb; border: 1px solid rgba(148, 163, 184, 0.25);">
+        <div class="modal-content" style="background: rgba(15, 23, 42, 0.92) !important; backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.2); color: #e5e7eb;">
             <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
-                <h5 class="modal-title fw-bold">Tambah Role Baru</h5>
+                <h5 class="modal-title fw-bold text-white" id="modalRoleLabel">Form Role</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label" style="color: #94a3b8;">Nama Role</label>
-                    <input type="text" name="name" class="form-control" style="background: rgba(2, 6, 23, 0.35); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb;" placeholder="Contoh: admin, kasir, pelanggan" required>
+            <form action="roles.php" method="POST" id="formRole">
+                <input type="hidden" name="edit_id" id="role_id">
+                <input type="hidden" name="action_create" id="trigger_create" value="1" disabled>
+                <input type="hidden" name="action_update" id="trigger_update" value="1" disabled>
+                <div class="modal-body" style="padding: 25px;">
+                    <div class="mb-3">
+                        <label class="form-label" style="color: #94a3b8 !important; font-weight: 500;" id="labelRoleInput">Nama Role</label>
+                        <input type="text" class="form-control" id="role_name" style="background: rgba(2, 6, 23, 0.4) !important; border: 1px solid rgba(148, 163, 184, 0.25) !important; color: #e5e7eb !important;" placeholder="Masukkan nama role..." required>
+                    </div>
                 </div>
-            </div>
-            <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.15);">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                <button type="submit" name="action_create" class="btn btn-success">Simpan Data</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- MODAL EDIT ROLE (Hitam Gelap) -->
-<div class="modal fade" id="modalEditRole" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <form action="roles.php" method="POST" class="modal-content" style="background: #1e293b; color: #e5e7eb; border: 1px solid rgba(148, 163, 184, 0.25);">
-            <div class="modal-header" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
-                <h5 class="modal-title fw-bold">Ubah Data Role</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <!-- Input Hidden ID untuk target pembaruan query -->
-                <input type="hidden" name="id" id="edit-role-id">
-                
-                <div class="mb-3">
-                    <label class="form-label" style="color: #94a3b8;">Nama Role</label>
-                    <input type="text" name="name" id="edit-role-name" class="form-control" style="background: rgba(2, 6, 23, 0.35); border: 1px solid rgba(148, 163, 184, 0.25); color: #e5e7eb;" required>
+                <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.15);">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-success" id="btnSubmitRole">Simpan</button>
                 </div>
-            </div>
-            <div class="modal-footer" style="border-top: 1px solid rgba(148, 163, 184, 0.15);">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                <button type="submit" name="action_update" class="btn btn-success">Perbarui</button>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -315,65 +325,72 @@ if (isset($_GET['action_delete'])) {
 </div>
 
 <script>
-let deleteRoleUrlTarget = '';
-let bootstrapDeleteRoleModalInstance = null;
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Handler untuk mengeksekusi aksi hapus saat tombol konfirmasi diklik
-    const btnConfirmDeleteRole = document.getElementById('btn_confirm_delete_role');
-    if (btnConfirmDeleteRole) {
-        btnConfirmDeleteRole.addEventListener('click', function(e) {
-            if (deleteRoleUrlTarget) {
-                e.preventDefault();
-                window.location.href = deleteRoleUrlTarget;
-            }
-        });
-    }
-});
-
-function triggerDeleteRole(url, roleName) {
-    // 1. Suntik nama ke teks deskripsi modal
-    const namePlaceholder = document.getElementById('delete_role_name');
-    if (namePlaceholder) {
-        namePlaceholder.innerText = roleName;
-    }
-    
-    // 2. Ubah URL tujuan tombol "Ya, Hapus" secara langsung
-    const btnConfirm = document.getElementById('btn_confirm_delete_role');
-    if (btnConfirm) {
-        btnConfirm.setAttribute('href', url);
-    }
-    
-    // 3. Tampilkan modal secara aman dan bersih
-    const modalElement = document.getElementById('modalDeleteRole');
-    if (modalElement) {
-        const existingInstance = bootstrap.Modal.getInstance(modalElement);
-        if (existingInstance) {
-            existingInstance.dispose(); // Hapus sisa instans memori lama yang macet
+    let deleteRoleUrlTarget = '';
+    document.addEventListener('DOMContentLoaded', function() {
+        // Otomatis bersihkan parameter status dari URL browser agar tidak stuck saat di-refresh
+        if (window.location.search.includes('status=')) {
+            setTimeout(function() {
+                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+            }, 50);
         }
-        
-        const newModalInstance = new bootstrap.Modal(modalElement);
-        newModalInstance.show();
-    }
-}
+        const btnConfirmDeleteRole = document.getElementById('btn_confirm_delete_role');
+        if (btnConfirmDeleteRole) {
+            btnConfirmDeleteRole.addEventListener('click', function(e) {
+                if (deleteRoleUrlTarget) { e.preventDefault(); window.location.href = deleteRoleUrlTarget; }
+            });
+        }
+    });
 
-// Fungsi pengisi data modal edit role otomatis sekaligus memicu tampilnya modal kustom
-function populateEditRoleModal(role) {
-    if (role) {
-        document.getElementById('edit_role_id').value = role.id;
-        
-        // Menangani penyesuaian jika properti data object dari backend menggunakan role.name atau role.role_name
-        document.getElementById('edit_role_name').value = role.name || role.role_name || '';
-        
-        // Membuka bootstrap modal edit kustom Anda secara terprogram
-        const editModalElement = document.getElementById('modalEditRole');
-        if (editModalElement) {
-            const bootstrapEditModalInstance = new bootstrap.Modal(editModalElement);
-            bootstrapEditModalInstance.show();
+    function triggerDeleteRole(url, roleName) {
+        const namePlaceholder = document.getElementById('delete_role_name');
+        if (namePlaceholder) { namePlaceholder.innerText = roleName; }
+        const btnConfirm = document.getElementById('btn_confirm_delete_role');
+        if (btnConfirm) { btnConfirm.setAttribute('href', url); }
+        const modalElement = document.getElementById('modalDeleteRole');
+        if (modalElement) {
+            const existingInstance = bootstrap.Modal.getInstance(modalElement);
+            if (existingInstance) { existingInstance.dispose(); }
+            const newModalInstance = new bootstrap.Modal(modalElement);
+            newModalInstance.show();
         }
     }
-}
 
+    function openModalRole(mode, data = null) {
+        const modalLabel = document.getElementById('modalRoleLabel');
+        const labelInput = document.getElementById('labelRoleInput');
+        const inputName = document.getElementById('role_name');
+        const inputId = document.getElementById('role_id');
+        const btnSubmit = document.getElementById('btnSubmitRole');
+        const triggerCreate = document.getElementById('trigger_create');
+        const triggerUpdate = document.getElementById('trigger_update');
+        if (mode === 'create') {
+            modalLabel.innerHTML = '<i class="bi bi-shield-plus me-2 text-success"></i>Tambah Role Baru';
+            labelInput.innerText = 'Nama Role';
+            inputName.name = 'name';
+            inputName.value = '';
+            inputId.value = '';
+            btnSubmit.innerText = 'Simpan Data';
+            triggerCreate.disabled = false;
+            triggerUpdate.disabled = true;
+        } else if (mode === 'update' && data) {
+            modalLabel.innerHTML = '<i class="bi bi-pencil-square me-2 text-success"></i>Ubah Data Role';
+            labelInput.innerText = 'Nama Role Baru';
+            inputName.name = 'update_name';
+            inputName.value = data.name;
+            inputId.value = data.id;
+            btnSubmit.innerText = 'Perbarui Data';
+            triggerCreate.disabled = true;
+            triggerUpdate.disabled = false;
+        }
+        const roleModalElement = document.getElementById('modalCrudRole');
+        if (roleModalElement) {
+            const existingInstance = bootstrap.Modal.getInstance(roleModalElement);
+            if (existingInstance) { existingInstance.dispose(); }
+            const roleModalInstance = new bootstrap.Modal(roleModalElement);
+            roleModalInstance.show();
+        }
+    }
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

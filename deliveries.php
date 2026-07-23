@@ -84,9 +84,6 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("iissssi", $order_id, $courier_id, $status, $pickup_time, $delivery_time, $proof_photo, $id);
         
         if ($stmt->execute()) {
-            // --- DEBUG: Log delivery update ---
-            error_log("[DELIVERY UPDATE] id=$id, order_id=$order_id, old_status=$oldStatus, new_status=$status, changed=" . (strcasecmp($oldStatus, $status) !== 0 ? 'yes' : 'no'));
-
             // === PATIENT NOTIFICATION (ONLY): Deliveries is source of truth for delivery status ===
             // Notify ONLY the patient who owns the order. No admin notification for status changes.
             $statusChanged = (strcasecmp($oldStatus, $status) !== 0);
@@ -99,9 +96,6 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($orderData = $orderRes->fetch_assoc()) {
                     $orderNumberFull = $orderData['order_number'] ?? ('ID ' . $oldOrderId);
                     $patientSessionId = (int)($orderData['patient_session_id'] ?? 0);
-
-                    // --- DEBUG: Log patient data ---
-                    error_log("[DELIVERY NOTIFICATION DEBUG] order_id=$oldOrderId, order_number=$orderNumberFull, patient_session_id=$patientSessionId, user_type=patient, user_reference=$patientSessionId");
 
                     if ($patientSessionId > 0) {
                         $notifTitle = 'Status Pengiriman Diperbarui';
@@ -125,28 +119,17 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                         $dupCheck->close();
 
                         if (!$notificationExists) {
-                            $insertedId = createNotification(
+                            createNotification(
                                 'patient',
                                 $patientSessionId,
                                 $notifTitle,
                                 $notifMessage,
                                 $notifLink
                             );
-
-                            // --- DEBUG: Log notification insert result ---
-                            error_log("[DELIVERY NOTIFICATION INSERT] result_id=" . ($insertedId !== false ? $insertedId : 'FAILED') . ", user_type=patient, user_reference=$patientSessionId, title=$notifTitle, link=$notifLink");
-                        } else {
-                            error_log("[DELIVERY NOTIFICATION SKIP] Duplicate notification already exists for order_id=$oldOrderId, status=$status");
                         }
-                    } else {
-                        error_log("[DELIVERY NOTIFICATION ERROR] patient_session_id is 0 or empty for order_id=$oldOrderId");
                     }
-                } else {
-                    error_log("[DELIVERY NOTIFICATION ERROR] No order found for id=$oldOrderId");
                 }
                 $orderStmt->close();
-            } else {
-                error_log("[DELIVERY NOTIFICATION SKIP] Status unchanged or no order_id. changed=" . (strcasecmp($oldStatus, $status) !== 0 ? 'yes' : 'no') . ", oldOrderId=$oldOrderId");
             }
 
             $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Data pengiriman berhasil diperbarui!'];
@@ -493,9 +476,6 @@ function openEditDelivery(btn) {
         delivery_time: btn.getAttribute('data-delivery-time'),
         proof_photo: btn.getAttribute('data-proof-photo')
     };
-
-    console.log('Delivery ID:', data.id);
-    console.log('Data Delivery:', data);
 
     document.getElementById('formDelivery').reset();
     document.getElementById('formDelivery').action = 'deliveries.php?action=update';

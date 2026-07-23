@@ -8,6 +8,13 @@ if (isset($_SESSION['id'])) {
     header("Location: index.php");
     exit();
 }
+
+// Tangkap flash error dari session (dikirim oleh index.php saat login gagal)
+$error = '';
+if (isset($_SESSION['flash_error'])) {
+    $error = $_SESSION['flash_error'];
+    unset($_SESSION['flash_error']);
+}
 ?>
 
 <!DOCTYPE html>

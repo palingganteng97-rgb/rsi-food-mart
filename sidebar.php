@@ -66,7 +66,6 @@ $menu = [
         'sub'   => [
             'couriers.php'               => [ 'href' => 'couriers.php', 'label' => 'Data Kurir', 'icon' => 'bi-person-badge' ],
             'deliveries.php'             => [ 'href' => 'deliveries.php', 'label' => 'Daftar Pengiriman', 'icon' => 'bi-box-seam' ],
-            'delivery_tracking.php'      => [ 'href' => 'delivery_tracking.php', 'label' => 'Pelacakan Live', 'icon' => 'bi-geo-alt' ],
         ]
     ],
     'payments_group' => [
