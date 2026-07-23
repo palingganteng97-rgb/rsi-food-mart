@@ -220,6 +220,13 @@ try {
     $notifResult = createNotification('patient', $patient_session_id, $notifTitle, $notifMessage, $notifLink);
     error_log("[CHECKOUT NOTIFICATION] order_id=$new_order_id, patient_session_id=$patient_session_id, result=" . ($notifResult !== false ? $notifResult : 'FAILED'));
     
+    // NOTIFIKASI ADMIN: Beri tahu semua admin bahwa ada pesanan baru
+    $adminNotifTitle = 'Pesanan Baru';
+    $adminNotifMessage = "Pesanan baru #{$order_number} telah dibuat oleh pasien dan menunggu diproses.";
+    $adminNotifLink = 'orders.php?id=' . $new_order_id;
+    $adminNotifResult = createNotificationForAllAdmins($adminNotifTitle, $adminNotifMessage, $adminNotifLink);
+    error_log("[CHECKOUT ADMIN NOTIFICATION] order_id=$new_order_id, admin_notifications=" . count($adminNotifResult));
+    
     // Redirect ke riwayat_pesanan.php dengan order_id untuk melihat detail pesanan
     header("Location: riwayat_pesanan.php?id=" . $new_order_id);
     exit();
