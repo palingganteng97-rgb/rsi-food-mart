@@ -134,7 +134,8 @@ if (isset($_GET['action_restore'])) {
 
     $query = "UPDATE products SET deleted_at = NULL, updated_at = NOW() WHERE id = $id";
     if (mysqli_query($conn, $query)) {
-        header("Location: products.php?status=success_restore");
+        $redirectView = (isset($_GET['view']) && $_GET['view'] === 'trash') ? '&view=trash' : '';
+        header("Location: products.php?status=success_restore" . $redirectView);
         exit();
     } else {
         header("Location: products.php?status=error&msg=" . urlencode(mysqli_error($conn)));
@@ -158,6 +159,39 @@ if (isset($_GET['action_delete'])) {
 }
 
 // ==========================================
+// 3B. PROSES PERMANENT DELETE (HAPUS PERMANEN)
+// ==========================================
+if (isset($_GET['action_permanent_delete'])) {
+    $id = intval($_GET['action_permanent_delete']);
+
+    // Ambil data produk untuk menghapus file gambar
+    $getData = mysqli_query($conn, "SELECT image FROM products WHERE id = $id LIMIT 1");
+    if ($getData) {
+        $prodData = mysqli_fetch_assoc($getData);
+        
+        // Hapus file gambar hanya jika TIDAK digunakan oleh produk lain
+        if (!empty($prodData['image'])) {
+            $checkImageUsage = mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM products WHERE image = '" . mysqli_real_escape_string($conn, $prodData['image']) . "' AND id != $id");
+            $usageData = mysqli_fetch_assoc($checkImageUsage);
+            if ((int)$usageData['cnt'] === 0 && file_exists($uploadDir . $prodData['image'])) {
+                @unlink($uploadDir . $prodData['image']);
+            }
+        }
+    }
+
+    // Hapus data dari database secara permanen
+    $query = "DELETE FROM products WHERE id = $id";
+    
+    if (mysqli_query($conn, $query)) {
+        header("Location: products.php?view=trash&status=success_permanent_delete");
+        exit();
+    } else {
+        header("Location: products.php?view=trash&status=error&msg=" . urlencode(mysqli_error($conn)));
+        exit();
+    }
+}
+
+// ==========================================
 // 4. FETCH DATA DROPDOWN & LIST PRODUK
 // ==========================================
 $listTenants = []; $listCategories = []; $listBrands = []; $listUnits = [];
@@ -170,21 +204,49 @@ while ($r = mysqli_fetch_assoc($qBrand)) { $listBrands[] = $r; }
 $qUnit = mysqli_query($conn, "SELECT id, name FROM units ORDER BY name ASC");
 while ($r = mysqli_fetch_assoc($qUnit)) { $listUnits[] = $r; }
 
+// Tentukan view: 'active' (default) atau 'trash'
+$currentView = isset($_GET['view']) && $_GET['view'] === 'trash' ? 'trash' : 'active';
+
 $listProducts = [];
-$sql = "SELECT p.*, t.name AS tenant_name, c.name AS category_name, b.name AS brand_name, u.name AS unit_name 
-        FROM products p 
-        LEFT JOIN tenants t ON p.tenant_id = t.id
-        LEFT JOIN categories c ON p.category_id = c.id
-        LEFT JOIN brands b ON p.brand_id = b.id
-        LEFT JOIN units u ON p.unit_id = u.id
-        WHERE p.deleted_at IS NULL
-        ORDER BY p.id DESC";
+$listTrashProducts = [];
+
+if ($currentView === 'active') {
+    $sql = "SELECT p.*, t.name AS tenant_name, c.name AS category_name, b.name AS brand_name, u.name AS unit_name 
+            FROM products p 
+            LEFT JOIN tenants t ON p.tenant_id = t.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN brands b ON p.brand_id = b.id
+            LEFT JOIN units u ON p.unit_id = u.id
+            WHERE p.deleted_at IS NULL
+            ORDER BY p.id DESC";
+} else {
+    $sql = "SELECT p.*, t.name AS tenant_name, c.name AS category_name, b.name AS brand_name, u.name AS unit_name 
+            FROM products p 
+            LEFT JOIN tenants t ON p.tenant_id = t.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN brands b ON p.brand_id = b.id
+            LEFT JOIN units u ON p.unit_id = u.id
+            WHERE p.deleted_at IS NOT NULL
+            ORDER BY p.deleted_at DESC";
+}
 
 $fetchQuery = mysqli_query($conn, $sql);
 if ($fetchQuery) {
     while ($row = mysqli_fetch_assoc($fetchQuery)) {
-        $listProducts[] = $row;
+        if ($currentView === 'active') {
+            $listProducts[] = $row;
+        } else {
+            $listTrashProducts[] = $row;
+        }
     }
+}
+
+// Hitung jumlah item di recycle bin
+$countTrashQuery = mysqli_query($conn, "SELECT COUNT(*) AS total FROM products WHERE deleted_at IS NOT NULL");
+$trashCount = 0;
+if ($countTrashQuery) {
+    $trashRow = mysqli_fetch_assoc($countTrashQuery);
+    $trashCount = (int)$trashRow['total'];
 }
 ?>
 
@@ -253,14 +315,30 @@ if ($fetchQuery) {
                     <?php 
                     if ($status == 'success_insert') echo "Data produk berhasil ditambahkan!";
                     elseif ($status == 'success_update') echo "Data produk berhasil diperbarui!";
-                    elseif ($status == 'success_delete') echo "Data produk berhasil dihapus!";
+                    elseif ($status == 'success_delete') echo "Data produk berhasil dipindahkan ke Recycle Bin!";
                     elseif ($status == 'success_restore') echo "Produk berhasil direstore!";
+                    elseif ($status == 'success_permanent_delete') echo "Produk berhasil dihapus permanen!";
                     else echo "Operasi gagal: " . htmlspecialchars($msg);
                     ?>
                 </strong>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         <?php endif; ?>
+
+        <!-- TAB NAVIGASI: Active Products vs Recycle Bin -->
+        <div class="d-flex align-items-center gap-2 mb-4 pb-2" style="border-bottom: 1px solid rgba(148, 163, 184, 0.15);">
+            <a href="products.php" class="btn btn-sm rounded-3 px-4 py-2 fw-medium <?= $currentView === 'active' ? 'btn-success text-white' : 'btn-outline-secondary text-white-50' ?>">
+                <i class="bi bi-box-seam-fill me-1"></i> Produk Aktif
+            </a>
+            <a href="products.php?view=trash" class="btn btn-sm rounded-3 px-4 py-2 fw-medium position-relative <?= $currentView === 'trash' ? 'btn-warning text-dark' : 'btn-outline-secondary text-white-50' ?>">
+                <i class="bi bi-trash-fill me-1"></i> Recycle Bin
+                <?php if ($trashCount > 0): ?>
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem; padding: 0.2rem 0.4rem;">
+                        <?= $trashCount ?>
+                    </span>
+                <?php endif; ?>
+            </a>
+        </div>
 
 <!-- STRUKTUR TABEL LIST DATA PRODUK (BISA DIGESER + TANPA BATANG SCROLL PUTIH) -->
 <div id="dragScrollProductContainer" class="table-responsive rounded-3 drag-scroll-container" style="border: none !important; background: transparent !important; cursor: grab; box-shadow: none !important; -webkit-box-shadow: none !important; overflow-x: auto !important; scrollbar-width: none; -ms-overflow-style: none;">
@@ -293,9 +371,10 @@ if ($fetchQuery) {
             </tr>
         </thead>
         <tbody style="background: transparent !important;">
-            <?php if (!empty($listProducts)): foreach ($listProducts as $row): ?>
-                <?php $isDeleted = !empty($row['deleted_at']); ?>
-                <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem; <?= $isDeleted ? 'opacity: 0.55;' : '' ?>">
+            <?php if ($currentView === 'active'): ?>
+                <!-- ====== TABEL PRODUK AKTIF ====== -->
+                <?php if (!empty($listProducts)): foreach ($listProducts as $row): ?>
+                <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem;">
                     <!-- Kolom ID -->
                     <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $row['id'] ?></td>
                     
@@ -354,66 +433,134 @@ if ($fetchQuery) {
                         <span class="text-white-50" style="font-size: 0.8rem;"><?= htmlspecialchars($row['updated_at'] ?? '-') ?></span>
                     </td>
                     <td class="text-center" style="background: transparent !important; border: none !important;">
-                        <?php if (!empty($row['deleted_at'])): ?>
-                            <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">Terhapus</span>
-                            <div class="text-white-50" style="font-size: 0.75rem; margin-top: 0.25rem;"><?= htmlspecialchars($row['deleted_at']) ?></div>
-                        <?php else: ?>
-                            <span class="text-white-50" style="font-size: 0.8rem;">-</span>
-                        <?php endif; ?>
+                        <span class="text-white-50" style="font-size: 0.8rem;">-</span>
                     </td>
-
-                    <!-- Kolom Status Data (Recycle Bin) -->
                     <td class="text-center" style="background: transparent !important; border: none !important;">
-                        <?php if (!empty($row['deleted_at'])): ?>
-                            <span class="badge bg-secondary-subtle text-white border border-secondary border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">Terhapus</span>
-                        <?php else: ?>
-                            <span class="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">Aktif</span>
-                        <?php endif; ?>
+                        <span class="badge bg-success-subtle text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">Aktif</span>
                     </td>
 
                     <!-- Kolom Aksi -->
                     <td class="text-center" style="background: transparent !important; border: none !important;">
                         <div class="d-flex justify-content-center gap-1">
-                            <?php if (!empty($row['deleted_at'])): ?>
-                                <!-- Produk terhapus: disable Edit/Hapus, tampilkan Restore -->
-                                <button type="button" class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit Produk" disabled style="opacity:.4; cursor:not-allowed;">
-                                    <i class="bi bi-pencil-square"></i>
-                                </button>
-
-                                <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Hapus Produk" disabled style="opacity:.4; cursor:not-allowed;">
-                                    <i class="bi bi-trash-fill"></i>
-                                </button>
-
-                                <a class="btn btn-sm btn-outline-info border-0 rounded-2 text-info" 
-                                   title="Restore Produk"
-                                   href="products.php?action_restore=<?= $row['id'] ?>">
-                                    <i class="bi bi-arrow-counterclockwise"></i>
-                                </a>
-                            <?php else: ?>
-                                <!-- Tombol Edit -->
-                                <button type="button" class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit Produk" 
-                                        onclick='openEditProduct(<?= json_encode($row) ?>)'>
-                                    <i class="bi bi-pencil-square"></i>
-                                </button>
-                                
-                                <!-- Tombol Hapus -->
-                                <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Hapus Produk"
-                                        data-bs-toggle="modal" 
-                                        data-bs-target="#modalConfirmDelete" 
-                                        onclick="document.getElementById('delete_target_name').innerText = '<?php echo addslashes($row['name']); ?>'; document.getElementById('btnConfirmDeleteAction').setAttribute('href', 'products.php?action_delete=<?= $row['id'] ?>')">
-                                    <i class="bi bi-trash-fill"></i>
-                                </button>
-                            <?php endif; ?>
+                            <!-- Tombol Edit -->
+                            <button type="button" class="btn btn-sm btn-outline-success border-0 rounded-2 text-success" title="Edit Produk" 
+                                    onclick='openEditProduct(<?= json_encode($row) ?>)'>
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+                            
+                            <!-- Tombol Hapus (Soft Delete) -->
+                            <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Hapus Produk"
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#modalConfirmDelete" 
+                                    onclick="document.getElementById('delete_target_name').innerText = '<?php echo addslashes($row['name']); ?>'; document.getElementById('btnConfirmDeleteAction').setAttribute('href', 'products.php?action_delete=<?= $row['id'] ?>')">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
                         </div>
                     </td>
                 </tr>
-            <?php endforeach; else: ?>
+                <?php endforeach; else: ?>
                 <tr>
-                    <td colspan="9" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">
+                    <td colspan="13" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">
                         <i class="bi bi-folder-x d-block mb-2" style="font-size: 2rem; color: rgba(148, 163, 184, 0.4);"></i>
                         Tidak ada data produk saat ini.
                     </td>
                 </tr>
+                <?php endif; ?>
+            
+            <?php else: ?>
+                <!-- ====== TABEL RECYCLE BIN (PRODUK TERHAPUS) ====== -->
+                <?php if (!empty($listTrashProducts)): foreach ($listTrashProducts as $row): ?>
+                <tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important; background: transparent !important; font-size: 0.88rem; opacity: 0.75;">
+                    <!-- Kolom ID -->
+                    <td class="text-center fw-semibold" style="color: #94a3b8 !important; background: transparent !important; border: none !important;"><?= $row['id'] ?></td>
+                    
+                    <!-- Kolom Gambar -->
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <?php if (!empty($row['image'])): ?>
+                            <img src="uploads/products/<?= htmlspecialchars($row['image']) ?>" alt="Gambar" class="rounded-2" style="max-height: 45px; max-width: 45px; object-fit: cover; filter: grayscale(0.6);">
+                        <?php else: ?>
+                            <span class="text-muted" style="font-size: 0.75rem;">No Image</span>
+                        <?php endif; ?>
+                    </td>
+                    
+                    <!-- Kolom Nama & Deskripsi Pendek -->
+                    <td class="fw-semibold text-white" style="background: transparent !important; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        <div class="text-truncate" title="<?= htmlspecialchars($row['name']) ?>"><?= htmlspecialchars($row['name']) ?></div>
+                        <div class="text-muted text-truncate fw-normal" style="font-size: 0.75rem;"><?= htmlspecialchars($row['description'] ?: '-') ?></div>
+                    </td>
+                    
+                    <!-- Kolom Tenant & Kategori -->
+                    <td style="background: transparent !important; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        <div class="text-white-50 text-truncate" style="font-size: 0.8rem;"><i class="bi bi-shop me-1"></i><?= htmlspecialchars($row['tenant_name']) ?></div>
+                        <span class="badge bg-secondary-subtle text-secondary border border-secondary border-opacity-25 rounded-2 mt-1" style="font-size: 0.72rem; background: rgba(108, 117, 125, 0.15);"><?= htmlspecialchars($row['category_name']) ?></span>
+                    </td>
+                    
+                    <!-- Kolom SKU & Brand -->
+                    <td style="background: transparent !important; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        <div class="font-monospace text-warning" style="font-size: 0.8rem;"><?= htmlspecialchars($row['sku'] ?: '-') ?></div>
+                        <div class="text-white-50 text-truncate mt-0.5" style="font-size: 0.75rem;"><i class="bi bi-tag me-1"></i><?= htmlspecialchars($row['brand_name'] ?: 'Tanpa Merek') ?></div>
+                    </td>
+
+                    <!-- Kolom Harga Jual -->
+                    <td class="text-end fw-bold text-white" style="background: transparent !important; border: none !important;">
+                        Rp <?= number_format($row['base_price'], 0, ',', '.') ?>
+                    </td>
+                    
+                    <!-- Kolom Stok & Satuan -->
+                    <td class="text-center" style="background: transparent !important; border: none !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        <span class="fw-semibold text-white"><?= $row['stock'] ?></span>
+                        <div class="text-muted" style="font-size: 0.72rem;"><?= htmlspecialchars($row['unit_name'] ?: 'Pcs') ?></div>
+                    </td>
+                    
+                    <!-- Kolom Status Produk -->
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <span class="badge bg-secondary-subtle text-secondary border border-secondary border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">-</span>
+                    </td>
+
+                    <!-- Kolom Audit -->
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <span class="text-white-50" style="font-size: 0.8rem;"><?= htmlspecialchars($row['created_at'] ?? '-') ?></span>
+                    </td>
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <span class="text-white-50" style="font-size: 0.8rem;"><?= htmlspecialchars($row['updated_at'] ?? '-') ?></span>
+                    </td>
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <span class="badge bg-danger text-white border border-danger border-opacity-50 rounded-pill px-2.5 py-1" style="font-size: 0.7rem;">Dihapus</span>
+                        <div class="text-danger" style="font-size: 0.7rem; margin-top: 0.2rem;"><?= htmlspecialchars($row['deleted_at'] ?? '-') ?></div>
+                    </td>
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1" style="font-size: 0.75rem;">Terhapus</span>
+                    </td>
+
+                    <!-- Kolom Aksi (Restore & Permanent Delete) -->
+                    <td class="text-center" style="background: transparent !important; border: none !important;">
+                        <div class="d-flex justify-content-center gap-1">
+                            <!-- Tombol Restore -->
+                            <a class="btn btn-sm btn-outline-info border-0 rounded-2 text-info" 
+                               title="Restore / Pulihkan Produk"
+                               href="products.php?action_restore=<?= $row['id'] ?>&view=trash">
+                                <i class="bi bi-arrow-counterclockwise"></i>
+                            </a>
+
+                            <!-- Tombol Hapus Permanen -->
+                            <button type="button" class="btn btn-sm btn-outline-danger border-0 rounded-2 text-danger" title="Hapus Permanen"
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#modalConfirmPermanentDelete" 
+                                    onclick="document.getElementById('permanent_delete_target_name').innerText = '<?php echo addslashes($row['name']); ?>'; document.getElementById('btnConfirmPermanentDeleteAction').setAttribute('href', 'products.php?action_permanent_delete=<?= $row['id'] ?>&view=trash')">
+                                <i class="bi bi-trash3-fill"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                <?php endforeach; else: ?>
+                <tr>
+                    <td colspan="13" class="text-center py-5 text-muted shadow-none" style="background: transparent !important; border: none !important;">
+                        <i class="bi bi-trash3 d-block mb-2" style="font-size: 2rem; color: rgba(148, 163, 184, 0.4);"></i>
+                        <h6 class="text-white-50">Recycle Bin kosong</h6>
+                        <p class="text-white-50 small">Tidak ada produk yang sudah dihapus.</p>
+                    </td>
+                </tr>
+                <?php endif; ?>
             <?php endif; ?>
         </tbody>
     </table>
@@ -540,7 +687,7 @@ if ($fetchQuery) {
     </div>
 </div>
 
-<!-- Modal Konfirmasi Hapus Produk -->
+<!-- Modal Konfirmasi Hapus Produk (Soft Delete) -->
 <div class="modal fade" id="modalConfirmDelete" tabindex="-1" aria-labelledby="modalConfirmDeleteLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content text-bg-dark border-secondary" style="background-color: #111827 !important; border-color: #374151 !important; border-radius: 16px;">
@@ -559,9 +706,10 @@ if ($fetchQuery) {
           <!-- Ikon Tempat Sampah Besar berwarna Merah -->
           <i class="bi bi-trash3-fill text-danger" style="font-size: 3.5rem;"></i>
         </div>
-        <p class="text-white-50 fs-6 mb-1">Apakah Anda yakin ingin menghapus produk ini?</p>
+        <p class="text-white-50 fs-6 mb-1">Apakah Anda yakin ingin memindahkan produk ini ke Recycle Bin?</p>
         <!-- Tempat nama produk akan muncul secara dinamis -->
         <h6 id="delete_target_name" class="text-warning fw-bold mt-2"></h6>
+        <p class="text-white-50 small mt-2">Produk masih bisa dipulihkan kembali dari Recycle Bin.</p>
       </div>
       
       <!-- Bagian Bawah / Tombol Aksi -->
@@ -569,7 +717,42 @@ if ($fetchQuery) {
         <button type="button" class="btn btn-sm btn-secondary px-4 rounded-3 py-2" data-bs-dismiss="modal" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8;">Batal</button>
         
         <!-- PERBAIKAN: Mengganti button menjadi tag <a> agar fungsi setAttribute('href') dari tabel bekerja sempurna -->
-        <a id="btnConfirmDeleteAction" href="#" class="btn btn-sm btn-danger px-4 rounded-3 py-2 fw-bold d-inline-flex align-items-center justify-content-center">Oke, Hapus</a>
+        <a id="btnConfirmDeleteAction" href="#" class="btn btn-sm btn-danger px-4 rounded-3 py-2 fw-bold d-inline-flex align-items-center justify-content-center">Ya, Pindahkan</a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal Konfirmasi Hapus Permanen -->
+<div class="modal fade" id="modalConfirmPermanentDelete" tabindex="-1" aria-labelledby="modalConfirmPermanentDeleteLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-bg-dark border-secondary" style="background-color: #111827 !important; border-color: #374151 !important; border-radius: 16px;">
+      
+      <!-- Bagian Atas / Header Modal -->
+      <div class="modal-header border-bottom border-secondary">
+        <h5 class="modal-title text-white fw-bold d-flex align-items-center" id="modalConfirmPermanentDeleteLabel">
+          <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i> Hapus Permanen
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <!-- Bagian Tengah / Isi Modal -->
+      <div class="modal-body text-center p-4">
+        <div class="mb-3">
+          <i class="bi bi-trash3-fill text-danger" style="font-size: 3.5rem;"></i>
+        </div>
+        <p class="text-white-50 fs-6 mb-1">Produk ini akan dihapus secara <strong class="text-danger">PERMANEN</strong>!</p>
+        <h6 id="permanent_delete_target_name" class="text-warning fw-bold mt-2"></h6>
+        <p class="text-white-50 small mt-2">Data dan gambar produk akan dihapus selamanya. Tindakan ini <strong class="text-danger">tidak dapat</strong> dibatalkan.</p>
+      </div>
+      
+      <!-- Bagian Bawah / Tombol Aksi -->
+      <div class="modal-footer border-top border-secondary justify-content-center">
+        <button type="button" class="btn btn-sm btn-secondary px-4 rounded-3 py-2" data-bs-dismiss="modal" style="background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.2); color: #94a3b8;">Batal</button>
+        <a id="btnConfirmPermanentDeleteAction" href="#" class="btn btn-sm btn-danger px-4 rounded-3 py-2 fw-bold d-inline-flex align-items-center justify-content-center" style="background-color: #dc2626 !important;">
+          <i class="bi bi-trash3-fill me-1"></i> Ya, Hapus Permanen
+        </a>
       </div>
 
     </div>

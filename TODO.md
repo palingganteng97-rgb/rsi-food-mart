@@ -1,36 +1,30 @@
-# TODO: Perbaikan Mekanisme Penghapusan File
+# Implementation Complete: Recycle Bin / Trash for Products
 
-## Ringkasan
-Berdasarkan hasil analisis dan persetujuan user, file yang perlu diubah:
-- **brands.php** (delete operation)
-- **master_barcode.php** (edit operation)
+## Changes Made
 
-**Tidak diubah** (sudah benar atau tidak diperlukan):
-- **banners.php** (sudah benar — file referensi)
-- **products.php** (soft delete + ada fitur restore → jangan hapus file fisik)
-- **deliveries.php** (sudah mengikuti pola yang benar)
+### 1. `products.php`
+- ✅ **Permanent Delete handler** (`action_permanent_delete`): Deletes record + image file from disk
+- ✅ **View toggle**: Switches between "Produk Aktif" and "Recycle Bin" via `?view=trash` parameter
+- ✅ **Active Products query**: `WHERE p.deleted_at IS NULL` (unchanged)
+- ✅ **Trash Products query**: `WHERE p.deleted_at IS NOT NULL ORDER BY p.deleted_at DESC`
+- ✅ **Trash count badge**: Shows number of deleted products on the Recycle Bin tab
+- ✅ **Recycle Bin table**: Displays photo (with grayscale), name, SKU, category, price, stock, deleted_at date
+- ✅ **Restore button**: Uses existing `action_restore` handler with `&view=trash` redirect
+- ✅ **Permanent Delete button**: Opens confirmation modal, permanently deletes data + image
+- ✅ **Updated soft delete modal**: Clarifies product goes to Recycle Bin (not permanently deleted)
+- ✅ **New permanent delete modal**: Warning that action cannot be undone
+- ✅ All existing CRUD logic preserved
 
----
+### 2. `sidebar.php`
+- ✅ **Recycle Bin menu item** added under "Produk" group
+- ✅ **Smart active detection**: Data Produk highlighted on normal view, Recycle Bin highlighted on trash view
+- ✅ **Produk group opens** when on either products page or trash view
+- ✅ Works in both desktop sidebar and mobile offcanvas
 
-## Step 1: brands.php — Perbaiki Delete Operation
-- [x] Ambil `logo` dari database SEBELUM operasi hapus
-- [x] Cek `file_exists()` → `unlink()` file logo terlebih dahulu
-- [x] Gunakan transaksi (`mysqli_begin_transaction`)
-- [x] `UPDATE products SET brand_id = NULL WHERE brand_id = ?`
-- [x] `DELETE FROM brands WHERE id = ?`
-- [x] `commit()` jika sukses, `rollback()` jika gagal
-- [x] Ganti `@unlink` dengan `error_log()` jika gagal
-
-## Step 2: master_barcode.php — Perbaiki Edit Operation (op=edit)
-- [x] Ambil `room_name` lama dari DB sebelum update
-- [x] Hitung nama file QR lama
-- [x] Update room_name + generate QR baru
-- [x] Jika generate QR baru sukses → hapus file QR lama
-- [x] Jika generate QR baru gagal → jangan hapus file lama
-- [x] Gunakan `file_exists()` dan `error_log()` untuk unlink
-
-## Step 3: Verifikasi Final
-- [x] Pastikan path upload benar sesuai masing-masing modul
-- [x] Pastikan tidak ada `@unlink()` — ganti dengan `error_log()`
-- [x] Pastikan placeholder/default image tidak terhapus
+## Verified
+- ✅ No PHP syntax errors in either file
+- ✅ Database structure unchanged
+- ✅ `home.php` still filters `deleted_at IS NULL` (patient view unaffected)
+- ✅ Soft delete mechanism preserved
+- ✅ Restore sets `deleted_at = NULL` (product returns to active list)
 

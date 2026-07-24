@@ -25,6 +25,7 @@ $currentFile = basename(parse_url($currentUri, PHP_URL_PATH));
 // Mengambil parameter tenant_id dari query string jika ada
 parse_str(parse_url($currentUri, PHP_URL_QUERY) ?? '', $queryParams);
 $currentTenantId = $queryParams['tenant_id'] ?? '';
+$sidebarView = $queryParams['view'] ?? '';
 
 $menu = [
     'dashboard.php' => [ 'href' => 'dashboard.php', 'label' => 'Dashboard', 'icon' => 'bi-speedometer2' ],
@@ -110,19 +111,22 @@ $menu = [
 // =========================================================================
 foreach ($menu as $key => $item) {
     if (isset($item['sub'])) {
-        if (array_key_exists($currentFile, $item['sub'])) {
+        // Cek apakah salah satu sub-menu adalah halaman yang sedang aktif
+        $isInSub = array_key_exists($currentFile, $item['sub']);
+        // Untuk produk, group tetap terbuka jika view=trash (recycle bin)
+        if ($isInSub || ($currentFile === 'products.php' && $key === 'produk_group')) {
             $menu[$key]['class'] .= ' show active';
         }
     }
 }
 
-function activeClass(string $file, string $currentFile, string $currentTenantId): string {
-    // Jika file yang dicek adalah produk, pastikan juga mencocokkan parameter query tenant_id
-    if ($file === 'products.php' && $currentFile === 'products.php') {
-        // Misalkan menu produk default tidak memiliki tenant_id, atau sesuaikan dengan kebutuhan render link Anda
-        return empty($currentTenantId) ? 'active' : '';
+function isSubActive(string $subKey, string $currentFile, string $currentView): string {
+    // Produk Recycle Bin
+    if ($subKey === 'products_trash') {
+        return ($currentFile === 'products_trash.php') ? 'active' : '';
     }
-    return $file === $currentFile ? 'active' : '';
+    // Menu biasa
+    return ($subKey === $currentFile) ? 'active' : '';
 }
 ?>
 
@@ -218,7 +222,7 @@ function activeClass(string $file, string $currentFile, string $currentTenantId)
               <div class="collapse <?= $isSubActive ? 'show' : ''; ?> ms-3" id="dropMenu-<?= $key ?>">
                 <?php foreach ($item['sub'] as $subFile => $subItem): ?>
                   <!-- Sub Menu Di Dalam Grup -->
-                  <a class="nav-link d-flex align-items-center gap-3 <?= ($currentFile === $subFile) ? 'active' : ''; ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding: 0.5rem 1rem 0.5rem 15px;">
+                  <a class="nav-link d-flex align-items-center gap-3 <?= isSubActive($subFile, $currentFile, $sidebarView); ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding: 0.5rem 1rem 0.5rem 15px;">
                     <i class="bi <?= $subItem['icon']; ?> d-inline-block text-center" style="width: 20px;"></i>
                     <span><?= htmlspecialchars($subItem['label']); ?></span>
                   </a>
@@ -275,7 +279,7 @@ function activeClass(string $file, string $currentFile, string $currentTenantId)
               </button>
               <div class="collapse <?= $isSubActive ? 'show' : ''; ?> ms-3" id="dropMobileMenu-<?= $key ?>">
                 <?php foreach ($item['sub'] as $subFile => $subItem): ?>
-                  <a class="nav-link d-flex align-items-center gap-2 <?= ($currentFile === $subFile) ? 'active' : ''; ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding: 0.5rem 1rem 0.5rem 15px; color: #94a3b8;" data-mobile-nav="1">
+                  <a class="nav-link d-flex align-items-center gap-2 <?= isSubActive($subFile, $currentFile, $currentView); ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding: 0.5rem 1rem 0.5rem 15px; color: #94a3b8;" data-mobile-nav="1">
                     <i class="bi <?= $subItem['icon']; ?>"></i><?= htmlspecialchars($subItem['label']); ?>
                   </a>
                 <?php endforeach; ?>
