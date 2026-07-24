@@ -269,7 +269,7 @@ if ($list) {
                     </td>
                     <td class="text-center" style="background: transparent !important; border: none !important;">
                       <div class="d-flex justify-content-center gap-1">
-                        <button class="btn btn-sm btn-outline-warning rounded-2" data-bs-toggle="modal" data-bs-target="#modalVoucher" onclick='openEditVoucher(<?= json_encode($row) ?>)' title="Edit">
+                        <button class="btn btn-sm btn-outline-warning rounded-2" onclick='openEditVoucher(<?= json_encode($row) ?>)' title="Edit">
                           <i class="bi bi-pencil-square"></i>
                         </button>
                         <button class="btn btn-sm btn-outline-danger rounded-2" onclick="triggerDeleteVoucher('vouchers.php?action=delete&id=<?= $row['id'] ?>', '<?= htmlspecialchars($row['code']) ?>')" title="Hapus">
@@ -419,35 +419,6 @@ if ($list) {
   </div>
 </div>
 
-<!-- MODAL KONFIRMASI HAPUS VOUCHER -->
-<div class="modal fade" id="modalConfirmDeleteVoucher" tabindex="-1" aria-labelledby="modalConfirmDeleteVoucherLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content text-bg-dark border-secondary" style="background-color: #111827 !important; border-color: #374151 !important;">
-      
-      <div class="modal-header border-bottom border-secondary">
-        <h5 class="modal-title text-white fw-bold d-flex align-items-center" id="modalConfirmDeleteVoucherLabel">
-          <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i> Konfirmasi Hapus
-        </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      
-      <div class="modal-body text-center p-4">
-        <div class="mb-3">
-          <i class="bi bi-ticket-perforated-fill text-danger" style="font-size: 3.5rem;"></i>
-        </div>
-        <p class="text-light fs-6 mb-1">Apakah Anda yakin ingin menghapus data voucher berikut?</p>
-        <h6 id="delete_voucher_code" class="text-warning fw-bold mt-2 mb-0" style="font-family: monospace; letter-spacing: 1px;"></h6>
-      </div>
-      
-      <div class="modal-footer border-top border-secondary justify-content-center">
-        <button type="button" class="btn btn-secondary px-4 rounded-2" data-bs-dismiss="modal">Batal</button>
-        <button type="button" id="btnConfirmDeleteVoucherAction" class="btn btn-danger px-4 rounded-2 fw-bold">Oke, Hapus</button>
-      </div>
-
-    </div>
-  </div>
-</div>
-
 <!-- JAVASCRIPT LOGIC -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -481,7 +452,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 let deleteVoucherUrlTarget = '';
-let bootstrapDeleteVoucherModalInstance = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     const formVoucher = document.getElementById('formVoucher');
@@ -504,6 +474,35 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // ============================================================
+    // GLOBAL CLEANUP: Safety net untuk semua modal di halaman ini
+    // Memastikan backdrop, class modal-open, dan style body
+    // selalu dikembalikan ke kondisi normal saat modal ditutup.
+    // ============================================================
+    function cleanupModalBackdrop() {
+        // Hapus semua elemen .modal-backdrop yang mungkin tertinggal
+        document.querySelectorAll('.modal-backdrop').forEach(function(el) {
+            el.remove();
+        });
+        // Hapus class modal-open dari body
+        document.body.classList.remove('modal-open');
+        // Kembalikan style overflow dan padding-right ke kondisi semula
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+    }
+
+    // Daftarkan hidden.bs.modal untuk setiap modal yang ada
+    var allModals = document.querySelectorAll('.modal');
+    allModals.forEach(function(modalEl) {
+        // Hindari pendaftaran event listener ganda
+        if (!modalEl.hasAttribute('data-cleanup-registered')) {
+            modalEl.setAttribute('data-cleanup-registered', 'true');
+            modalEl.addEventListener('hidden.bs.modal', function() {
+                cleanupModalBackdrop();
+            });
+        }
+    });
 });
 
 function openTambahVoucher() {
@@ -542,8 +541,12 @@ function openEditVoucher(data) {
     
     const modalElement = document.getElementById('modalVoucher');
     if (modalElement) {
-        const myModal = new bootstrap.Modal(modalElement);
-        myModal.show();
+        // Gunakan getInstance untuk menghindari dual-instance
+        var modalInstance = bootstrap.Modal.getInstance(modalElement);
+        if (!modalInstance) {
+            modalInstance = new bootstrap.Modal(modalElement);
+        }
+        modalInstance.show();
     }
 }
 
@@ -556,10 +559,12 @@ function triggerDeleteVoucher(url, voucherCode) {
     
     const modalElement = document.getElementById('modalConfirmDeleteVoucher');
     if (modalElement) {
-        if (!bootstrapDeleteVoucherModalInstance) {
-            bootstrapDeleteVoucherModalInstance = new bootstrap.Modal(modalElement);
+        // Gunakan getInstance untuk menghindari dual-instance
+        var modalInstance = bootstrap.Modal.getInstance(modalElement);
+        if (!modalInstance) {
+            modalInstance = new bootstrap.Modal(modalElement);
         }
-        bootstrapDeleteVoucherModalInstance.show();
+        modalInstance.show();
     }
 }
 </script>

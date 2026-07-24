@@ -208,7 +208,7 @@ if ($resTenants) {
                 <a href="promos.php" class="btn btn-outline-light rounded-3">Reset</a>
             <?php endif; ?>
         </form>
-        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalPromo" onclick="openTambahPromo()">
+        <button class="btn btn-success rounded-3 px-3 py-2 fw-medium d-flex align-items-center gap-2" onclick="openTambahPromo()">
           <i class="bi bi-tags"></i> Tambah Promo
         </button>
       </div>
@@ -435,8 +435,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
 let deletePromoUrlTarget = '';
 let bootstrapDeletePromoModalInstance = null;
+let bootstrapModalPromoInstance = null;
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Inisialisasi singleton modal #modalPromo — sekali saja
+    const modalElement = document.getElementById('modalPromo');
+    if (modalElement) {
+        bootstrapModalPromoInstance = new bootstrap.Modal(modalElement, {
+            backdrop: true,
+            keyboard: true
+        });
+
+        // Cleanup event hidden.bs.modal — jamin backdrop & class terhapus
+        modalElement.addEventListener('hidden.bs.modal', function() {
+            // Hapus seluruh .modal-backdrop yang mungkin tertinggal
+            document.querySelectorAll('.modal-backdrop').forEach(function(el) {
+                el.remove();
+            });
+            // Hapus class modal-open dari body
+            document.body.classList.remove('modal-open');
+            // Kembalikan style inline body ke kondisi semula
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+        });
+    }
+
     const formPromo = document.getElementById('formPromo');
     if (formPromo) {
         formPromo.addEventListener('submit', function (e) {
@@ -471,6 +494,11 @@ function openTambahPromo() {
         submitBtn.className = "btn btn-success";
         submitBtn.innerText = "Simpan Data";
     }
+    
+    // Gunakan singleton instance — tanpa data-bs-toggle
+    if (bootstrapModalPromoInstance) {
+        bootstrapModalPromoInstance.show();
+    }
 }
 
 function openEditPromo(data) {
@@ -492,10 +520,9 @@ function openEditPromo(data) {
         submitBtn.innerText = "Perbarui Data";
     }
     
-    const modalElement = document.getElementById('modalPromo');
-    if (modalElement) {
-        const myModal = new bootstrap.Modal(modalElement);
-        myModal.show();
+    // Gunakan singleton instance — tidak membuat instance baru
+    if (bootstrapModalPromoInstance) {
+        bootstrapModalPromoInstance.show();
     }
 }
 
@@ -515,17 +542,6 @@ function triggerDeletePromo(url, promoTitle) {
     }
 }
 </script>
-
-<style>
-    .modal-body {
-        overflow-y: auto !important;
-        max-height: calc(100vh - 210px) !important;
-    }
-    .modal-dialog-scrollable .modal-content {
-        max-height: 100% !important;
-        overflow: hidden !important;
-    }
-</style>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

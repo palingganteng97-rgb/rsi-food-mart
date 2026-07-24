@@ -1,30 +1,15 @@
-# Implementation Complete: Recycle Bin / Trash for Products
+# TODO - Perbaikan Bug Modal Backdrop promos.php
 
-## Changes Made
+## Root Cause
+Fungsi `openEditPromo()` membuat instance `new bootstrap.Modal()` baru setiap kali dipanggil → instance ganda mengelola DOM yang sama → event `hidden.bs.modal` bentrok → backdrop tidak bersih.
 
-### 1. `products.php`
-- ✅ **Permanent Delete handler** (`action_permanent_delete`): Deletes record + image file from disk
-- ✅ **View toggle**: Switches between "Produk Aktif" and "Recycle Bin" via `?view=trash` parameter
-- ✅ **Active Products query**: `WHERE p.deleted_at IS NULL` (unchanged)
-- ✅ **Trash Products query**: `WHERE p.deleted_at IS NOT NULL ORDER BY p.deleted_at DESC`
-- ✅ **Trash count badge**: Shows number of deleted products on the Recycle Bin tab
-- ✅ **Recycle Bin table**: Displays photo (with grayscale), name, SKU, category, price, stock, deleted_at date
-- ✅ **Restore button**: Uses existing `action_restore` handler with `&view=trash` redirect
-- ✅ **Permanent Delete button**: Opens confirmation modal, permanently deletes data + image
-- ✅ **Updated soft delete modal**: Clarifies product goes to Recycle Bin (not permanently deleted)
-- ✅ **New permanent delete modal**: Warning that action cannot be undone
-- ✅ All existing CRUD logic preserved
+## Steps
 
-### 2. `sidebar.php`
-- ✅ **Recycle Bin menu item** added under "Produk" group
-- ✅ **Smart active detection**: Data Produk highlighted on normal view, Recycle Bin highlighted on trash view
-- ✅ **Produk group opens** when on either products page or trash view
-- ✅ Works in both desktop sidebar and mobile offcanvas
-
-## Verified
-- ✅ No PHP syntax errors in either file
-- ✅ Database structure unchanged
-- ✅ `home.php` still filters `deleted_at IS NULL` (patient view unaffected)
-- ✅ Soft delete mechanism preserved
-- ✅ Restore sets `deleted_at = NULL` (product returns to active list)
+- [x] Step 1: Hapus `data-bs-toggle` dan `data-bs-target` dari tombol "Tambah Promo" (gunakan JS saja)
+- [x] Step 2: Tambah variabel global `bootstrapModalPromoInstance` (singleton)
+- [x] Step 3: Inisialisasi singleton modal di `DOMContentLoaded` sekali saja
+- [x] Step 4: Tambah event `hidden.bs.modal` untuk cleanup darurat (hapus backdrop, class modal-open, style inline)
+- [x] Step 5: Update `openTambahPromo()` — panggil `bootstrapModalPromoInstance.show()`
+- [x] Step 6: Update `openEditPromo()` — gunakan singleton instance, jangan buat instance baru
+- [x] Step 7: Hapus CSS `.modal-body overflow-y: auto !important` yang bentrok dengan Bootstrap
 
