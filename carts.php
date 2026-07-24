@@ -259,6 +259,22 @@ if ($action === 'update_item' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $cart_items = fetch_cart_items($conn, $cart_id);
 $grand_total = fetch_grand_total($conn, $cart_id);
+
+// AMBIL VOUCHER AKTIF
+$active_vouchers = [];
+$voucher_query = "SELECT id, code, discount_type, discount_value, minimum_purchase, quota 
+                  FROM vouchers 
+                  WHERE status = 1 
+                    AND quota > 0 
+                    AND start_date <= CURDATE() 
+                    AND end_date >= CURDATE() 
+                  ORDER BY id DESC";
+$voucher_res = $conn->query($voucher_query);
+if ($voucher_res) {
+    while ($v = $voucher_res->fetch_assoc()) {
+        $active_vouchers[] = $v;
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -421,7 +437,42 @@ $grand_total = fetch_grand_total($conn, $cart_id);
 
         <div class="d-flex justify-content-between mb-2">
           <span class="text-white-50">Subtotal Produk</span>
-          <span class="fw-semibold text-white"><?php echo money_id($grand_total); ?></span>
+          <span class="fw-semibold text-white" id="summary_subtotal"><?php echo money_id($grand_total); ?></span>
+        </div>
+
+        <!-- VOUCHER SECTION -->
+        <?php if (!empty($active_vouchers)): ?>
+        <div class="mb-3 p-3 rounded-4" style="background: rgba(2,6,23,.35); border: 1px solid rgba(148,163,184,.12);">
+          <label class="form-label text-white-50 small fw-medium mb-2" style="opacity:.85;">
+            <i class="bi bi-ticket-perforated text-warning me-1"></i> Pilih Voucher Diskon
+          </label>
+          <select id="voucher_select" class="form-select text-white border-secondary py-2 px-3" style="background:rgba(2,6,23,0.4); border-radius:10px; font-size:0.9rem;">
+            <option value="">-- Tidak pakai voucher --</option>
+            <?php foreach ($active_vouchers as $v): 
+              $v_id = (int)$v['id'];
+              $v_code = htmlspecialchars($v['code']);
+              $v_type = $v['discount_type'];
+              $v_val = (float)$v['discount_value'];
+              $v_min = (float)$v['minimum_purchase'];
+              $v_quota = (int)$v['quota'];
+              $label_diskon = $v_type === 'percent' ? $v_val.'%' : 'Rp '.number_format($v_val,0,',','.');
+              $label_min = $v_min > 0 ? ' (min. Rp '.number_format($v_min,0,',','.').')' : '';
+            ?>
+              <option value="<?= $v_id ?>" 
+                data-type="<?= $v_type ?>" 
+                data-value="<?= $v_val ?>" 
+                data-minimum="<?= $v_min ?>">
+                <?= $v_code ?> — <?= $label_diskon . $label_min ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+          <div id="voucher_info" class="small mt-2" style="display:none;"></div>
+        </div>
+        <?php endif; ?>
+
+        <div class="d-flex justify-content-between mb-2" id="discount_row" style="display:none;">
+          <span class="text-white-50">Diskon Voucher</span>
+          <span class="fw-semibold text-warning" id="summary_discount">- Rp 0</span>
         </div>
 
         <div class="d-flex justify-content-between mb-4">
@@ -433,7 +484,7 @@ $grand_total = fetch_grand_total($conn, $cart_id);
 
         <div class="d-flex justify-content-between align-items-center mb-4">
           <span class="fw-bold fs-5 text-white">Total Bayar</span>
-          <span class="text-success fw-bold fs-4"><?php echo money_id($grand_total); ?></span>
+          <span class="text-success fw-bold fs-4" id="summary_grand_total"><?php echo money_id($grand_total); ?></span>
         </div>
 
         <?php
@@ -449,6 +500,8 @@ $grand_total = fetch_grand_total($conn, $cart_id);
 
         <form method="POST" action="checkout_process.php" id="formCheckout">
           <input type="hidden" name="payment_method_id" id="payment_method_id" value="">
+          <input type="hidden" name="voucher_id" id="checkout_voucher_id" value="">
+          <input type="hidden" name="discount_amount" id="checkout_discount_amount" value="0">
           <a href="#" class="btn btn-success w-100 rounded-3 py-2 fw-medium d-flex align-items-center justify-content-center gap-2"
              data-bs-toggle="modal" data-bs-target="#modalPilihMetodePembayaran">
               <i class="bi bi-wallet2"></i> Lanjutkan Pemesanan
@@ -762,9 +815,81 @@ $grand_total = fetch_grand_total($conn, $cart_id);
       form.submit();
     }
   }
+
+  // ===== VOUCHER LOGIC =====
+  (function() {
+    const voucherSelect = document.getElementById('voucher_select');
+    if (!voucherSelect) return; // no vouchers available
+
+    const originalGrandTotal = <?= json_encode($grand_total) ?>;
+    const subtotalDisplay = document.getElementById('summary_subtotal');
+    const grandTotalDisplay = document.getElementById('summary_grand_total');
+    const discountRow = document.getElementById('discount_row');
+    const discountDisplay = document.getElementById('summary_discount');
+    const voucherInfo = document.getElementById('voucher_info');
+    const hiddenVoucherId = document.getElementById('checkout_voucher_id');
+    const hiddenDiscountAmt = document.getElementById('checkout_discount_amount');
+
+    function formatMoney(amount) {
+      return 'Rp ' + Math.round(amount).toLocaleString('id-ID');
+    }
+
+    function updateVoucher() {
+      const selected = voucherSelect.options[voucherSelect.selectedIndex];
+      if (!selected || !selected.value) {
+        // No voucher selected
+        discountRow.style.display = 'none';
+        voucherInfo.style.display = 'none';
+        grandTotalDisplay.textContent = formatMoney(originalGrandTotal);
+        if (hiddenVoucherId) hiddenVoucherId.value = '';
+        if (hiddenDiscountAmt) hiddenDiscountAmt.value = '0';
+        return;
+      }
+
+      const type = selected.dataset.type;
+      const value = parseFloat(selected.dataset.value) || 0;
+      const minimum = parseFloat(selected.dataset.minimum) || 0;
+      const voucherId = selected.value;
+
+      // Check minimum purchase
+      if (originalGrandTotal < minimum) {
+        voucherInfo.style.display = 'block';
+        voucherInfo.className = 'small mt-2 text-danger';
+        voucherInfo.innerHTML = '<i class="bi bi-exclamation-circle me-1"></i> Minimal belanja ' + formatMoney(minimum) + ' untuk menggunakan voucher ini.';
+        discountRow.style.display = 'none';
+        grandTotalDisplay.textContent = formatMoney(originalGrandTotal);
+        if (hiddenVoucherId) hiddenVoucherId.value = '';
+        if (hiddenDiscountAmt) hiddenDiscountAmt.value = '0';
+        return;
+      }
+
+      // Calculate discount
+      let discount = 0;
+      if (type === 'percent') {
+        discount = (originalGrandTotal * value) / 100;
+      } else {
+        // nominal
+        discount = Math.min(value, originalGrandTotal);
+      }
+
+      const newTotal = originalGrandTotal - discount;
+
+      // Update UI
+      discountRow.style.display = 'flex';
+      discountDisplay.textContent = '- ' + formatMoney(discount);
+      grandTotalDisplay.textContent = formatMoney(newTotal);
+      voucherInfo.style.display = 'block';
+      voucherInfo.className = 'small mt-2 text-success';
+      voucherInfo.innerHTML = '<i class="bi bi-check-circle me-1"></i> Diskon ' + formatMoney(discount) + ' diterapkan!';
+      
+      if (hiddenVoucherId) hiddenVoucherId.value = voucherId;
+      if (hiddenDiscountAmt) hiddenDiscountAmt.value = discount.toFixed(2);
+    }
+
+    voucherSelect.addEventListener('change', updateVoucher);
+  })();
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-

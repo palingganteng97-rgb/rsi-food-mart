@@ -156,6 +156,54 @@ foreach ($cart_items as $item) {
     $item['final_calculated_price'] = $final_unit_price;
     $processed_cart_items[] = $item;
 }
+
+// ===== VOUCHER DISCOUNT LOGIC =====
+$voucher_id = isset($_POST['voucher_id']) ? (int)$_POST['voucher_id'] : 0;
+$subtotal_before_discount = $grand_total;
+$discount_amount = 0.0;
+$applied_voucher_code = '';
+
+if ($voucher_id > 0) {
+    // Validasi voucher masih aktif & memenuhi syarat
+    $v_check = $conn->prepare("SELECT id, code, discount_type, discount_value, minimum_purchase, quota 
+                               FROM vouchers 
+                               WHERE id = ? AND status = 1 AND quota > 0 
+                               AND start_date <= CURDATE() AND end_date >= CURDATE()");
+    $v_check->bind_param('i', $voucher_id);
+    $v_check->execute();
+    $v_res = $v_check->get_result();
+    
+    if ($v_res && $v_res->num_rows > 0) {
+        $voucher_data = $v_res->fetch_assoc();
+        $v_type = $voucher_data['discount_type'];
+        $v_value = (float)$voucher_data['discount_value'];
+        $v_minimum = (float)$voucher_data['minimum_purchase'];
+        $v_quota = (int)$voucher_data['quota'];
+        $applied_voucher_code = $voucher_data['code'];
+        
+        // Cek minimum purchase
+        if ($grand_total >= $v_minimum) {
+            // Hitung diskon
+            if ($v_type === 'percent') {
+                $discount_amount = ($grand_total * $v_value) / 100;
+            } else {
+                // nominal
+                $discount_amount = min($v_value, $grand_total);
+            }
+            
+            // Kurangi quota voucher
+            $new_quota = $v_quota - 1;
+            $v_update = $conn->prepare("UPDATE vouchers SET quota = ? WHERE id = ?");
+            $v_update->bind_param('ii', $new_quota, $voucher_id);
+            $v_update->execute();
+        }
+    }
+}
+
+// Terapkan diskon ke grand total
+$grand_total = $grand_total - $discount_amount;
+if ($grand_total < 0) $grand_total = 0;
+
 mysqli_begin_transaction($conn);
 try {
     $order_number = "INV-" . date('Ymd') . "-" . rand(1000, 9999);
@@ -163,8 +211,8 @@ try {
     $payment_status = 'unpaid';
     
     // INSERT ke tabel orders
-    $insert_order_query = "INSERT INTO orders (order_number, patient_session_id, tenant_id, grand_total, payment_status, status, created_at) 
-                           VALUES ('$order_number', $patient_session_id, $tenant_id, $grand_total, '$payment_status', '$status', NOW())";
+    $insert_order_query = "INSERT INTO orders (order_number, patient_session_id, tenant_id, subtotal, discount, grand_total, payment_status, status, created_at) 
+                           VALUES ('$order_number', $patient_session_id, $tenant_id, $subtotal_before_discount, $discount_amount, $grand_total, '$payment_status', '$status', NOW())";
     if (!mysqli_query($conn, $insert_order_query)) {
         throw new Exception("Gagal INSERT orders: " . mysqli_error($conn));
     }

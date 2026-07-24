@@ -54,3 +54,15 @@
 {"log_id":"cartlog_6a61be4ed65c96.74690283","compiled_notes_used":"","select_found":false,"select_row":null}
 {"log_id":"cartlog_6a61be4fba1709.75420606","action":"add","method":"POST","cart_id":1,"product_id":3,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":20000}
 {"log_id":"cartlog_6a61be4fba1709.75420606","compiled_notes_used":"","select_found":false,"select_row":null}
+{"log_id":"cartlog_6a62d670a5a8f6.10545188","action":"add","method":"POST","cart_id":4,"product_id":1,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":15000}
+{"log_id":"cartlog_6a62d670a5a8f6.10545188","compiled_notes_used":"","select_found":false,"select_row":null}
+{"log_id":"cartlog_6a62d77b2cfb79.33661530","action":"add","method":"POST","cart_id":5,"product_id":3,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":20000}
+{"log_id":"cartlog_6a62d77b2cfb79.33661530","compiled_notes_used":"","select_found":false,"select_row":null}
+{"log_id":"cartlog_6a62d77bcd4e02.00337852","action":"add","method":"POST","cart_id":5,"product_id":3,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":20000}
+{"log_id":"cartlog_6a62d77bcd4e02.00337852","compiled_notes_used":"","select_found":true,"select_row":{"id":6,"qty":1}}
+{"log_id":"cartlog_6a62d77c7daef2.29734006","action":"add","method":"POST","cart_id":5,"product_id":3,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":20000}
+{"log_id":"cartlog_6a62d77c7daef2.29734006","compiled_notes_used":"","select_found":true,"select_row":{"id":6,"qty":1}}
+{"log_id":"cartlog_6a62d77d2013d4.43156377","action":"add","method":"POST","cart_id":5,"product_id":3,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":20000}
+{"log_id":"cartlog_6a62d77d2013d4.43156377","compiled_notes_used":"","select_found":true,"select_row":{"id":6,"qty":1}}
+{"log_id":"cartlog_6a62d827f02d68.30481440","action":"add","method":"POST","cart_id":5,"product_id":1,"notes_raw":"","notes_trimmed":"","qty_expected":1,"price":15000}
+{"log_id":"cartlog_6a62d827f02d68.30481440","compiled_notes_used":"","select_found":false,"select_row":null}

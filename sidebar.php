@@ -22,7 +22,7 @@ if ($settingsQuery) {
 $currentUri = $_SERVER['REQUEST_URI'] ?? '';
 $currentFile = basename(parse_url($currentUri, PHP_URL_PATH));
 
-// Mengambil parameter tenant_id dari query string jika ada
+// Mengambil parameter dari query string jika ada
 parse_str(parse_url($currentUri, PHP_URL_QUERY) ?? '', $queryParams);
 $currentTenantId = $queryParams['tenant_id'] ?? '';
 $sidebarView = $queryParams['view'] ?? '';
@@ -111,21 +111,23 @@ $menu = [
 // =========================================================================
 foreach ($menu as $key => $item) {
     if (isset($item['sub'])) {
-        // Cek apakah salah satu sub-menu adalah halaman yang sedang aktif
         $isInSub = array_key_exists($currentFile, $item['sub']);
-        // Untuk produk, group tetap terbuka jika view=trash (recycle bin)
         if ($isInSub || ($currentFile === 'products.php' && $key === 'produk_group')) {
-            $menu[$key]['class'] .= ' show active';
+            $menu[$key]['class'] = ' show active';
         }
     }
 }
 
+// Perbaikan fungsi deteksi status aktif link menu produk & trash
 function isSubActive(string $subKey, string $currentFile, string $currentView): string {
-    // Produk Recycle Bin
-    if ($subKey === 'products_trash') {
-        return ($currentFile === 'products_trash.php') ? 'active' : '';
+    if ($currentFile === 'products.php') {
+        if ($subKey === 'products.php' && $currentView !== 'trash') {
+            return 'active';
+        }
+        if ($subKey === 'products_trash' && $currentView === 'trash') {
+            return 'active';
+        }
     }
-    // Menu biasa
     return ($subKey === $currentFile) ? 'active' : '';
 }
 ?>
@@ -169,6 +171,11 @@ function isSubActive(string $subKey, string $currentFile, string $currentView): 
       .content-shift { margin-left: 0 !important; } 
       .d-mobile-none { display: none !important; } /* Menyembunyikan item menu khusus admin di dalam offcanvas */
   }
+
+    /* Hilangkan panah up/down di input number */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
 </style>
 
 <!-- Mobile Topbar -->
@@ -180,17 +187,15 @@ function isSubActive(string $subKey, string $currentFile, string $currentView): 
     <div class="d-flex align-items-center gap-2">
       <!-- Mengganti ikon bi-hospital dengan logo rsi.png dari folder uploads -->
       <div class="logo-badge d-flex align-items-center justify-content-center" aria-hidden="true" style="width: 32px; height: 32px;">
-        <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
+        <img src="uploads/<?php echo rawurlencode('logo rsi.png'); ?>" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
       </div>
       <div class="lh-tight">
-        <div class="fw-bold text-white" style="font-size:.95rem;"><?= $appName ?></div>
-        <div class="text-white-50" style="font-size:.78rem;"><?= $appSlogan ?></div>
+        <div class="fw-bold text-white" style="font-size:.95rem;">RSI FOOD &amp; MART</div>
+        <div class="text-white-50" style="font-size:.78rem;">Pemesanan Makanan Sehat</div>
       </div>
     </div>
-    <div class="d-flex align-items-center gap-2">
-      <div class="text-white-50">
-        <i class="bi bi-moon-stars fs-4"></i>
-      </div>
+    <div class="text-white-50" style="width:38px; text-align:right;">
+      <i class="bi bi-moon-stars fs-4"></i>
     </div>
   </div>
 </nav>
@@ -201,11 +206,11 @@ function isSubActive(string $subKey, string $currentFile, string $currentView): 
     <div class="app-brand">
       <!-- Mengganti ikon bi-hospital dengan logo rsi.png dari folder uploads -->
       <div class="logo-badge d-flex align-items-center justify-content-center" aria-hidden="true" style="width: 32px; height: 32px;">
-        <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
+        <img src="uploads/<?php echo rawurlencode('logo rsi.png'); ?>" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
       </div>
       <div>
-        <div class="fw-bold" style="letter-spacing:.2px;"><?= $appName ?></div>
-        <div class="text-white-50" style="font-size:.82rem;"><?= $appSlogan ?></div>
+        <div class="fw-bold" style="letter-spacing:.2px;">RSI FOOD &amp; MART</div>
+        <div class="text-white-50" style="font-size:.82rem;">Pemesanan Makanan Sehat</div>
       </div>
     </div>
     <div class="sidebar-scroll-container">
@@ -222,7 +227,7 @@ function isSubActive(string $subKey, string $currentFile, string $currentView): 
               <div class="collapse <?= $isSubActive ? 'show' : ''; ?> ms-3" id="dropMenu-<?= $key ?>">
                 <?php foreach ($item['sub'] as $subFile => $subItem): ?>
                   <!-- Sub Menu Di Dalam Grup -->
-                  <a class="nav-link d-flex align-items-center gap-3 <?= isSubActive($subFile, $currentFile, $sidebarView); ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding: 0.5rem 1rem 0.5rem 15px;">
+                  <a class="nav-link d-flex align-items-center gap-3 <?= ($currentFile === $subFile) ? 'active' : ''; ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding: 0.5rem 1rem 0.5rem 15px;">
                     <i class="bi <?= $subItem['icon']; ?> d-inline-block text-center" style="width: 20px;"></i>
                     <span><?= htmlspecialchars($subItem['label']); ?></span>
                   </a>
@@ -253,50 +258,50 @@ function isSubActive(string $subKey, string $currentFile, string $currentView): 
 <div class="offcanvas offcanvas-start text-white" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel" style="background:#0b1223; border-right:1px solid rgba(148,163,184,.25);">
   <div class="offcanvas-header">
     <div class="d-flex align-items-center gap-2">
+      <!-- Mengganti ikon bi-hospital dengan logo rsi.png dari folder uploads -->
       <div class="logo-badge d-flex align-items-center justify-content-center" aria-hidden="true" style="width: 32px; height: 32px;">
-        <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
+        <img src="uploads/<?php echo rawurlencode('logo rsi.png'); ?>" alt="Logo RSI" style="height: 100%; width: 100%; object-fit: contain;">
       </div>
       <div>
-        <div class="fw-bold"><?= $appName ?></div>
-        <div class="text-white-50" style="font-size:.82rem;"><?= $appSlogan ?></div>
+        <div class="fw-bold">RSI FOOD &amp; MART</div>
+        <div class="text-white-50" style="font-size:.82rem;">Menu Pasien</div>
       </div>
     </div>
     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
   </div>
   <div class="offcanvas-body d-flex flex-column justify-content-between p-0">
-    <div class="sidebar-scroll-container py-3" style="overflow-y: auto; flex-grow: 1;">
+    <div class="sidebar-scroll-container py-3">
       <div class="navmenu">
         <?php foreach ($menu as $key => $item): ?>
-          
-          <?php if (isset($item['sub'])): $isSubActive = array_key_exists($currentFile, $item['sub']); ?>
-            <!-- JIKA BERBENTUK GRUP DROPDOWN (Tenants, Master Data, Produk, dll) -->
+          <!-- PERBAIKAN: Filter pembatasan menu mobile telah dihapus agar semua data menu muncul -->
+
+          <?php if (isset($item['sub'])): 
+              // Menyesuaikan logika deteksi sub-menu aktif agar dropdown otomatis terbuka di mobile
+              $isSubActive = array_key_exists($currentFile, $item['sub']) || ($currentFile === 'products.php' && $key === 'produk_group'); 
+          ?>
             <div class="w-100 mb-1 <?= $item['class'] ?? ''; ?>">
-              <button class="nav-link w-100 border-0 text-start d-flex align-items-center justify-content-between gap-2 <?= $isSubActive ? 'active' : ''; ?>" data-bs-toggle="collapse" data-bs-target="#dropMobileMenu-<?= $key ?>" aria-expanded="<?= $isSubActive ? 'true' : 'false'; ?>" style="background:transparent; color:inherit; padding: 0.6rem 1rem;" data-mobile-nav="1">
-                <div class="d-flex align-items-center gap-2">
-                  <i class="bi <?= $item['icon']; ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
-                </div>
-                <i class="bi bi-chevron-down small transition-arrow" style="transition: transform 0.2s; font-size: 0.75rem; opacity: 0.7;"></i>
+              <button class="nav-link w-100 border-0 text-start d-flex align-items-center gap-2 <?= $isSubActive ? 'active' : ''; ?>" data-bs-toggle="collapse" data-bs-target="#dropMobileMenu-<?= $key ?>" aria-expanded="<?= $isSubActive ? 'true' : 'false'; ?>" style="background:transparent; color:inherit;" data-mobile-nav="1">
+                <i class="bi <?= $item['icon']; ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
+                <i class="bi bi-chevron-down small transition-arrow" style="transition: transform 0.2s; font-size: 0.75rem; opacity: 0.7; margin-left: auto;"></i>
               </button>
               <div class="collapse <?= $isSubActive ? 'show' : ''; ?> ms-3" id="dropMobileMenu-<?= $key ?>">
                 <?php foreach ($item['sub'] as $subFile => $subItem): ?>
-                  <a class="nav-link d-flex align-items-center gap-2 <?= isSubActive($subFile, $currentFile, $currentView); ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding: 0.5rem 1rem 0.5rem 15px; color: #94a3b8;" data-mobile-nav="1">
-                    <i class="bi <?= $subItem['icon']; ?>"></i><?= htmlspecialchars($subItem['label']); ?>
+                  <a class="nav-link <?= isSubActive($subFile, $currentFile, $sidebarView) ? 'active' : ''; ?>" href="<?= htmlspecialchars($subItem['href']); ?>" style="font-size:0.85rem; padding-left:15px;" data-mobile-nav="1">
+                    <i class="bi <?= $subItem['icon']; ?> me-2"></i><?= htmlspecialchars($subItem['label']); ?>
                   </a>
                 <?php endforeach; ?>
               </div>
             </div>
           <?php else: ?>
-            <!-- JIKA BERBENTUK SINGLE LINK MENU biasa (Dashboard, Master Barcode, User, dll) -->
-            <a class="nav-link d-flex align-items-center gap-2 <?= ($currentFile === $key) ? 'active' : ''; ?> <?= $item['class'] ?? ''; ?>" href="<?= htmlspecialchars($item['href'] ?? '#'); ?>" style="padding: 0.6rem 1rem;" data-mobile-nav="1">
-              <i class="bi <?= htmlspecialchars($item['icon'] ?? 'bi-link'); ?>"></i><span><?= htmlspecialchars($item['label'] ?? $key); ?></span>
+            <a class="nav-link <?= ($currentFile === $key) ? 'active' : ''; ?> <?= $item['class'] ?? ''; ?>" href="<?= htmlspecialchars($item['href']); ?>" data-mobile-nav="1">
+              <i class="bi <?= htmlspecialchars($item['icon']); ?>"></i><span><?= htmlspecialchars($item['label']); ?></span>
             </a>
           <?php endif; ?>
-
         <?php endforeach; ?>
       </div>
     </div>
-    <div class="sidebar-footer w-100" style="border-top: 1px solid rgba(148,163,184,.15); background: rgba(15,23,42,.3);">
-        <button type="button" class="btn-logout d-flex align-items-center gap-3 w-100 border-0 text-start" data-bs-toggle="modal" data-bs-target="#logoutModal" style="padding: 0.8rem 1rem; background: transparent; color: #ef4444; font-weight: 600;">
+    <div class="sidebar-footer w-100">
+        <button type="button" class="btn-logout d-flex align-items-center gap-3 w-100 border-0 text-start" data-bs-toggle="modal" data-bs-target="#logoutModal" style="padding: 0.6rem 1rem; background: transparent; color: #ef4444; font-weight: 600;">
             <i class="bi bi-box-arrow-left"></i><span>Logout</span>
         </button>
     </div>
@@ -316,14 +321,14 @@ function isSubActive(string $subKey, string $currentFile, string $currentView): 
             
             <div class="modal-body text-center pt-0 px-4">
                 <div class="mb-3">
-                    <img src="uploads/logo rsi.png" alt="Logo RSI" style="height: 65px; object-fit: contain;">
+                    <img src="<?php echo $basePath; ?>/uploads/logo rsi.png" alt="Logo RSI" style="height: 65px; object-fit: contain;">
                 </div>
                 <h5 class="modal-title fw-bold mb-2" id="logoutModalLabel">Konfirmasi Keluar</h5>
-<p class="text-white-50 small mb-4">Apakah Anda yakin ingin keluar dari sistem keamanan aplikasi <?= $appName ?>?</p>
+                <p class="text-white-50 small mb-4">Apakah Anda yakin ingin keluar dari sistem keamanan aplikasi RSI FOOD &amp; MART?</p>
                 
                 <div class="row g-2 justify-content-center mt-3">
                     <div class="col-12">
-                        <a href="logout.php" class="btn btn-danger fw-bold py-2.5 rounded-3 border-2 border-dark shadow-sm text-white w-100" style="box-shadow: 3px 3px #000 !important; background-color: #dc2626 !important; border-color: #323232 !important;">
+                        <a href="<?php echo $basePath; ?>/auth/logout.php" class="btn btn-danger fw-bold py-2.5 rounded-3 border-2 border-dark shadow-sm text-white w-100" style="box-shadow: 3px 3px #000 !important; background-color: #dc2626 !important; border-color: #323232 !important;">
                             <i class="bi bi-box-arrow-left me-2"></i> Ya, Keluar Sekarang
                         </a>
                     </div>
@@ -434,5 +439,4 @@ function isSubActive(string $subKey, string $currentFile, string $currentView): 
     });
   })();
 </script>
-<script src="notifications.js?v=1.0"></script>
 
