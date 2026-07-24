@@ -85,7 +85,7 @@ if (isset($_SESSION['flash_error'])) {
                 </button>
 
                 <div class="d-flex align-items-center justify-content-between mt-2" style="font-size: 0.85rem;">
-                    <a class="text-decoration-none text-white-50" href="lupa-password.php">Lupa Password?</a>
+                    <a class="text-decoration-none text-white-50" href="lupa_password.php">Lupa Password?</a>
                     <a class="text-decoration-none text-white-50" href="register.php">Daftar Akun Baru</a>
                 </div>
             </form>
