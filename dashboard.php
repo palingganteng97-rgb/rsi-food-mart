@@ -43,83 +43,111 @@ $userName = $_SESSION['name'] ?? 'Admin';
 <body>
     <?php require __DIR__ . '/sidebar.php'; ?>
 
-    <main class="content-shift p-4">
-        <div class="container-fluid" style="max-width: 1200px;">
-            <div class="d-flex align-items-center justify-content-between mb-4 pb-3" style="border-bottom: 1px solid rgba(148,163,184,.15);">
-                <div>
-                    <h2 class="fw-bold m-0">Dashboard Admin</h2>
-                    <div class="text-white-50" style="font-size:.9rem;">Halo, <?php echo htmlspecialchars($userName); ?></div>
-                </div>
-                <div class="d-flex gap-2">
-                    <a href="admin/orders.php" class="btn btn-success rounded-3 fw-medium d-flex align-items-center gap-2">
-                        <i class="bi bi-receipt-cutoff"></i> Lihat Pesanan
-                    </a>
-                    <a href="admin/products.php" class="btn btn-outline-success rounded-3 fw-medium d-flex align-items-center gap-2">
-                        <i class="bi bi-bag"></i> Kelola Produk
-                    </a>
-                </div>
+<main class="content-shift p-4">
+    <div class="container-fluid" style="max-width: 1200px;">
+        <div class="d-flex align-items-center justify-content-between mb-4 pb-3" style="border-bottom: 1px solid rgba(148,163,184,.15);">
+            <div>
+                <h2 class="fw-bold m-0">Dashboard Admin</h2>
+                <div class="text-white-50" style="font-size:.9rem;">Halo, <?php echo htmlspecialchars($userName); ?></div>
             </div>
+            <div class="d-flex gap-2">
+                <a href="orders.php" class="btn btn-success rounded-3 fw-medium d-flex align-items-center gap-2">
+                    <i class="bi bi-receipt-cutoff"></i> Lihat Pesanan
+                </a>
+                <a href="products.php" class="btn btn-outline-success rounded-3 fw-medium d-flex align-items-center gap-2">
+                    <i class="bi bi-bag"></i> Kelola Produk
+                </a>
+            </div>
+        </div>
 
-            <div class="row g-3">
-                <div class="col-md-6 col-lg-4">
-                    <div class="card text-white" style="background: rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.2); border-radius: 18px;">
-                        <div class="card-body">
-                            <div class="d-flex align-items-start justify-content-between">
-                                <div>
-                                    <div class="text-white-50 small">Menu</div>
-                                    <div class="fw-bold fs-5">Katalog Pasien</div>
-                                </div>
-                                <i class="bi bi-shop" style="font-size: 1.6rem; color: var(--green);"></i>
-                            </div>
-                            <div class="mt-3">
-                                <a href="home_admin.php" class="btn btn-success w-100 rounded-3 fw-medium">
-                                    Buka Home Pasien
-                                </a>
-                            </div>
+    <div class="row g-3">
+        <!-- Tenants --->
+        <div class="col-md-6 col-lg-4">
+            <div class="card text-white" style="background: rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.2); border-radius: 18px;">
+                <div class="card-body">
+                    <div class="d-flex align-items-start justify-content-between">
+                        <div>
+                            <div class="text-white-50 small">Menu</div>
+                            <div class="fw-bold fs-5">Tenants</div>
                         </div>
+                        <i class="bi bi-building-gear" style="font-size: 1.6rem; color: var(--green);"></i>
                     </div>
-                </div>
-
-                <div class="col-md-6 col-lg-4">
-                    <div class="card text-white" style="background: rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.2); border-radius: 18px;">
-                        <div class="card-body">
-                            <div class="d-flex align-items-start justify-content-between">
-                                <div>
-                                    <div class="text-white-50 small">Pesanan</div>
-                                    <div class="fw-bold fs-5">Tracking / Status</div>
-                                </div>
-                                <i class="bi bi-clock-history" style="font-size: 1.6rem; color: var(--green);"></i>
-                            </div>
-                            <div class="mt-3">
-                                <a href="orders.php" class="btn btn-outline-success w-100 rounded-3 fw-medium">
-                                    Kelola Pesanan
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-12 col-lg-4">
-                    <div class="card text-white" style="background: rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.2); border-radius: 18px;">
-                        <div class="card-body">
-                            <div class="d-flex align-items-start justify-content-between">
-                                <div>
-                                    <div class="text-white-50 small">Master Data</div>
-                                    <div class="fw-bold fs-5">Kategori, Brand, Units</div>
-                                </div>
-                                <i class="bi bi-layers-half" style="font-size: 1.6rem; color: var(--green);"></i>
-                            </div>
-                            <div class="mt-3 d-flex gap-2 flex-wrap">
-                                <a href="categories.php" class="btn btn-outline-success rounded-3 fw-medium">Kategori</a>
-                                <a href="brands.php" class="btn btn-outline-success rounded-3 fw-medium">Brand</a>
-                                <a href="units.php" class="btn btn-outline-success rounded-3 fw-medium">Units</a>
-                            </div>
-                        </div>
+                    <div class="mt-3">
+                        <!-- PERBAIKAN: Mengubah btn-success menjadi btn-outline-success agar transparan -->
+                        <a href="tenants.php" class="btn btn-outline-success w-100 rounded-3 fw-medium">
+                            Kelola Tenants
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
-    </main>
+
+        <!-- Produk --->
+        <div class="col-md-6 col-lg-4">
+            <div class="card text-white" style="background: rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.2); border-radius: 18px;">
+                <div class="card-body">
+                    <div class="d-flex align-items-start justify-content-between">
+                        <div>
+                            <div class="text-white-50 small">Menu</div>
+                            <div class="fw-bold fs-5">Produk</div>
+                        </div>
+                        <i class="bi bi-box-seam-fill" style="font-size: 1.6rem; color: var(--green);"></i>
+                    </div>
+                    <div class="mt-3">
+                        <!-- PERBAIKAN: Mengubah btn-success menjadi btn-outline-success agar transparan -->
+                        <a href="products.php" class="btn btn-outline-success w-100 rounded-3 fw-medium">
+                            Kelola Produk
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pesanan --->
+        <div class="col-md-6 col-lg-4">
+            <div class="card text-white" style="background: rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.2); border-radius: 18px;">
+                <div class="card-body">
+                    <div class="d-flex align-items-start justify-content-between">
+                        <div>
+                            <div class="text-white-50 small">Pesanan</div>
+                            <div class="fw-bold fs-5">Tracking / Status</div>
+                        </div>
+                        <!-- PERBAIKAN: Ikon diganti menjadi bi-cart-check agar sesuai dengan menu Pesanan -->
+                        <i class="bi bi-cart-check" style="font-size: 1.6rem; color: var(--green);"></i>
+                    </div>
+                    <div class="mt-3">
+                        <a href="orders.php" class="btn btn-outline-success w-100 rounded-3 fw-medium">
+                            Kelola Pesanan
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Master Data --->
+        <div class="col-md-12 col-lg-4">
+            <div class="card text-white" style="background: rgba(15,23,42,.55); border:1px solid rgba(148,163,184,.2); border-radius: 18px;">
+                <div class="card-body">
+                    <div class="d-flex align-items-start justify-content-between">
+                        <div>
+                            <div class="text-white-50 small">Master Data</div>
+                            <div class="fw-bold fs-5">Kategori, Brand, Units</div>
+                        </div>
+                        <!-- PERBAIKAN: Ikon diganti menjadi bi-database-fill-gear agar sesuai dengan karakteristik Master Data -->
+                        <i class="bi bi-database-fill-gear" style="font-size: 1.6rem; color: var(--green);"></i>
+                    </div>
+                    <div class="mt-3 d-flex gap-2 flex-wrap">
+                        <a href="categories.php" class="btn btn-outline-success rounded-3 fw-medium">Kategori</a>
+                        <a href="brands.php" class="btn btn-outline-success rounded-3 fw-medium">Brand</a>
+                        <a href="units.php" class="btn btn-outline-success rounded-3 fw-medium">Units</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        </div>
+    </div>
+</main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
